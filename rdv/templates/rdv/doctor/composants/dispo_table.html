@@ -1,0 +1,33 @@
+<table class="data-table">
+      <thead>
+        <tr>
+          <th>Jour</th>
+          <th>Heure début</th>
+          <th>Heure fin</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="dispo-tbody">
+        {% for dispo in page_obj.object_list %}
+          <tr data-slot-id="{{ dispo.id }}">
+            <td>{{ dispo.jour }}</td>
+            <td>{{ dispo.heure_debut|time:"H:i" }}</td>
+            <td>{{ dispo.heure_fin|time:"H:i" }}</td>
+            <td>
+              <button class="action-btn-edit" data-slot-id="{{ dispo.id }}">
+                <i class='bx bxs-edit'></i>
+              </button>
+              <button
+                class="action-btn-delete"
+                data-delete-url="{% url 'rdv:disponibilite_delete' dispo.id %}">
+                <i class='bx bxs-trash-alt'></i>
+              </button>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="4" class="text-center">Aucune disponibilité trouvée.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>

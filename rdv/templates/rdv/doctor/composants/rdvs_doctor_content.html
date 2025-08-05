@@ -1,0 +1,73 @@
+{% load static %}
+
+<div class="section-header">
+    <div>
+        <h2>Mes Rendez-vous</h2>
+        <p>Gère tes Mes Rendez-vous</p>
+    </div>
+</div>
+
+<div id="rdv-content" class="rdv-content">
+    <form id="filter-form" class="search-filter-bar">
+        <div class="search-filter-bar">
+            <i class="bx bx-search search-icon"></i>
+            <input
+                type="search"
+                id="search-input"
+                value="{{ search_query }}"
+                placeholder="Rechercher par jour ou heure de début…"
+            />
+        </div>
+        <select class="filter-select">
+            <option>Tous les statuts</option>
+            <option>Programmé</option>
+            <option>Confirmé</option>
+            <option>Annulé</option>
+            <option>Terminé</option>
+        </select>
+        <input type="date" class="date-input" placeholder="jj/mm/aaaa"/>
+    </form>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Heure</th>
+                <th>Patient</th>
+                <th>Motif</th>
+                <th>Statut</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for rdv in rdvs %}
+            <tr>
+                <td>{{ rdv.date_heure_rdv|date:"d/m/Y" }}</td>
+                <td>{{ rdv.date_heure_rdv|time:"H:i" }}</td>
+                <td>{{ rdv.patient.user.nom }}</td>
+                <td>{{ rdv.motif }}</td>
+                <td>
+                    {% if rdv.motif %}
+                    {{ rdv.motif }}
+                    {% else %}
+                    Aucune information
+                    {% endif %}
+                </td>
+                <td><span class="stat">{{ rdv.statut }}</span></td>
+                <td>
+                    <a href="{% url 'rdv:modifier_rendez_vous' rdv.id %}" class="action-btn-edit">
+                        <i class='bx bxs-edit' style='color:#20a52d'  ></i>
+                    </a>
+                    <a href="{% url 'rdv:supprimer_rendez_vous' rdv.id %}" class="action-btn-delete">
+                        <i class='bx bxs-trash' style='color:#ff0000' ></i>
+                    </a>
+                </td>
+            </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="5" style="text-align:center; color:#6c757d;">Aucun Rendez-vous.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+</div>

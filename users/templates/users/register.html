@@ -1,0 +1,49 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+    <head>
+        <meta charset="utf-8">
+        <title>register</title>
+        <link rel="stylesheet" href="{% static 'users/css/register.css' %}"> 
+
+          <!-- ICONES -->
+        <link rel="stylesheet" href="{% static 'rdv/css/boxicons.min.css' %}">
+        <link rel="stylesheet" href="{% static 'rdv/css/animations.css' %}">
+        <link rel="stylesheet" href="{% static 'rdv/css/transformations.css' %}">
+    </head>
+    <body>
+        <div class="register-container">
+            <div class="register-header">
+                <div class="logo">
+                    <div class="logo-icon">M</div>
+                    <div class="logo-text">MedicalCare</div>
+                </div>
+                <h1 class="auth-title">Inscription</h1>
+                <p class="auth-subtitle">Incrivez-vous pour bénéficier de nos services</p>
+            </div>
+            <div class="contenu">
+                {% for message in messages %}
+                    <p>{{ message }}</p>
+                {% endfor %}
+
+                <form id="inscription-form" method="post" action="{% url 'users:register' %}">
+                    {% csrf_token %}
+                    {{ form.as_p }}
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">
+                            <i class='bx bxs-save'></i>
+                            <span>Enregistrer</span>
+                        </button>
+                    </div>
+                </form>
+
+                <p>J'ai déjà un compte ? <a href="{% url 'users:login' %}">me connecter !</a></p>
+
+            </div>
+        </div>
+
+        <script defer src="{% static 'rdv/js/admin/users/user_forms.js.js' %}"></script>
+        
+    </body>
+</html>
+

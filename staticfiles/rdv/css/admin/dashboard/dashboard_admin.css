@@ -1,0 +1,34 @@
+/* Layout global pour le dashboard */
+.container {
+  max-width: 1200px;
+  height: 100%;
+  margin: 0;
+  padding: 1rem 1rem;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 0rem;
+}
+
+.content-grid {
+  display: flex;               /* aligne les enfants côte à côte */
+    justify-content: space-between; /* espace entre les cartes */
+    align-items: stretch;        /* même hauteur */
+    gap: 1.5rem;                 /* espace entre les cartes */
+    width: 100%;                 /* prend toute la largeur */
+    padding: 1rem;               /* marge intérieure */
+    box-sizing: border-box;
+}
+
+.content-grid .card {
+    flex: 1 1 50%;               /* chaque carte prend ~50% */
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    padding: 1rem;
+    box-sizing: border-box;
+}
+

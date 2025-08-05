@@ -1,0 +1,14 @@
+{% extends 'rdv/admin/base_admin.html' %}
+{% load static %}
+{% block extra_block %}
+    {% include 'rdv/admin/composants/menu_admin.html' %}
+{% endblock %}
+{% block content %}
+
+{% include 'rdv/admin/rdvs/composants/rdvs_content.html' %}
+
+{% endblock %}
+
+{% block extra_js %}
+    {{ block.super }}
+{% endblock %}

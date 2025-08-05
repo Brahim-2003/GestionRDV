@@ -1,0 +1,45 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+    <head>
+        <meta charset="utf-8">
+        <title>login</title>
+        <link rel="stylesheet" href="{% static 'users/css/login.css' %}"> 
+          <!-- ICONES -->
+        <link rel="stylesheet" href="{% static 'rdv/css/boxicons.min.css' %}">
+        <link rel="stylesheet" href="{% static 'rdv/css/animations.css' %}">
+        <link rel="stylesheet" href="{% static 'rdv/css/transformations.css' %}">
+    </head>
+    <body>
+        <div class="auth-container">
+            <div class="auth-header">
+                <div class="logo">
+                    <div class="logo-icon">M</div>
+                    <div class="logo-text">MedicalCare</div>
+                </div>
+                <h1 class="auth-title">Bienvenue</h1>
+                <p class="auth-subtitle">Connectez-vous à votre compte</p>
+            </div>
+            
+            <div class="contenu">
+
+                {% for message in messages %}
+                    <p>{{ message }}</p>
+                {% endfor %}
+
+                <form method="post">
+                    {% csrf_token %}
+                    {{ form.as_p }}
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">
+                            <i class='bx bxs-log-in'></i>
+                            <span>Connecter</span>
+                        </button>
+                    </div>
+                </form>
+
+                <p>Pas de compte ? <a href="{% url 'users:register' %}">m'inscrire !</a></p>
+            </div>
+        </div>
+    </body>
+</html>

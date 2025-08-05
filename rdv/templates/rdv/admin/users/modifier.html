@@ -1,0 +1,38 @@
+{% load static %}
+<link rel="stylesheet" href="{% static 'rdv/css/admin/users/ajouter.css' %}">
+
+  <!-- ICONES -->
+  <link rel="stylesheet" href="{% static 'rdv/css/boxicons.min.css' %}">
+  <link rel="stylesheet" href="{% static 'rdv/css/animations.css' %}">
+  <link rel="stylesheet" href="{% static 'rdv/css/transformations.css' %}">
+
+<div class="form-wrapper">
+    <div class="form-container">
+        <h2 class="form-title">Modifier un utilisateur</h2>
+        <p class="form-subtitle">Complétez le formulaire pour modifier les informations d'utilisateur.</p>
+        {% if messages %}
+            <div class="messages">
+                {% for message in messages %}
+                    <div class="alert alert-success">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        <form method="post">
+            {% csrf_token %}
+            {{ form.as_p }}
+
+            <div class="form-actions">
+                <button type="submit" class="btn-primary">
+                    <i class='bx bxs-save'></i>
+                    <span>Enregistrer</span>
+                </button>
+                <a href="{% url 'users:list_users' %}" class="btn-secondary">
+                    <i class='bx bxs-left-arrow-alt'></i>
+                    <span>Annuler</span>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+

@@ -1,0 +1,16 @@
+{% load custom_tags %}
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">Rendez-vous cette semaine</h3>
+  </div>
+  <div class="card-body">
+    <ul class="schedule-list">
+      {% for count in rendez_vous_jour %}
+      <li class="schedule-item">
+        <span class="day-name">{{ jours_semaine|index:forloop.counter0 }}</span>
+        <span class="appointment-count">{{ count }}</span>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>

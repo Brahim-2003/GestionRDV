@@ -1,0 +1,163 @@
+/* En-tête de section */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 10px 20px;
+}
+
+.section-header h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+  color: #22223b;
+}
+
+.section-header p {
+  color: #6c757d;
+  margin: 2px 0 0;
+  font-size: 0.875rem;
+}
+
+/* Conteneur général : ligne flex, remplit la largeur */
+.search-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;                    /* espace entre les éléments */
+  width: 100%;
+  margin-bottom: 16px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  padding: 8px 12px;
+}
+
+/* Tous les enfants directs s’étendent également */
+.search-filter-bar > * {
+  flex: 1 1 0;                  /* grow, shrink, base 0 */
+  min-width: 0;                 /* pour éviter le overflow */
+}
+
+/* Spécifique à la recherche (icône + input) */
+.search-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+/* Icône loupe */
+.search-input-container .search-icon {
+  position: absolute;
+  left: 12px;
+  font-size: 18px;
+  color: #6c757d;
+  pointer-events: none;
+}
+
+/* Input recherche dans son container */
+.search-input-container input[type="search"] {
+  width: 100%;
+  padding: 8px 12px 8px 36px;  /* laisse la place pour l’icône */
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  background: #f8f9fa;
+  transition: border-color .2s, box-shadow .2s;
+}
+
+.search-input-container input[type="search"]:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 0 .1rem rgba(0,123,255,.25);
+  outline: none;
+}
+
+/* Styles communs pour select et date-input */
+.search-filter-bar select,
+.search-filter-bar .date-input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  background: #f8f9fa;
+  font-size: 0.875rem;
+  transition: border-color .2s, box-shadow .2s;
+}
+
+.search-filter-bar select:focus,
+.search-filter-bar .date-input:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 0 .1rem rgba(0,123,255,.25);
+  outline: none;
+}
+
+
+
+/* Tableau */
+.data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(60, 72, 88, 0.06);
+}
+.data-table th, .data-table td {
+  padding: 12px;
+  text-align: left;
+}
+.data-table thead th {
+  background: #f1f5f9;
+  color: #22223b;
+  font-weight: 600;
+  font-size: 0.875rem;
+  border-bottom: 1px solid #e0e6ed;
+}
+.data-table tbody tr {
+  border-bottom: 1px solid #e0e6ed;
+}
+.data-table tbody tr:last-child {
+  border-bottom: none;
+}
+.data-table td {
+  font-size: 0.875rem;
+  color: #22223b;
+}
+
+/* Actions */
+.action-btn-edit{
+  color: rgb(44, 233, 44);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  margin-right: 0.5rem;
+  transition: transform 0.2s;
+}
+
+.action-btn-delete {
+  color: rgb(232, 71, 71);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  margin-right: 0.5rem;
+  transition: transform 0.2s;
+}
+.action-btn-edit:hover {
+  transform: scale(1.1);
+  color: #157f20;
+}
+.action-btn-delete:hover {
+  transform: scale(1.1);
+  color: #b1202e;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .search-filter-bar {
+    flex-direction: column;
+  }
+  .search-filter-bar input[type="search"] {
+    width: 100%;
+  }
+}

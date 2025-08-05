@@ -1,0 +1,56 @@
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Nom</th>
+            <th>Email</th>
+            <th>Rôle</th>
+            <th>Statut</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody id="users-tbody">
+        {% for user in page_obj.object_list %}
+            <tr data-user-id="{{ user.id }}">
+                <td>
+                    <a href="{% url 'users:profil_user' user.id %}" class="btn-profil">{{ user.nom }} {{ user.prenom }}</a>
+                </td>
+                <td>{{ user.email }}</td>
+                <td><span class="user-role">{{ user.role }}</span></td>
+                <td><span class="user-status">{% if user.is_actif %}Actif{% else %}Non Actif{% endif %}</span></td>
+                <td>
+                    <a href="{% url 'users:modifier_utilisateur' user.id %}" class="action-btn-edit">
+                        <i class='bx bxs-edit' style='color:#20a52d'  ></i>
+                    </a>
+                    <a 
+                        href="#" 
+                        class="action-btn-delete" 
+                        data-delete-url="{% url 'users:supprimer_utilisateur' user.id %}"
+                        >
+                        <i class='bx bxs-trash-alt' style='color:#dc3545'></i>
+                    </a>
+
+                </td>
+            </tr>
+        {% empty %}
+            <tr>
+                <td colspan="5" style="text-align:center; color:#6c757d;">Aucun utilisateur trouvé.</td>
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+{% if page_obj.has_other_pages %}
+<div class="pagination">
+    <ul>
+        {% if page_obj.has_previous %}
+        <li><a href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if role_filter %}&role={{ role_filter }}{% endif %}" data-page="1">« Première</a></li>
+        <li><a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if role_filter %}&role={{ role_filter }}{% endif %}" data-page="{{ page_obj.previous_page_number }}">‹ Précédent</a></li>
+        {% endif %}
+        <li>Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</li>
+        {% if page_obj.has_next %}
+        <li><a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if role_filter %}&role={{ role_filter }}{% endif %}" data-page="{{ page_obj.next_page_number }}">Suivant ›</a></li>
+        <li><a href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if role_filter %}&role={{ role_filter }}{% endif %}" data-page="{{ page_obj.paginator.num_pages }}">Dernière »</a></li>
+        {% endif %}
+    </ul>
+</div>
+{% endif %}

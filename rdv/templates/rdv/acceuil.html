@@ -1,0 +1,134 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Accueil - Gestion des Rendez-vous Médicaux</title>
+    <link rel="stylesheet" href="{% static 'rdv/css/acceuil.css' %}">
+    <script src="{% static 'rdv/js/acceuil.js' %}"></script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <nav class="nav">
+                <div class="logo">
+                    <div class="logo-icon">🏥</div>
+                    MedicalCare
+                </div>
+                <ul class="nav-links">
+                    <li><a href="{% url 'rdv:acceuil' %}">Accueil</a></li>
+                    <li><a href="{% url 'rdv:dashboard_redirect' %}">Fonctionnalités</a></li>
+                    <li><a href="#apropos">À propos</a></li>
+                    <li><a href="#contact">Contact</a></li>
+                </ul>
+                <div class="auth-buttons">
+                    <a href="{% url 'users:login' %}" class="btn btn-connect">Connexion</a>
+                    <a href="{% url 'users:register' %}" class="btn btn-register">S'inscrire</a>
+                </div>
+                <button class="mobile-menu-toggle">☰</button>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero" id="accueil">
+        <div class="container">
+            <h1>Gérez vos rendez-vous médicaux en toute simplicité</h1>
+            <p>Une plateforme moderne et intuitive pour la prise de rendez-vous médicaux, avec assistant virtuel intégré et suivi personnalisé.</p>
+            <div class="hero-buttons">
+                <a href="#demo" class="btn-primary">
+                    📅 Prendre un rendez-vous
+                </a>
+                <a href="#assistant" class="btn-secondary">
+                    🤖 Assistant virtuel
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="fonctionnalites">
+        <div class="container">
+            <h2 class="section-title">Pourquoi choisir MedicalCare ?</h2>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-icon blue">📅</div>
+                    <h3>Prise de rendez-vous simplifiée</h3>
+                    <p>Réservez vos rendez-vous en quelques clics avec notre interface intuitive. Choisissez votre date, heure et médecin préféré facilement.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon green">🤖</div>
+                    <h3>Assistant virtuel intelligent</h3>
+                    <p>Notre assistant IA vous guide dans vos démarches, répond à vos questions et vous aide à optimiser vos consultations médicales.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon purple">👨‍⚕️</div>
+                    <h3>Médecins qualifiés</h3>
+                    <p>Accédez à un réseau de médecins certifiés et spécialisés, disponibles selon vos besoins et votre localisation.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon blue">📱</div>
+                    <h3>Interface responsive</h3>
+                    <p>Utilisez MedicalCare sur tous vos appareils : ordinateur, tablette ou smartphone avec une expérience optimisée.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon green">📊</div>
+                    <h3>Suivi personnalisé</h3>
+                    <p>Consultez l'historique de vos rendez-vous, suivez vos consultations et recevez des rappels automatiques.</p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-icon purple">🔒</div>
+                    <h3>Sécurité garantie</h3>
+                    <p>Vos données médicales sont protégées par un chiffrement de niveau bancaire et respectent les normes RGPD.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Stats Section -->
+    <section class="stats">
+        <div class="container">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number">10k+</div>
+                    <div class="stat-label">Patients satisfaits</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">500+</div>
+                    <div class="stat-label">Médecins partenaires</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">50k+</div>
+                    <div class="stat-label">Rendez-vous pris</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">24/7</div>
+                    <div class="stat-label">Support disponible</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-section">
+        <div class="container">
+            <div class="cta-content">
+                <h2>Prêt à commencer ?</h2>
+                <p>Rejoignez des milliers de patients qui font confiance à MedicalCare pour gérer leurs rendez-vous médicaux en toute sérénité.</p>
+                <a href="{% url 'users:register' %}" class="btn-primary">
+                    🚀 Commencer maintenant
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2025 MedicalCare. Tous droits réservés. | Fait avec ❤️ pour votre santé</p>
+        </div>
+    </footer>
+
+</body>

@@ -1,0 +1,66 @@
+{# rdv/admin/users/composants/users_content.html #}
+{% load static %}
+
+  <link rel="stylesheet" href="{% static 'rdv/css/admin/users/users.css' %}">
+
+<div class="section-header">
+  <div>
+    <h2>Gestion des utilisateurs</h2>
+    <p style="color: #6c757d;">Gérez les comptes utilisateurs du système</p>
+  </div>
+
+ <!-- Bouton Ajouter -->
+<button id="open-create-user" class="btn-primary btn-sm"
+        data-form-url="{% url 'users:creer_utilisateur' %}">
+  <i class='bx bxs-user-plus'></i> Ajouter un utilisateur
+</button>
+
+<!-- Modal Overlay -->
+<div id="create-user-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <header class="modal-header">
+      <h2 class="modal-title">Ajouter un utilisateur</h2>
+      <button class="modal-close" aria-label="Fermer">&times;</button>
+    </header>
+    <section class="modal-body">
+      <div id="modal-form-container">
+        <p>Chargement du formulaire…</p>
+      </div>
+    </section>
+  </div>
+</div>
+
+
+</div>
+
+<div id="users-content">
+  <form id="filter-form" class="search-filter-bar">
+    <div class="search-input-container">
+      <i class="bx bx-search search-icon"></i>
+      <input 
+        type="search"
+        id="search-input"
+        value="{{ search_query }}"
+        placeholder="Rechercher par nom, prénom ou email…"
+      >
+    </div>
+    <select id="role-select">
+      <option value="">Tous les rôles</option>
+      {% for code, libelle in roles %}
+        <option value="{{ code }}" {% if role_filter == code %}selected{% endif %}>
+          {{ libelle }}
+        </option>
+      {% endfor %}
+    </select>
+  </form>
+
+  <div id="users-table-container"
+       data-url="{% url 'users:list_users' %}"
+       data-ajax-url="{% url 'users:list_users_ajax' %}">
+    {% include 'rdv/admin/users/composants/users_table.html' %}
+  </div>
+</div>
+
+<script defer src="{% static 'rdv/js/admin/users/modal.js' %}"></script>
+<script defer src="{% static 'rdv/js/admin/users/users.js' %}"></script>
+

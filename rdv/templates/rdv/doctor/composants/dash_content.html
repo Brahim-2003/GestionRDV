@@ -1,0 +1,24 @@
+<div class="section-header">
+    <div class="welcome-section">
+        <h2 class="welcome-title">Bonjour Dr. {{ user.nom }} {{ user.prenom }}</h2>
+        <p class="specialty">Spécialité: 
+            {% if user.specialite %}
+            {{ user.specialite }}
+            {% else %}
+            Aucune information
+            {% endif %} 
+        </p>
+    </div>
+    
+</div>
+
+<div id="dashboard-content" class="dashboard-content">
+    <div class="stats-grid">
+        {% include 'rdv/admin/dashboard/composants/card.html' with title="Total Rendez-vous" value=total_rendez_vous color="blue" icon="<i class='bx bxs-calendar' ></i>" %}
+        {% include 'rdv/admin/dashboard/composants/card.html' with title="Total Rendez-vous programmés" value=total_programmes color="green" icon="<i class='bx bxs-calendar' ></i>" %}
+        {% include 'rdv/admin/dashboard/composants/card.html' with title="Total Rendez-vous aujourd'hui" value=rendez_vous_aujour color="blue" icon="<i class='bx bxs-calendar' ></i>" %}
+    </div>
+</div>
+
+
+

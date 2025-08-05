@@ -1,0 +1,14 @@
+<div class="stat-card">
+  <div class="stat-info">
+    <h3>{{ title }}</h3>
+    <div class="stat-value">
+      {% if value != 0 %}
+        {{ value }}
+      {% else %}
+        <p style="font-size: 1rem; font-weight: bold; margin: 0.125rem 0;">Aucun</p>
+      {% endif %}
+
+    </div>
+  </div>
+  <div class="stat-icon icon-{{ color }}">{{ icon }}</div>
+</div>

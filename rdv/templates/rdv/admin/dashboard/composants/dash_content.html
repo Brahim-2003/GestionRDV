@@ -1,0 +1,17 @@
+{% load static %}
+
+<div class="stats-grid">
+    {% include 'rdv/admin/dashboard/composants/card.html' with title="Total Utilisateurs" value=total_utilisateurs color="blue" icon="<i class='bx bxs-group'></i>" %}
+    {% include 'rdv/admin/dashboard/composants/card.html' with title="Total Administrateurs" value=total_admins color="orange" icon="<i class='bx bxs-group' ></i>" %}
+    {% include 'rdv/admin/dashboard/composants/card.html' with title="Total Patients" value=total_patients color="green" icon="<i class='bx bxs-group' ></i>" %}
+    {% include 'rdv/admin/dashboard/composants/card.html' with title="Total Médecins" value=total_medecins color="purple" icon="<i class='bx bxs-group' ></i>" %}
+    {% include 'rdv/admin/dashboard/composants/card.html' with title="Total Rendez-vous" value=total_rendez_vous color="blue" icon="<i class='bx bxs-calendar' ></i>" %}
+    {% include 'rdv/admin/dashboard/composants/card.html' with title="Total Rendez-vous aujourd'hui" value=rendez_vous_aujour color="blue" icon="<i class='bx bxs-calendar-minus' ></i>" %}
+</div>
+<div class="content-grid">
+    {% include 'rdv/admin/dashboard/composants/card_jour.html' with rendez_vous_jour=rendez_vous_jour %}
+    {% include 'rdv/admin/dashboard/composants/card_recent.html' %}
+</div>
+
+<script defer src="{% static 'rdv/js/admin/dashboard/dashboard_admin.js' %}"></script>
+

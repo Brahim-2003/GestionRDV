@@ -1,0 +1,159 @@
+/* Conteneur principal */
+.tab-content {
+  background: #f8fafc;
+  padding: 20px 16px;
+  border-radius: 8px;
+  max-width: 1100px;
+  margin: 20px auto;
+  font-family: 'Inter', Arial, sans-serif;
+}
+
+/* En-tête de section */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.section-header h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+  color: #22223b;
+}
+
+.section-header p {
+  color: #6c757d;
+  margin: 2px 0 0 0;
+  font-size: 0.875rem;
+}
+
+/* Bouton principal */
+.action-btn-edit {
+  background: #f8fafc;
+  border: none;
+  padding: 0.125rem 0.375rem;
+  border-radius: 3px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.action-btn-delete {
+  background: #f8fafc;
+  border: none;
+  padding: 0.125rem 0.375rem;
+  border-radius: 3px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.action-btn-edit:hover {
+  background: #cad7ce68;
+}
+.action-btn-delete:hover {
+  background: #ceafaf84;
+}
+
+/* Barre de recherche et filtre */
+.search-filter-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.search-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 80%; /* ou une largeur fixe selon ton design */
+}
+
+.search-input-container .search-icon {
+  position: absolute;
+  left: 12px;
+  font-size: 18px;
+  color: #6c757d;
+  pointer-events: none; /* pour que l'input garde le focus même si on clique sur l’icône */
+}
+
+.search-input-container input {
+  width: 100%;
+  padding: 8px 12px 8px 36px; /* padding-left pour ne pas que le texte chevauche l’icône */
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+.filter-select {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #e0e6ed;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  background: #fff;
+}
+
+/* Tableau des données */
+.data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(60, 72, 88, 0.06);
+}
+
+.data-table th, .data-table td {
+  padding: 12px 12px;
+  text-align: left;
+}
+
+.data-table thead th {
+  background: #f1f5f9;
+  color: #22223b;
+  font-weight: 600;
+  font-size: 0.875rem;
+  border-bottom: 1px solid #e0e6ed;
+}
+
+.data-table tbody tr {
+  border-bottom: 1px solid #e0e6ed;
+}
+
+.data-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.data-table td {
+  font-size: 0.875rem;
+  color: #22223b;
+}
+
+.stat {
+  font-size: 0.8125rem;
+  color: #0c5a11;
+  background-color: #caebd2;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+/* Badge de rôle */
+.user-date {
+  background: #e3f0ff;
+  color: #007bff;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.8125rem;
+}
+
+/* Statut actif */
+.data-table td:contains('Actif') {
+  color: #28a745;
+  font-weight: 600;
+}

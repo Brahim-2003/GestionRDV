@@ -1,0 +1,69 @@
+{# rdv/admin/rdvs/composants/rdvs_table.html #}
+<table class="data-table">
+  <thead>
+    <tr>
+      <th>Patient</th>
+      <th>Médecin</th>
+      <th>Date/Heure</th>
+      <th>Motif</th>
+      <th>Statut</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for rdv in page_obj %}
+    <tr>
+      <td>{{ rdv.patient.user.nom }} {{ rdv.patient.user.prenom }}</td>
+      <td>
+        {{ rdv.medecin.user.nom }} {{ rdv.medecin.user.prenom }}
+        ({{ rdv.medecin.get_specialite_display }})
+      </td>
+      <td>{{ rdv.date_heure_rdv|date:"d/m/Y H:i" }}</td>
+      <td>{{ rdv.motif|default:"—" }}</td>
+      <td><span class="stat">{{ rdv.get_statut_display }}</span></td>
+      <td>
+        <a href="{% url 'rdv:modifier_rendez_vous' rdv.id %}"
+           class="action-btn-edit">
+          <i class='bx bxs-edit' style='color:#20a52d'  ></i>
+          </a>
+        <a href="{% url 'rdv:supprimer_rendez_vous' rdv.id %}"
+           class="action-btn-delete">
+          <i class='bx bxs-trash-alt' style='color:#dc3545'></i>
+        </a>
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="6" style="text-align:center; color:#6c757d;">
+      Aucun rendez‑vous trouvé.
+    </td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+{% if page_obj.has_other_pages %}
+<div class="pagination">
+  <ul>
+    {% if page_obj.has_previous %}
+      <li>
+        <a href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}"
+           data-page="1">« Première</a>
+      </li>
+      <li>
+        <a href="?page={{ page_obj.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}"
+           data-page="{{ page_obj.previous_page_number }}">‹ Précédent</a>
+      </li>
+    {% endif %}
+    <li>Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</li>
+    {% if page_obj.has_next %}
+      <li>
+        <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}"
+           data-page="{{ page_obj.next_page_number }}">Suivant ›</a>
+      </li>
+      <li>
+        <a href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}"
+           data-page="{{ page_obj.paginator.num_pages }}">Dernière »</a>
+      </li>
+    {% endif %}
+  </ul>
+</div>
+{% endif %}

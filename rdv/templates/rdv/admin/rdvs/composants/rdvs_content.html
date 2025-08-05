@@ -1,0 +1,37 @@
+{# rdv/admin/rdvs/composants/rdvs_content.html #}
+{% load static %}
+
+<div class="section-header">
+  <div>
+    <h2>Gestion des rendez‑vous</h2>
+    <p style="color: #6c757d;">Gérez tous les rendez‑vous du système</p>
+  </div>
+</div>
+
+  <div id="users-content">
+  <form id="filter-form" class="search-filter-bar">
+    <!-- type=search pour clear natif -->
+    <div class="search-input-container">
+  <i class="bx bx-search search-icon"></i>
+  <input 
+    type="search"
+    id="search-input"
+    value="{{ search_query }}"
+    placeholder="Rechercher par nom ou prénom du patient..." >
+</div>
+  <select id="rdv-status-select">
+    <option value="">Tous les statuts</option>
+    {% for code,label in statuses %}
+      <option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>
+        {{ label }}
+      </option>
+    {% endfor %}
+  </select>
+  {# bouton reset retiré #}
+</form>
+
+<div id="rdv-table-container" data-url="{% url 'rdv:list_rdv' %}">
+  {% include 'rdv/admin/rdvs/composants/rdvs_table.html' %}
+</div>
+
+<script defer src="{% static 'rdv/js/admin/rdvs/rdvs.js' %}"></script>

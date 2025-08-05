@@ -1,0 +1,23 @@
+{% load static %}
+<link rel="stylesheet" href="{% static 'rdv/css/boxicons.min.css' %}">
+
+<form id="create-user-form" method="post" action="{% url 'users:creer_utilisateur' %}" class="modern-form">
+  {% csrf_token %}
+  <h3 class="form-title">
+    <i class='bx bxs-user-plus'></i> Nouveau compte
+  </h3>
+
+  {{ form.as_p }}
+
+  <div class="form-actions">
+    <button type="submit" class="btn-primary">
+      <i class='bx bxs-save'></i>
+      <span>Enregistrer</span>
+    </button>
+    <button type="button" class="btn-secondary modal-cancel">
+      <i class='bx bxs-x-circle'></i>
+      Annuler
+    </button>
+  </div>
+</form>
+

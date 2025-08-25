@@ -44,13 +44,16 @@
         placeholder="Rechercher par nom, prénom ou email…"
       >
     </div>
-    <select id="role-select">
+    <select class="filter-select" id="active-select" name="active">
+      <option value="">Tous les Utilisateurs</option>
+      <option value="1">Actif</option>
+      <option value="0">Inactif</option>
+    </select>
+    <select class="filter-select" id="role-select" name="role">
       <option value="">Tous les rôles</option>
-      {% for code, libelle in roles %}
-        <option value="{{ code }}" {% if role_filter == code %}selected{% endif %}>
-          {{ libelle }}
-        </option>
-      {% endfor %}
+      <option value="admin">Administrateurs</option>
+      <option value="medecin">Médecins</option>
+      <option value="patient">Patients</option>
     </select>
   </form>
 

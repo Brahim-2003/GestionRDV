@@ -1,103 +1,141 @@
-// static/rdv/js/admin/base.js
+// static/rdv/js/doctor/base_doctor.js
 
 /**
- * Injecte et execute tous les <script> inline, et charge les <script src="">
- * en série avant d’appeler runAllInits().
+ * Retire callback et eventListeners, puis recharge le script inline ou externe.
+ * Semblable à static/rdv/js/admin/base.js
  */
 function injectAndExecuteScripts(container) {
-  // Récupère tous les scripts du fragment
   const scripts = Array.from(container.querySelectorAll('script'));
-  const externalLoads = [];
+  const loads = [];
 
   scripts.forEach(old => {
     const s = document.createElement('script');
     // Inline
     if (!old.src) {
       s.textContent = old.textContent;
-      document.body.appendChild(s);
     } else {
-      // Externe : on crée une promise qui se résout au chargement
-      const p = new Promise((resolve, reject) => {
+      // Externe
+      loads.push(new Promise((res, rej) => {
         s.src = old.src;
-        s.onload = resolve;
-        s.onerror = reject;
-      });
-      // Important : charger immédiatement, sans async/defer
+        s.onload = res;
+        s.onerror = rej;
+      }));
       s.async = false;
-      document.body.appendChild(s);
-      externalLoads.push(p);
     }
+    document.body.appendChild(s);
   });
 
-  // Retourne une promesse qui se résout quand tous les externes sont chargés
-  return Promise.all(externalLoads);
+  return Promise.all(loads);
 }
 
 /**
- * Charge un fragment via AJAX dans #ajax-content,
- * injecte ses scripts, puis appelle runAllInits().
+ * Normalise un path (supprime slash final, query & hash).
  */
-function loadContent(url, pushState = true) {
-  const contentDiv = document.getElementById('ajax-content');
-  if (!contentDiv) return;
+function normalizePath(path) {
+  let p = path.split('?')[0].split('#')[0];
+  if (p.length > 1 && p.endsWith('/')) p = p.slice(0, -1);
+  return p || '/';
+}
 
-  contentDiv.innerHTML = '<p>Chargement…</p>';
-  fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-    .then(r => {
-      if (!r.ok) throw new Error(`Erreur réseau ${r.status}`);
-      return r.text();
-    })
-    .then(html => {
-      contentDiv.innerHTML = html;
-      // Injecte scripts et attend leur chargement
-      return injectAndExecuteScripts(contentDiv)
-        .then(() => {
-          if (pushState) history.pushState({ url }, '', url);
-          runAllInits();
-        });
-    })
-    .catch(err => {
-      console.error('Erreur AJAX loadContent:', err);
-      contentDiv.innerHTML = '<p>Erreur lors du chargement.</p>';
-    });
+/**
+ * Met à jour la classe active en fonction de location.pathname
+ */
+function highlightActiveNav(url) {
+  const current = normalizePath(new URL(url, window.location.origin).pathname);
+  document.querySelectorAll('.nav-tab').forEach(link => {
+    const href = link.getAttribute('href');
+    const linkPath = normalizePath(new URL(href, window.location.origin).pathname);
+    // on test current === linkPath ou current commence par linkPath + '/'
+    if (current === linkPath || current.startsWith(linkPath + '/')) {
+      link.classList.add('active');
+    } else {
+      link.classList.remove('active');
+    }
+  });
 }
 
 /**
  * Exécute toutes les fonctions window.initXXX()
  */
 function runAllInits() {
-  Object.keys(window).forEach(key => {
-    if (key.startsWith('init') && typeof window[key] === 'function') {
-      try { window[key](); }
-      catch (e) { console.error(`Erreur dans ${key}():`, e); }
+  Object.keys(window).forEach(fn => {
+    if (fn.startsWith('init') && typeof window[fn] === 'function') {
+      try { window[fn](); }
+      catch (e) { console.error(`Erreur dans ${fn}():`, e); }
     }
   });
 }
 
 /**
- * Lie la navigation par onglets en AJAX
+ * Charge un fragment via AJAX et l’injecte dans #ajax-content.
+ * Puis gère pushState, active nav et init.
+ */
+function loadContent(url, push = true) {
+  const container = document.getElementById('ajax-content');
+  if (!container) return;
+
+  container.innerHTML = '<p>Chargement…</p>';
+  fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    .then(r => r.ok ? r.text() : Promise.reject(`HTTP ${r.status}`))
+    .then(html => {
+      // si le serveur renvoie une page complète contenant #ajax-content,
+      // on tente d'extraire le fragment pour éviter de mettre toute la page
+      let fragment = html;
+      if (html.includes('<html') || html.includes('<body') || html.includes('id="ajax-content"')) {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        const extracted = tmp.querySelector('#ajax-content');
+        if (extracted) fragment = extracted.innerHTML;
+        else {
+          const body = tmp.querySelector('body');
+          fragment = body ? body.innerHTML : html;
+        }
+      }
+
+      container.innerHTML = fragment;
+      return injectAndExecuteScripts(container);
+    })
+    .then(() => {
+      if (push) history.pushState({ url }, '', url);
+      highlightActiveNav(url);
+      runAllInits();
+    })
+    .catch(err => {
+      console.error('Erreur AJAX loadContent:', err);
+      container.innerHTML = '<p>Erreur lors du chargement.</p>';
+    });
+}
+
+/**
+ * Lie les onglets du menu à loadContent()
  */
 function setupNavTabs() {
-  document.querySelectorAll('.nav-tab').forEach(tab => {
-    tab.onclick = null;
-    tab.addEventListener('click', e => {
+  document.querySelectorAll('.nav-tab').forEach(link => {
+    // éviter duplication d'handlers si appelé plusieurs fois
+    try { link.onclick = null; } catch (e) {}
+    link.addEventListener('click', e => {
       e.preventDefault();
-      loadContent(tab.href);
+      loadContent(link.href);
     });
   });
 }
 
-// Historique back/forward
+// Back/forward
 window.addEventListener('popstate', e => {
-  if (e.state?.url) loadContent(e.state.url, false);
+  if (e.state?.url) {
+    loadContent(e.state.url, false);
+  }
 });
 
-// Au premier chargement de la page
+// Au premier chargement
 window.addEventListener('DOMContentLoaded', () => {
   setupNavTabs();
+  // Active l'onglet correspondant à l'URL actuelle
+  highlightActiveNav(window.location.href);
   runAllInits();
 });
 
 // Expose pour debug / usage manuel
 window.loadContent = loadContent;
+window.highlightActiveNav = highlightActiveNav;
 window.runAllInits = runAllInits;

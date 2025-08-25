@@ -1,241 +1,266 @@
 // static/rdv/js/doctor/dispo.js
-
-// =========================
-// 1) UTILS
-// =========================
-console.log('dispo.js chargé');
+// Version inspirée de users.js : filtres (type, jour, date) + pagination + polling
 
 function getCookie(name) {
   let cookieValue = null;
   if (document.cookie && document.cookie !== '') {
-    document.cookie.split(';').forEach(c => {
-      c = c.trim();
-      if (c.startsWith(name + '=')) {
-        cookieValue = decodeURIComponent(c.slice(name.length + 1));
+    document.cookie.split(';').forEach(cookie => {
+      cookie = cookie.trim();
+      if (cookie.startsWith(name + '=')) {
+        cookieValue = decodeURIComponent(cookie.slice(name.length + 1));
       }
     });
   }
   return cookieValue;
 }
 
-// =========================
-// 2) FORM AJAX (création)
-// =========================
-function initDispoForm() {
-  const form = document.querySelector('#create-dispo-form');
-  if (!form) return;
-
-  // Désactive d'éventuels anciens handlers
-  form.onsubmit = null;
-
-  form.addEventListener('submit', e => {
-    e.preventDefault();
-    const url = form.action;
-    const data = new FormData(form);
-
-    fetch(url, {
-      method: 'POST',
-      headers: {
-        'X-Requested-With': 'XMLHttpRequest',
-        'X-CSRFToken': getCookie('csrftoken')
-      },
-      body: data
-    })
-    .then(r => r.ok ? r.json() : r.json().then(err => Promise.reject(err)))
-    .then(json => {
-      if (json.status === 'ok') {
-        // Recharge la table
-        if (window.fetchDispoTable) window.fetchDispoTable();
-        else location.reload();
-        // Ferme le modal
-        document.getElementById('create-dispo-modal').classList.add('hidden');
-      } else {
-        console.error(json.errors);
-        alert('Erreurs : ' + JSON.stringify(json.errors));
-      }
-    })
-    .catch(err => {
-      console.error('Erreur AJAX disposition:', err);
-      alert('Une erreur est survenue');
-    });
-  });
-}
-
-// =========================
-// 3) MODAL create dispo
-// =========================
-function initCreateDispoModal() {
-  const openBtn   = document.getElementById('open-create-dispo');
-  const modal     = document.getElementById('create-dispo-modal');
-  const closeBtns = modal?.querySelectorAll('.modal-close, .modal-cancel');
-  const container = document.getElementById('modal-form-container');
-  if (!openBtn || !modal || !closeBtns.length || !container) return;
-
-  openBtn.onclick = () => {
-    modal.classList.remove('hidden');
-    container.innerHTML = '<p>Chargement du formulaire…</p>';
-    fetch(openBtn.dataset.formUrl, {
-      headers: {'X-Requested-With':'XMLHttpRequest'}
-    })
-    .then(r => r.ok ? r.text() : Promise.reject())
-    .then(html => {
-      container.innerHTML = html;
-      initDispoForm();  // Bind form handler
-      // Init flatpickr on the injected inputs
-      if (window.flatpickr) {
-        flatpickr(container.querySelectorAll('input[type="text"]'), {
-          enableTime: true,
-          noCalendar: true,
-          dateFormat: "H:i"
-        });
-      }
-    })
-    .catch(() => {
-      container.innerHTML = '<p>Impossible de charger le formulaire.</p>';
-    });
-  };
-
-  closeBtns.forEach(btn => btn.onclick = () => modal.classList.add('hidden'));
-  modal.onclick = e => { if (e.target === modal) modal.classList.add('hidden'); };
-}
-
-// =========================
-// 4) TABLE: search, date, pagination, delete
-// =========================
 function initDispoTable() {
   console.log('🔄 initDispoTable');
-  const container   = document.getElementById('dispo-table-container');
-  const searchInput = document.getElementById('search-input');
-  const dateInput   = document.querySelector('.date-input');
-  if (!container || !searchInput || !dateInput) return;
 
-  const baseUrl = container.dataset.url;
+  const container   = document.getElementById('dispo-table-container');
+  const typeSelect  = document.getElementById('type-select');
+  const jourSelect  = document.getElementById('jour-select');
+  // prefer explicit date input id; fallback to class
+  const dateInput   = document.getElementById('date-input') || document.querySelector('.date-input');
+
+  if (!container) return;
+
+  const baseAjax = container.dataset.ajaxUrl || container.dataset.url || container.dataset.base;
+  if (!baseAjax) return;
+
   let debounceTimer;
 
-  function debounce(fn, delay=300) {
+  function debounce(fn, delay = 300) {
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(fn, delay);
   }
 
-  async function fetchDispoTable(params={}) {
-  const url = new URL(container.dataset.ajaxUrl, window.location.origin);
-  Object.entries(params).forEach(([k,v])=>{
-    v ? url.searchParams.set(k,v) : url.searchParams.delete(k);
-  });
-  const r = await fetch(url, { headers:{ 'X-Requested-With':'XMLHttpRequest' } });
-  const html = await r.text();
-  // on s'attend à du <table>…</table> ou au moins <tbody>…</tbody>
-  container.innerHTML = html;
-  bindTableEvents();
-}
-  window.fetchDispoTable = fetchDispoTable;
+  function readFiltersFromDom() {
+    return {
+      type:  (typeSelect && typeSelect.value) ? typeSelect.value : '',
+      jour:  (jourSelect && jourSelect.value) ? jourSelect.value : '',
+      date:  (dateInput && dateInput.value) ? dateInput.value : ''
+    };
+  }
+
+  function applyTypeUx() {
+    const t = typeSelect ? typeSelect.value : '';
+    if (!typeSelect) return;
+    if (t === 'ponctuel') {
+      if (jourSelect) { jourSelect.value = ''; jourSelect.disabled = true; }
+      if (dateInput)  { dateInput.disabled = false; }
+    } else if (t === 'hebdomadaire') {
+      if (dateInput) { dateInput.value = ''; dateInput.disabled = true; }
+      if (jourSelect) { jourSelect.disabled = false; }
+    } else {
+      if (jourSelect) { jourSelect.disabled = false; }
+      if (dateInput)  { dateInput.disabled = false; }
+    }
+  }
+
+  // fetch table fragment (table-only=1)
+  function fetchTable(params = {}) {
+    const url = new URL(baseAjax, window.location.origin);
+    url.searchParams.set('table-only', '1');
+
+    // merge DOM filters + explicit params (params override)
+    const filters = readFiltersFromDom();
+    const final = Object.assign({}, filters, params);
+
+    // normalization: if type=ponctuel -> ignore jour ; type=hebdomadaire -> ignore date
+    if (final.type === 'ponctuel') delete final.jour;
+    if (final.type === 'hebdomadaire') delete final.date;
+
+    Object.entries(final).forEach(([k, v]) => {
+      if (v || v === 0) url.searchParams.set(k, v);
+      else url.searchParams.delete(k);
+    });
+
+    fetch(url.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(r => r.ok ? r.text() : Promise.reject(r.statusText))
+      .then(html => {
+        container.innerHTML = html;
+        // after replacement, bind events inside new table
+        bindTableEvents();
+        // ensure UX: filters may have been re-rendered by server-side; re-apply UX and rebind filter controls
+        applyTypeUx();
+      })
+      .catch(err => {
+        console.error('fetchDispoTable error:', err);
+      });
+  }
+
+  // Expose for polling / other scripts
+  window.fetchDispoTable = fetchTable;
 
   function bindTableEvents() {
-    // DELETE
+    // Guard: prevent multiple bindings on same container
+    // We'll still rebind controls each time (idempotent)
+    // DELETE buttons
     container.querySelectorAll('.action-btn-delete').forEach(btn => {
-      btn.onclick = null;
-      btn.addEventListener('click', async e => {
+      // neutralize potential inline onclick
+      try { btn.onclick = null; } catch (e) {}
+      // remove existing named listener by dataset flag approach is harder; use addEventListener but ensure not duplicated:
+      if (btn.dataset.boundDelete === '1') return;
+      btn.dataset.boundDelete = '1';
+      btn.addEventListener('click', async (e) => {
         e.preventDefault();
+        if (btn.dataset.busy === '1') return;
         if (!confirm('Supprimer ce créneau ?')) return;
-        const url = btn.dataset.deleteUrl;
-        const row = btn.closest('tr');
+        btn.dataset.busy = '1';
         try {
-          const r = await fetch(url, {
+          const url = btn.dataset.deleteUrl || btn.getAttribute('href');
+          const res = await fetch(url, {
             method: 'POST',
             headers: {
               'X-CSRFToken': getCookie('csrftoken'),
-              'X-Requested-With':'XMLHttpRequest'
+              'X-Requested-With': 'XMLHttpRequest'
             }
           });
-          const json = await r.json();
-          if (json.status==='success' || json.success) row.remove();
-          else alert(json.message||'Erreur suppression');
-        } catch(err) {
+          const json = await res.json().catch(() => ({}));
+          if (json.success || json.status === 'ok') {
+            const row = btn.closest('tr');
+            if (row) row.remove();
+          } else {
+            alert(json.message || 'Erreur lors de la suppression');
+          }
+        } catch (err) {
           console.error('delete error:', err);
-          alert('Impossible de supprimer');
+          alert('Impossible de supprimer (erreur réseau)');
+        } finally {
+          delete btn.dataset.busy;
         }
       });
     });
 
-    // PAGINATION
-    container.querySelectorAll('.pagination a[data-page]').forEach(link => {
-      link.onclick = null;
-      link.addEventListener('click', e => {
-        e.preventDefault();
-        const page = link.dataset.page;
-        fetchDispoTable({
-          search: searchInput.value,
-          date:   dateInput.value,
-          page
-        });
-        history.pushState(null,'',`?page=${page}&search=${encodeURIComponent(searchInput.value)}&date=${encodeURIComponent(dateInput.value)}`);
+    // Pagination links (delegated within container)
+    // We can clear previous delegated listener by using dataset flag on container
+    if (container.dataset.boundPagination !== '1') {
+      container.dataset.boundPagination = '1';
+      container.addEventListener('click', function (e) {
+        const pageLink = e.target.closest('.pagination a[data-page]');
+        if (pageLink) {
+          e.preventDefault();
+          const page = pageLink.dataset.page;
+          fetchTable({ page });
+        }
       });
+    }
+
+    // If there are inline forms with data-ajax="1", bind them (they can be in the table)
+    container.querySelectorAll('form[data-ajax="1"]').forEach(f => {
+      // use closest container as the form's container
+      const c = f.closest('[data-ajax-container]') || f.parentElement;
+      if (typeof bindDispoForm === 'function') {
+        try { bindDispoForm(c || f); } catch (e) { /* ignore */ }
+      }
     });
   }
 
-  bindTableEvents();
+  // Bind filters UI controls (debounced)
+  applyTypeUx();
 
-  // LIVE SEARCH
-  searchInput.oninput = null;
-  searchInput.addEventListener('input', () => debounce(() => {
-    fetchDispoTable({ search: searchInput.value, date: dateInput.value });
-  }));
+  if (typeSelect) {
+    try { typeSelect.onchange = null; } catch (e) {}
+    if (typeSelect.dataset.bound !== '1') {
+      typeSelect.dataset.bound = '1';
+      typeSelect.addEventListener('change', () => {
+        applyTypeUx();
+        debounce(() => fetchTable({ page: 1 }), 200);
+      });
+    }
+  }
 
-  // DATE FILTER
-  dateInput.onchange = null;
-  dateInput.addEventListener('change', () => {
-    fetchDispoTable({ search: searchInput.value, date: dateInput.value });
-  });
+  if (jourSelect) {
+    try { jourSelect.onchange = null; } catch (e) {}
+    if (jourSelect.dataset.bound !== '1') {
+      jourSelect.dataset.bound = '1';
+      jourSelect.addEventListener('change', () => {
+        debounce(() => fetchTable({ page: 1 }), 200);
+      });
+    }
+  }
 
-  // HISTORY NAV
-  window.addEventListener('popstate', () => {
+  if (dateInput) {
+    try { dateInput.onchange = null; } catch (e) {}
+    if (dateInput.dataset.bound !== '1') {
+      dateInput.dataset.bound = '1';
+      dateInput.addEventListener('change', () => {
+        debounce(() => fetchTable({ page: 1 }), 200);
+      });
+    }
+  }
+
+  // handle popstate: if user navigates back/forward we reload the table params from URL
+  function handlePopState() {
     if (!document.body.contains(container)) return;
     const params = Object.fromEntries(new URLSearchParams(location.search));
-    fetchDispoTable(params);
-  });
+    // map URL params to fetchTable (we don't push state on filter changes, so this is mostly for completeness)
+    fetchTable(params);
+  }
+  window.removeEventListener('popstate', handlePopState);
+  window.addEventListener('popstate', handlePopState);
+
+  // initial bind & maybe initial fetch if table area empty
+  bindTableEvents();
+  if (!container.querySelector('tbody')) {
+    fetchTable({ page: 1 });
+  }
 }
 
-// =========================
-// 5) POLLING
-// =========================
 function initDispoPolling() {
   console.log('🔄 initDispoPolling');
+
   const container = document.getElementById('dispo-table-container');
   if (!container) return;
-  const ajaxUrl = container.dataset.ajaxUrl;
+  if (container.dataset.pollBound === '1') return;
+  container.dataset.pollBound = '1';
+
+  const ajaxUrl = container.dataset.url || window.location.href;
   let lastCount = null;
 
   async function poll() {
-    let url = ajaxUrl;
-    if (lastCount !== null) url += `?last_count=${lastCount}`;
     try {
-      const res  = await fetch(url, { headers:{'X-Requested-With':'XMLHttpRequest'} });
-      const data = await res.json();
-      if (data.changed) {
+      const url = new URL(ajaxUrl, window.location.origin);
+      url.searchParams.set('json', '1');
+      if (lastCount !== null) url.searchParams.set('last_count', lastCount);
+      const res = await fetch(url.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      const data = await res.json().catch(() => null);
+      if (data && data.changed) {
         lastCount = data.last_count;
-        window.fetchDispoTable({
-          search: document.getElementById('search-input').value,
-          date:   document.querySelector('.date-input').value
-        });
+        if (typeof window.fetchDispoTable === 'function') {
+          // reload first page with current filters
+          window.fetchDispoTable({ page: 1 });
+        }
       }
-    } catch(e) {
-      console.error('polling error:', e);
+    } catch (err) {
+      // silent
     }
   }
 
   setInterval(poll, 5000);
 }
 
-// =========================
-// 6) INIT ON DOM READY
-// =========================
+// Auto-init on DOMContentLoaded
 document.addEventListener('DOMContentLoaded', () => {
-  // Init Flatpickr for date field if loaded
+  // flatpickr init if present (keeps date input usable)
   if (window.flatpickr) {
-    flatpickr('.date-input', { dateFormat: 'Y-m-d' });
+    try { flatpickr(".date-input", { dateFormat: "Y-m-d" }); } catch (e) { /* ignore */ }
   }
-  initCreateDispoModal();
-  initDispoForm();
+
+  // Bind any inline ajax forms already present
+  document.querySelectorAll('form[data-ajax="1"]').forEach(node => {
+    const container = node.closest('[data-ajax-container]') || node.parentElement;
+    if (typeof bindDispoForm === 'function') {
+      try { bindDispoForm(container || node); } catch (e) {}
+    }
+  });
+
   initDispoTable();
   initDispoPolling();
 });
+
+// Expose for debug
+window.initDispoTable = initDispoTable;
+window.initDispoPolling = initDispoPolling;
+window.fetchDispoTable = window.fetchDispoTable || function(){ console.warn('fetchDispoTable not initialized yet'); };

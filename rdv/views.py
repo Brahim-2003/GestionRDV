@@ -1,18 +1,25 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required, permission_required, user_passes_test
-from django.http import HttpResponse, HttpResponseForbidden
-from django.views.decorators.http import require_POST, require_http_methods
-from .models import RendezVous, Notification, Patient, Medecin, Disponibilite
-from django.utils import timezone
-from users.models import Utilisateur # Importer le modèle Utilisateur
-from django.contrib import messages # Importer les messages pour les notifications
-from django.contrib.auth.decorators import login_required           # Importer le décorateur pour les vues nécessitant une connexion    
-from django.http import JsonResponse
-from django.contrib.auth.decorators import login_required, permission_required, user_passes_test
-from .forms import UpdateRDVForm, DisponibiliteForm
+from datetime import timedelta
+
+# Django imports (groupés et triés)
+from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.core.serializers.json import DjangoJSONEncoder
+from django.db import IntegrityError, transaction
+from django.db.models import Q, Count
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
+from django.shortcuts import render, redirect, get_object_or_404
 from django.template.loader import render_to_string
+from django.utils import timezone
+from django.views.decorators.http import require_POST, require_http_methods
+from django.contrib.auth.decorators import login_required, permission_required
+
+
+# App imports
+from users.models import Utilisateur
+from .forms import UpdateRDVForm, DisponibiliteEditForm, DisponibiliteCreateForm
+from .models import RendezVous, Notification, Patient, Medecin, Disponibilite
+
 
 
 
@@ -23,7 +30,7 @@ def acceuil_view(request):
 
 """ Vues pour les notifications """
 
-@login_required
+@login_required(login_url='users:login')
 def list_notif(request):
     filter_type = request.GET.get('type', 'all')
     notifications = Notification.objects.filter(user=request.user)
@@ -53,7 +60,7 @@ def list_notif(request):
 
 
 
-@login_required
+@login_required(login_url='users:login')
 @require_POST
 def mark_as_read(request, notification_id):
     """Marquer une notification comme lue"""
@@ -65,7 +72,7 @@ def mark_as_read(request, notification_id):
     
     return redirect('list_notif')
 
-@login_required
+@login_required(login_url='users:login')
 @require_POST
 def mark_all_as_read(request):
     """Marquer toutes les notifications comme lues"""
@@ -80,7 +87,7 @@ def mark_all_as_read(request):
     messages.success(request, 'Toutes les notifications ont été marquées comme lues.')
     return redirect('list_notif')
 
-@login_required
+@login_required(login_url='users:login')
 @require_POST
 def delete_notification(request, notification_id):
     """Supprimer une notification"""
@@ -92,7 +99,7 @@ def delete_notification(request, notification_id):
     
     return redirect('list_notif')
 
-@login_required
+@login_required(login_url='users:login')
 @require_POST
 def delete_all_notifications(request):
     """Supprimer toutes les notifications"""
@@ -104,7 +111,7 @@ def delete_all_notifications(request):
     messages.success(request, 'Toutes les notifications ont été supprimées.')
     return redirect('list_notif')
 
-@login_required
+@login_required(login_url='users:login')
 def get_notification_count(request):
     """API pour récupérer le nombre de notifications non lues"""
     unread_count = Notification.objects.filter(user=request.user, is_read=False).count()
@@ -256,29 +263,57 @@ def api_dashboard_stats(request):
 
     return JsonResponse(data)
 
-# Liste des rdvs
+
 @login_required(login_url='users:login')
 @permission_required('users.can_manage_appointments', raise_exception=True)
 def liste_rendez_vous(request):
-    search_query = request.GET.get('search', '')
-    status_filter = request.GET.get('status', '')
-
+    search_query = request.GET.get('search', '').strip()
+    status_filter = request.GET.get('status', '').strip()
+    date_filter = request.GET.get('date', '').strip()  # format YYYY-MM-DD attendu
+    # Base queryset
     rdvs = RendezVous.objects.all()
 
+    # Filtre recherche (nom/prénom du patient ou motif)
     if search_query:
         rdvs = rdvs.filter(
             Q(patient__user__nom__icontains=search_query) |
             Q(patient__user__prenom__icontains=search_query) |
+            Q(motif__icontains=search_query) |
             Q(medecin__user__nom__icontains=search_query) |
             Q(medecin__user__prenom__icontains=search_query)
         )
 
+    # Filtre statut
     if status_filter:
         rdvs = rdvs.filter(statut=status_filter)
 
+    # Filtre date (si fourni) — on compare la portion date
+    if date_filter:
+        try:
+            rdvs = rdvs.filter(date_heure_rdv__date=date_filter)
+        except Exception:
+            # ignore invalid date formats
+            pass
+
+    # Tri
     rdvs = rdvs.order_by('-date_heure_rdv')
 
-    # Pagination
+    # Polling JSON endpoint (optimisé)
+    if request.GET.get('json') == '1':
+        last_count = int(request.GET.get('last_count', '0') or 0)
+        current = rdvs.count()
+        if last_count == current:
+            return JsonResponse({'changed': False})
+        # renvoyer un petit payload utile
+        data = [{
+            'id': r.id,
+            'date': r.date_heure_rdv.isoformat(),
+            'patient': f"{r.patient.user.nom} {r.patient.user.prenom}",
+            'statut': r.statut,
+        } for r in rdvs]
+        return JsonResponse({'changed': True, 'last_count': current, 'rdvs': data})
+
+    # Pagination / table-only
     paginator = Paginator(rdvs, 25)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -289,18 +324,19 @@ def liste_rendez_vous(request):
         'search_query': search_query,
         'status_filter': status_filter,
         'statuses': RendezVous.STATUT_CHOICES,
+        'date_filter': date_filter,
     }
-    # Si on ne veut que la table
-    if request.GET.get('table-only') == '1':
+
+    # requête table-only (fragment)
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' and request.GET.get('table-only'):
         return render(request, 'rdv/admin/rdvs/composants/rdvs_table.html', context)
 
-    # Si c'est un appel AJAX de navigation
+    # AJAX navigation (content)
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return render(request, 'rdv/admin/rdvs/composants/rdvs_content.html', context)
 
-    # Sinon Page complète
+    # page complète
     return render(request, 'rdv/admin/rdvs/rdvs.html', context)
-
 
 # Modifier un rdv
 @login_required(login_url='users:login')
@@ -419,12 +455,12 @@ def dashboard_medecin_view(request):
 
     # Si c'est une requête AJAX, on renvoie JUSTE le fragment
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-       return render(request, 'rdv/doctor/composants/dash_content.html', context)
+       return render(request, 'rdv/doctor/composants/dashboard/dash_content.html', context)
 
     # Sinon on renvoie base.html, qui inclura via {% block content %} ton dashboard.html complet
     return render(request, 'rdv/doctor/dash_doctor.html', context)
 
-# Liste des rdvs du medecin
+
 @login_required(login_url='users:login')
 def liste_rdv_medecin(request):
     # Récupérer le profil Medecin lié à l’utilisateur
@@ -433,43 +469,65 @@ def liste_rdv_medecin(request):
     except Medecin.DoesNotExist:
         return HttpResponseForbidden("Vous n'êtes pas autorisé à accéder à cette page.")
 
-    # Préparer les filtres
-    search_query  = request.GET.get('search', '')
-    status_filter = request.GET.get('status', '')
+    # Préparer les filtres (lecture des params envoyés par le JS)
+    search_query  = request.GET.get('search', '').strip()
+    status_filter = request.GET.get('status', '').strip()
+    date_filter   = request.GET.get('date', '').strip()  # format YYYY-MM-DD
 
     # Charger uniquement ses propres rendez-vous
-    rdvs = RendezVous.objects.filter(medecin=medecin)
+    qs = RendezVous.objects.filter(medecin=medecin)
 
-    # Appliquer la recherche (sur nom/prénom du patient et motif)
+    # Appliquer la recherche (sur nom/prénom du patient seulement)
     if search_query:
-        rdvs = rdvs.filter(
+        qs = qs.filter(
             Q(patient__user__nom__icontains=search_query) |
-            Q(patient__user__prenom__icontains=search_query) |
-            Q(motif__icontains=search_query)
+            Q(patient__user__prenom__icontains=search_query)
         )
 
-    # Filtrer par statut si besoin
+    # Filtrer par statut si fourni (les valeurs doivent être les clés : 'programme', 'confirme', etc.)
     if status_filter:
-        rdvs = rdvs.filter(statut=status_filter)
+        qs = qs.filter(statut=status_filter)
 
-    # Trier et paginer
-    rdvs = rdvs.order_by('-date_heure_rdv')
-    paginator   = Paginator(rdvs, 25)
+    # Filtrer par date si fourni (on compare la date seulement)
+    if date_filter:
+        try:
+            # si date_filter au format YYYY-MM-DD
+            qs = qs.filter(date_heure_rdv__date=date_filter)
+        except Exception:
+            pass
+
+    # Trier
+    qs = qs.order_by('-date_heure_rdv')
+
+    # Pagination
+    paginator   = Paginator(qs, 25)
     page_number = request.GET.get('page')
     page_obj    = paginator.get_page(page_number)
 
     context = {
-        'rdvs':          rdvs,
+        'rdvs':          qs,            # utile si les templates anciens s'attendent à rdvs
         'page_obj':      page_obj,
         'search_query':  search_query,
         'status_filter': status_filter,
+        'date_filter':   date_filter,
         'statuses':      RendezVous.STATUT_CHOICES,
     }
 
-    # Rendu AJAX ou complet
+    # Rendu AJAX table-only : renvoie le fragment du tableau
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' and request.GET.get('table-only'):
+        # Fournir les deux variables pour compatibilité template (rdvs ou page_obj)
+        return render(request, 'rdv/doctor/composants/rdvs/rdvs_doctor_table.html', {
+            'page_obj': page_obj,
+            'rdvs': page_obj.object_list,
+        })
+
+    # Rendu AJAX "contenu complet" (filtre + header)
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
-        return render(request, 'rdv/doctor/composants/rdvs_doctor_content.html', context)
+        return render(request, 'rdv/doctor/composants/rdvs/rdvs_doctor_content.html', context)
+
+    # Page complète
     return render(request, 'rdv/doctor/rdvs_doctor.html', context)
+
 
 @login_required(login_url='users:login')
 def disponibilites_list(request):
@@ -479,99 +537,203 @@ def disponibilites_list(request):
     except Medecin.DoesNotExist:
         return HttpResponseForbidden()
 
-    # 2. Filtre et recherche
-    qs = Disponibilite.objects.filter(medecin=medecin, is_active=True)
-    search = request.GET.get('search','')
-    if search:
-        qs = qs.filter(Q(jour__icontains=search) | Q(date_specific__icontains=search))
+    # 2. Base queryset
+    qs = Disponibilite.objects.filter(medecin=medecin)
 
-    # 3. Tri
-    qs = qs.order_by('date_specific','jour','heure_debut')
+    # 3. Récupère filtres depuis GET
+    type_filter = request.GET.get('type', '').strip()        # '', 'ponctuel', 'hebdomadaire'
+    jour_filter = request.GET.get('jour', '').strip()        # ex: 'mon','tue',...
+    date_filter = request.GET.get('date', '').strip()        # format attendu: 'YYYY-MM-DD'
 
-    # 4. Pagination (HTML/table fragment)
+    # 4. Applique les filtres côté serveur
+    # Si type demandé
+    if type_filter == 'ponctuel':
+        qs = qs.filter(date_specific__isnull=False)
+        if date_filter:
+            qs = qs.filter(date_specific=date_filter)
+    elif type_filter == 'hebdomadaire':
+        qs = qs.filter(date_specific__isnull=True)
+        if jour_filter:
+            qs = qs.filter(jour=jour_filter)
+    else:
+        # pas de type forcé : appliquer jour/date si fournis
+        if date_filter:
+            qs = qs.filter(date_specific=date_filter)
+        if jour_filter:
+            qs = qs.filter(jour=jour_filter, date_specific__isnull=True)
+
+    # 5. Tri
+    qs = qs.order_by('date_specific', 'jour', 'heure_debut')
+
+    # 6. Pagination
     page_obj = Paginator(qs, 25).get_page(request.GET.get('page'))
 
-    # 5. JSON polling ?
+    # 7. JSON polling (respecte les mêmes filtres car 'qs' est filtré)
     if request.GET.get('json') == '1':
-        last_count = int(request.GET.get('last_count','0') or 0)
+        last_count = int(request.GET.get('last_count', '0') or 0)
         current = qs.count()
         if last_count == current:
             return JsonResponse({'changed': False})
         data = [{
             'id': d.id,
-            'jour': d.jour or d.date_specific.isoformat(),
+            'jour': d.jour or (d.date_specific.isoformat() if d.date_specific else ''),
             'heure_debut': d.heure_debut.strftime('%H:%M'),
             'heure_fin': d.heure_fin.strftime('%H:%M'),
         } for d in qs]
         return JsonResponse({'changed': True, 'last_count': current, 'disponibilites': data})
 
-    # 6. Fragment table-only ?
-    if request.headers.get('X-Requested-With')=='XMLHttpRequest' and request.GET.get('table-only'):
-        return render(request, 'rdv/doctor/composants/dispo_table_fragment.html', {
+    # 8. Fragment table-only ?
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' and request.GET.get('table-only'):
+        return render(request, 'rdv/doctor/composants/dispo/dispo_table.html', {
             'page_obj': page_obj,
         })
 
-    # 7. Calendrier FullCalendar ?
-    if request.GET.get('calendar') == '1':
-        events = []
-        for d in qs:
-            for start,end in d.get_slot_datetimes():
-                events.append({
-                    'id': d.id,
-                    'title': str(d),
-                    'start': start.isoformat(),
-                    'end': end.isoformat(),
-                })
-        return JsonResponse(events, safe=False)
-
-    # 8. Page complète
+    # 9. Page complète : passe aussi les valeurs de filtres pour utiliser dans le template (pagination links)
     return render(request, 'rdv/doctor/disponibilites.html', {
-        'page_obj':      page_obj,
-        'search_query':  search,
-        'form':          DisponibiliteForm(),
+        'page_obj': page_obj,
+        'type_filter': type_filter,
+        'jour_filter': jour_filter,
+        'date_filter': date_filter,
     })
 
 
-# Ajouter une disponibilite par medecin
+def _is_ajax(request):
+    return request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+def errors_to_dict(errors):
+    """
+    Normalize Django form/errors/ValidationError into a plain dict of lists.
+    Accepts:
+      - ErrorDict / form.errors
+      - ValidationError with message_dict or messages
+    """
+    if isinstance(errors, ValidationError):
+        md = getattr(errors, 'message_dict', None)
+        if md:
+            return {k: [str(m) for m in v] for k, v in md.items()}
+        return {'__all__': [str(m) for m in errors.messages]}
+    # form.errors is an ErrorDict: convert to normal dict of lists
+    try:
+        return {k: [str(msg) for msg in v] for k, v in errors.items()}
+    except Exception:
+        # fallback: string
+        return {'__all__': [str(errors)]}
+
 @login_required(login_url='users:login')
 @require_http_methods(["GET", "POST"])
 def disponibilite_add(request):
-    # Récupère le médecin ou interdit l’accès
+    """
+    GET (AJAX)  -> fragment HTML du formulaire (modal)
+    POST (AJAX) -> renvoie JSON (status ok / erreurs)
+    POST non-AJAX -> redirect (fallback)
+    """
     medecin = get_object_or_404(Medecin, user=request.user)
 
-    # Instancie le form, en POST ou vide en GET
-    form = DisponibiliteForm(request.POST or None)
+    # base instance with medecin to avoid RelatedObjectDoesNotExist in model.clean
+    base_instance = Disponibilite(medecin=medecin)
 
-    # Si c’est un POST et que le form est valide
-    if request.method == 'POST' and form.is_valid():
-        dispo = form.save(commit=False)
-        dispo.medecin = medecin
-        dispo.save()
+    if request.method == 'GET':
+        form = DisponibiliteCreateForm(instance=base_instance, medecin=medecin)
+        return render(request, 'rdv/doctor/composants/dispo/dispo_add_form.html', {'form': form})
 
-        # Si AJAX, on renvoie juste JSON
-        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-            return JsonResponse({'status': 'ok', 'id': dispo.id})
+    # POST
+    form = DisponibiliteCreateForm(request.POST, instance=base_instance, medecin=medecin)
+    if not form.is_valid():
+        if _is_ajax(request):
+            return JsonResponse({'status': 'error', 'errors': errors_to_dict(form.errors)}, status=400)
+        # fallback: render fragment with errors (rare if you don't use page)
+        return render(request, 'rdv/doctor/composants/dispo/dispo_add_form.html', {'form': form})
 
-        # Sinon, on redirige vers la liste classique
-        return redirect('rdv:disponibilites_list')
+    dispo = form.save(commit=False)
+    dispo.medecin = medecin
+    try:
+        with transaction.atomic():
+            dispo.full_clean()  # execute model.clean()
+            dispo.save()
+    except ValidationError as ve:
+        errs = errors_to_dict(ve)
+        if _is_ajax(request):
+            return JsonResponse({'status': 'error', 'errors': errs}, status=400)
+        # attach to form then re-render fragment
+        for f, msgs in errs.items():
+            if f == '__all__':
+                form.add_error(None, msgs)
+            else:
+                for m in msgs:
+                    form.add_error(f, m)
+        return render(request, 'rdv/doctor/composants/dispo/dispo_add_form.html', {'form': form})
+    except IntegrityError:
+        msg = "Un créneau identique existe déjà pour ce médecin (même jour/date et mêmes heures)."
+        if _is_ajax(request):
+            return JsonResponse({'status': 'error', 'errors': {'__all__': [msg]}}, status=409)
+        form.add_error(None, msg)
+        return render(request, 'rdv/doctor/composants/dispo/dispo_add_form.html', {'form': form})
+    except Exception as e:
+        # logger.exception(e)  # si tu as un logger
+        msg = "Erreur serveur lors de l'enregistrement."
+        if _is_ajax(request):
+            return JsonResponse({'status': 'error', 'errors': {'__all__': [msg]}}, status=500)
+        form.add_error(None, msg)
+        return render(request, 'rdv/doctor/composants/dispo/dispo_add_form.html', {'form': form})
 
-    # Sur GET ou si form invalide, on renvoie uniquement le fragment du form
-    return render(
-        request,
-        'rdv/doctor/composants/dispo_add_form.html',
-        {'form': form}
-    )
+    # succès
+    if _is_ajax(request):
+        return JsonResponse({'status': 'ok', 'id': dispo.id})
+    return redirect('rdv:disponibilites_list')
+
 
 @login_required(login_url='users:login')
-@require_POST
+@require_http_methods(["GET", "POST"])
 def disponibilite_edit(request, pk):
     medecin = get_object_or_404(Medecin, user=request.user)
-    disponibilite = get_object_or_404(Disponibilite, pk=pk, medecin=medecin)
-    form = DisponibiliteForm(request.POST, instance=disponibilite)
-    if form.is_valid():
-        form.save()
-        return JsonResponse({'success': True})
-    return JsonResponse({'success': False, 'errors': form.errors})
+    dispo = get_object_or_404(Disponibilite, pk=pk, medecin=medecin)
+
+    if request.method == 'GET':
+        form = DisponibiliteEditForm(instance=dispo, medecin=medecin)
+        return render(request, 'rdv/doctor/composants/dispo/dispo_edit_form.html', {'form': form, 'disponibilite': dispo})
+
+    # POST
+    form = DisponibiliteEditForm(request.POST, instance=dispo, medecin=medecin)
+    if not form.is_valid():
+        if _is_ajax(request):
+            return JsonResponse({'status': 'error', 'errors': errors_to_dict(form.errors)}, status=400)
+        return render(request, 'rdv/doctor/composants/dispo/dispo_edit_form.html', {'form': form, 'disponibilite': dispo})
+
+    try:
+        with transaction.atomic():
+            updated = form.save(commit=False)
+            updated.medecin = medecin
+            updated.full_clean()
+            updated.save()
+    except ValidationError as ve:
+        errs = errors_to_dict(ve)
+        if _is_ajax(request):
+            return JsonResponse({'status': 'error', 'errors': errs}, status=400)
+        for f, msgs in errs.items():
+            if f == '__all__':
+                form.add_error(None, msgs)
+            else:
+                for m in msgs:
+                    form.add_error(f, m)
+        return render(request, 'rdv/doctor/composants/dispo/dispo_edit_form.html', {'form': form, 'disponibilite': dispo})
+    except IntegrityError:
+        msg = "Un créneau identique existe déjà pour ce médecin (même jour/date et mêmes heures)."
+        if _is_ajax(request):
+            return JsonResponse({'status': 'error', 'errors': {'__all__': [msg]}}, status=409)
+        form.add_error(None, msg)
+        return render(request, 'rdv/doctor/composants/dispo/dispo_edit_form.html', {'form': form, 'disponibilite': dispo})
+    except Exception as e:
+        # logger.exception(e)
+        msg = "Erreur serveur lors de la mise à jour."
+        if _is_ajax(request):
+            return JsonResponse({'status': 'error', 'errors': {'__all__': [msg]}}, status=500)
+        form.add_error(None, msg)
+        return render(request, 'rdv/doctor/composants/dispo/dispo_edit_form.html', {'form': form, 'disponibilite': dispo})
+
+    # succès
+    if _is_ajax(request):
+        return JsonResponse({'status': 'ok', 'id': dispo.id})
+    return redirect('rdv:disponibilites_list')
 
 @login_required(login_url='users:login')
 @require_POST

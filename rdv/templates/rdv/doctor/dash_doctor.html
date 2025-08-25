@@ -1,19 +1,13 @@
 {% extends 'rdv/doctor/base_doctor.html' %}
 
-{% load static %}
-
 {% block menu_block %}
     {% include 'rdv/doctor/composants/menu_doctor.html' %}
 {% endblock %}
 
 {% block content %}
-{% include 'rdv/doctor/composants/dash_content.html' %}
-
+    {% include 'rdv/doctor/composants/dashboard/dash_content.html' %}
 {% endblock %}
-
 
 {% block extra_js %}
     {{ block.super }}
-    
-    
 {% endblock %}

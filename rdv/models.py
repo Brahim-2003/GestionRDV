@@ -5,6 +5,7 @@ from django.utils.timesince import timesince
 from django.utils.translation import gettext_lazy as _
 from django.core.validators import RegexValidator
 from django.utils import timezone
+from django.db.models import Q, UniqueConstraint
 
 
 
@@ -74,8 +75,6 @@ class Medecin(models.Model):
         return f"Dr. {self.user.nom_complet()} - {self.specialite}"
 
 class Disponibilite(models.Model):
-    # --- Types de créneau ---
-    # Si date_specific est renseigné, on ignore 'jour' (créneau ponctuel)
     JOUR_CHOICES = [
         ('mon', 'Lundi'),
         ('tue', 'Mardi'),
@@ -87,7 +86,7 @@ class Disponibilite(models.Model):
     ]
 
     medecin        = models.ForeignKey(
-        Medecin, on_delete=models.CASCADE, related_name="disponibilites"
+        'Medecin', on_delete=models.CASCADE, related_name="disponibilites"
     )
     # Créneau hebdo
     jour           = models.CharField(
@@ -106,48 +105,67 @@ class Disponibilite(models.Model):
         help_text="Désactive pour masquer temporairement sans supprimer"
     )
 
-    # Pour reporting et audit
     created_at     = models.DateTimeField(auto_now_add=True)
     updated_at     = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = "Disponibilité"
         verbose_name_plural = "Disponibilités"
-        # Empêche les doublons exacts
-        unique_together = [
-            ('medecin', 'jour', 'date_specific', 'heure_debut', 'heure_fin')
-        ]
         ordering = ['medecin', 'date_specific', 'jour', 'heure_debut']
 
+        constraints = [
+            # Unicité pour les créneaux hebdomadaires (date_specific NULL)
+            UniqueConstraint(
+                fields=['medecin', 'jour', 'heure_debut', 'heure_fin'],
+                condition=Q(date_specific__isnull=True) & ~Q(jour=''),
+                name='unique_dispo_hebdo'
+            ),
+            # Unicité pour les créneaux spécifiques (jour vide)
+            UniqueConstraint(
+                fields=['medecin', 'date_specific', 'heure_debut', 'heure_fin'],
+                condition=Q(jour='') | Q(jour__exact=''),
+                name='unique_dispo_specifique'
+            ),
+        ]
+
     def clean(self):
-        # 1) début < fin
+        errors = {}
+
+        # 0) Medecin : si absent, on lève une erreur explicite (utile si instance créée sans medecin)
+        if not getattr(self, 'medecin', None):
+            raise ValidationError(_("Le médecin est requis pour valider cette disponibilité."))
+
+        # 1) Présence des heures
+        if self.heure_debut is None:
+            errors['heure_debut'] = _("L'heure de début est requise.")
+        if self.heure_fin is None:
+            errors['heure_fin'] = _("L'heure de fin est requise.")
+        if errors:
+            raise ValidationError(errors)
+
+        # 2) début < fin
         if self.heure_debut >= self.heure_fin:
-            raise ValidationError(_("L'heure de début doit être antérieure à l'heure de fin."))
+            raise ValidationError({
+                'heure_debut': _("L'heure de début doit être antérieure à l'heure de fin."),
+                'heure_fin': _("L'heure de fin doit être postérieure à l'heure de début."),
+            })
 
-        # 2) jour XOR date_specific
+        # 3) XOR jour / date_specific (exactement l'un ou l'autre)
         if bool(self.jour) == bool(self.date_specific):
-            raise ValidationError(
-                _("Spécifiez soit un jour de semaine (jour), soit une date précise (date_specific), pas les deux.")
-            )
+            raise ValidationError(_("Spécifiez soit un jour de semaine (jour), soit une date précise (date_specific), pas les deux."))
 
-        # 3) conflit de créneaux
+        # 4) Conflits : seulement si medecin renseigné (on l'a déjà vérifié)
         qs = Disponibilite.objects.filter(medecin=self.medecin, is_active=True)
-        # même type de créneau (hebdo vs ponctuel)
         if self.date_specific:
             qs = qs.filter(date_specific=self.date_specific)
         else:
             qs = qs.filter(jour=self.jour, date_specific__isnull=True)
 
-        # exclure l’instance en cours si update
         if self.pk:
             qs = qs.exclude(pk=self.pk)
 
-        # détecter chevauchement
-        conflits = qs.filter(
-            heure_debut__lt=self.heure_fin,
-            heure_fin__gt=self.heure_debut
-        )
-        if conflits.exists():
+        chevauchements = qs.filter(heure_debut__lt=self.heure_fin, heure_fin__gt=self.heure_debut)
+        if chevauchements.exists():
             raise ValidationError(_("Chevauchement détecté avec un autre créneau."))
 
     def __str__(self):
@@ -157,12 +175,7 @@ class Disponibilite(models.Model):
             label = dict(self.JOUR_CHOICES).get(self.jour, self.jour)
         return f"{self.medecin} — {label} de {self.heure_debut:%H:%M} à {self.heure_fin:%H:%M}"
 
-    # 5) Méthode utilitaire pour générer des slots datetime
     def get_slot_datetimes(self, reference_week_start=None):
-        """
-        Si c'est un créneau hebdo, renvoie les datetimes pour la semaine spécifiée
-        Si c'est ponctuel, renvoie la date_specific + heures
-        """
         slots = []
         if self.date_specific:
             date = self.date_specific
@@ -170,10 +183,8 @@ class Disponibilite(models.Model):
             end   = timezone.datetime.combine(date, self.heure_fin)
             slots.append((start, end))
         else:
-            # on a besoin d'un point de départ de semaine
             if not reference_week_start:
                 reference_week_start = timezone.now().date()
-            # calcul du prochain jour de semaine correspondant
             dow_map = {'mon':0,'tue':1,'wed':2,'thu':3,'fri':4,'sat':5,'sun':6}
             target = dow_map[self.jour]
             delta_days = (target - reference_week_start.weekday()) % 7
@@ -200,8 +211,10 @@ class RendezVous(models.Model):
     duree_minutes = models.IntegerField(default=30)
     motif = models.CharField(max_length=200, blank=True)
     statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='programme')
+    raison_report = models.CharField(max_length=255, blank=True, null=True)
+    raison_annulation = models.CharField(max_length=255, blank=True, null=True)
     date_creation = models.DateTimeField(auto_now_add=True)
-    date_modification = models.DateTimeField(auto_now_add=True)
+    date_modification = models.DateTimeField(auto_now=True)
 
 
 

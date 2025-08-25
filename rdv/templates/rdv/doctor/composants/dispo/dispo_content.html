@@ -1,0 +1,125 @@
+{% load static %}
+
+<div class="section-header">
+  <div>
+    <h2>
+      <i class="bx bxs-calendar-check"></i>
+      <span>Mes Disponibilités</span>
+    </h2>
+    <p>Gère tes créneaux de consultation</p>
+  </div>
+
+  <button id="open-create-dispo" class="btn-primary btn-sm" data-form-url="{% url 'rdv:disponibilite_add' %}">
+    <i class='bx bxs-calendar-plus'></i> Ajouter un créneau
+  </button>
+
+
+  <!-- Modal Overlay -->
+<div id="create-dispo-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <header class="modal-header">
+      <h2 class="modal-title"><i class="bx bx-calendar-plus"></i> Ajouter une Disponibilité</h2>
+      <button class="modal-close" aria-label="Fermer">&times;</button>
+    </header>
+    <section class="modal-body">
+      <div id="modal-form-container">          
+        <p>Chargement du formulaire…</p>
+      </div>
+    </section>
+  </div>
+</div>    
+</div>
+
+<div id="edit-dispo-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <header class="modal-header">
+      <h2 class="modal-title"><i class='bx bxs-calendar-edit'></i> Modifier une Disponibilité</h2>
+      <button class="modal-close" aria-label="Fermer">&times;</button>
+    </header>
+    <section class="modal-body">
+      <div id="edit-modal-form-container"><p>Chargement du formulaire…</p></div>
+    </section>
+  </div>
+</div>
+
+
+
+
+   
+
+<div id="dispo-content">
+  <!-- Formulaire de filtres — adapté au dispo.js -->
+<form id="filter-form" class="search-filter-bar" role="search" aria-label="Filtrer les disponibilités" onsubmit="return false;">
+<select class="filter-select" id="type-select" name="type" aria-label="Filtrer par type">
+    <option value="">Tous types</option>
+    <option value="ponctuel">Ponctuel</option>
+    <option value="hebdomadaire">Hebdomadaire</option>
+  </select>
+  <select class="filter-select" id="jour-select" name="jour" aria-label="Filtrer par jour">
+    <option value="">Tous les jours</option>
+    <option value="mon">Lundi</option>
+    <option value="tue">Mardi</option>
+    <option value="wed">Mercredi</option>
+    <option value="thu">Jeudi</option>
+    <option value="fri">Vendredi</option>
+    <option value="sat">Samedi</option>
+    <option value="sun">Dimanche</option>
+  </select>
+
+  <!-- date input : renvoie normalement YYYY-MM-DD via input[type=date] -->
+ <input id="date-input"
+         name="date"
+         type="date"
+         class="date-input"
+         placeholder="jj/mm/aaaa"
+         aria-label="Filtrer par date">
+
+</form>
+
+
+  <div id="dispo-table-container"
+       data-url="{% url 'rdv:disponibilites_list' %}"
+       data-ajax-url="{% url 'rdv:disponibilites_list' %}?table-only=1">
+    {% include 'rdv/doctor/composants/dispo/dispo_table.html' %}
+    {% if page_obj.has_other_pages %}
+      <div class="pagination">
+        <ul>
+        {% if page_obj.has_previous %}
+          <li>
+            <a href="?page=1{% if type_filter %}&type={{ type_filter }}{% endif %}{% if jour_filter %}&jour={{ jour_filter }}{% endif %}{% if date_filter %}&date={{ date_filter }}{% endif %}" data-page="1">
+              « Première
+            </a>
+          </li>
+          <li>
+            <a href="?page={{ page_obj.previous_page_number }}{% if type_filter %}&type={{ type_filter }}{% endif %}{% if jour_filter %}&jour={{ jour_filter }}{% endif %}{% if date_filter %}&date={{ date_filter }}{% endif %}" data-page="{{ page_obj.previous_page_number }}">
+              ‹ Précédent
+            </a>
+          </li>
+        {% endif %}
+          <li>Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</li>
+          {% if page_obj.has_next %}
+            <li>
+              <a href="?page={{ page_obj.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}"
+                 data-page="{{ page_obj.next_page_number }}">
+                Suivant ›
+              </a>
+            </li>
+            <li>
+              <a href="?page={{ page_obj.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}"
+                 data-page="{{ page_obj.paginator.num_pages }}">
+                Dernière »
+              </a>
+            </li>
+          {% endif %}
+        </ul>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+
+<script defer src="{% static 'rdv/js/doctor/dispo_modal.js' %}"></script>
+<script defer src="{% static 'rdv/js/doctor/dispo.js' %}"></script>
+
+
+

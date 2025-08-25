@@ -34,12 +34,9 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 a {
-  color: var(--primary-color);
   text-decoration: none;
-}
-
-a:hover {
-  text-decoration: underline;
+  color: var(--primary-color);
+  
 }
 
 button {
@@ -63,19 +60,26 @@ button {
   background-color: #ffffff;
   display: flex;
   flex-direction: column;
-  border-right: 10px solid var(--border-color);
+  border-right: 5px solid var(--border-color);
   z-index: 1000;
   overflow: hidden;
 }
 
+
+/* override fiable pour #ajax-content */
 #ajax-content {
   margin-left: var(--sidebar-width);
-  width: calc(100% - var(--sidebar-width));
-  height: 100vh;
-  background: #ffffff;
+  width: calc(100vw - var(--sidebar-width));
+  min-width: 0;
+  background: #fff;
+  height: auto;            /* évite fixed 100vh qui peut créer overflow */
+  max-height: 100vh;
+  box-sizing: border-box;
+  position: relative;
+  flex: 1 1 auto;
   overflow-y: auto;
-  transition: margin-left 0.3s ease;
 }
+
 
 /* ===== OVERLAY MOBILE ===== */
 .sidebar-overlay {
@@ -97,6 +101,208 @@ button {
   opacity: 1;
   visibility: visible;
 }
+
+/* Bouton principal */
+.btn-primary {
+  background: #007bff;
+  color: #fff;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn-primary:hover {
+  background: #0056b3;
+}
+
+/* En-tête de section */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 10px 20px;
+}
+
+.section-header h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0;
+  color: #22223b;
+}
+
+.section-header p {
+  color: #6c757d;
+  margin: 2px 0 0;
+  font-size: 0.875rem;
+}
+/* Conteneur form en flex */
+.search-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 8px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+
+/* Tous les direct children prennent de la place */
+.search-filter-bar > * {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Zone recherche : peut être .search-input-container ou .search-filter-bar (cas erroné) */
+.search-filter-bar .search-input-container,
+.search-filter-bar > .search-filter-bar {
+  flex: 2;               /* 2 parts */
+  position: relative;
+}
+
+/* Icône dans la zone recherche */
+.search-filter-bar .search-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1rem;
+  color: #6c757d;
+  pointer-events: none;
+}
+
+/* Inputs et select remplissent leur conteneur */
+.search-filter-bar input,
+.search-filter-bar select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: 1px solid #ced4da;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  background: #f8f9fa;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  /* si icône présente, on compense le padding */
+}
+.search-filter-bar .search-input-container input {
+  padding-left: 36px;
+}
+
+.search-filter-bar input:focus,
+.search-filter-bar select:focus {
+  border-color: #007bff;
+  box-shadow: 0 0 0 0.1rem rgba(0,123,255,0.25);
+  outline: none;
+}
+
+/* Champ date et select : 1 part chacun */
+.search-filter-bar .date-input,
+.search-filter-bar .filter-select {
+  flex: 1;
+}
+
+
+
+
+/* Conteneur principal */
+.tab-content {
+  background: #f8fafc;
+  padding: 20px 16px;
+  border-radius: 8px;
+  max-width: 1100px;
+  margin: 20px auto;
+  font-family: 'Inter', Arial, sans-serif;
+}
+
+/* Tableau */
+.data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 6px rgba(60, 72, 88, 0.06);
+}
+.data-table th, .data-table td {
+  padding: 12px;
+  text-align: left;
+}
+.data-table thead th {
+  background: #f1f5f9;
+  color: #22223b;
+  font-weight: 600;
+  font-size: 0.875rem;
+  border-bottom: 1px solid #e0e6ed;
+}
+.data-table tbody tr {
+  border-bottom: 1px solid #e0e6ed;
+}
+.data-table tbody tr:last-child {
+  border-bottom: none;
+}
+.data-table td {
+  font-size: 0.875rem;
+  color: #22223b;
+}
+
+/* Actions */
+.action-btn-edit{
+  color: rgb(44, 233, 44);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  margin-right: 0.5rem;
+  transition: transform 0.2s;
+}
+
+.action-btn-delete {
+  color: rgb(232, 71, 71);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  margin-right: 0.5rem;
+  transition: transform 0.2s;
+}
+.action-btn-edit:hover {
+  transform: scale(1.1);
+  color: #157f20;
+}
+.action-btn-delete:hover {
+  transform: scale(1.1);
+  color: #b1202e;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .search-filter-bar {
+    flex-direction: column;
+  }
+  .search-filter-bar input[type="search"] {
+    width: 100%;
+  }
+}
+
+/* Responsive : sur très petit écran, on empile */
+@media (max-width: 500px) {
+  .search-filter-bar {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .search-filter-bar > * {
+    width: 100%;
+  }
+}
+
+
+
+
 
 /* ===== RESPONSIVE DESIGN ===== */
 @media (max-width: 1200px) {
@@ -158,3 +364,5 @@ button {
   border-radius: 0 !important;
   box-shadow: none !important;
 }
+
+

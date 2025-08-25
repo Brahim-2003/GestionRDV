@@ -16,7 +16,7 @@
                 </td>
                 <td>{{ user.email }}</td>
                 <td><span class="user-role">{{ user.role }}</span></td>
-                <td><span class="user-status">{% if user.is_actif %}Actif{% else %}Non Actif{% endif %}</span></td>
+                <td><span class="user-status">{% if user.is_actif %}<i class='bx bxs-check-circle' style='color:#2d7318' ></i>{% else %}<i class='bx bx-x' style='color:#af1014'></i>{% endif %}</span></td>
                 <td>
                     <a href="{% url 'users:modifier_utilisateur' user.id %}" class="action-btn-edit">
                         <i class='bx bxs-edit' style='color:#20a52d'  ></i>

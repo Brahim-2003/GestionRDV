@@ -5,26 +5,26 @@ from .models import Patient, Medecin, RendezVous, Disponibilite, Notification, M
 
 @admin.register(Patient)
 class PatientAdmin(admin.ModelAdmin):
-    list_display = ('numero_patient', 'user', 'date_naissance')
-    search_fields = ['numero_patient', 'utilisateur__nom', 'utilisateur__prenom', 'utilisateur__email']
-    list_filter = ['date_naissance',]
+    list_display = ('numero_patient', 'user', 'date_naissance', 'adresse', 'sexe', 'tel')
+    search_fields = ['numero_patient', 'user__nom', 'user__prenom', 'user__email']
+    list_filter = ['sexe','user__date_inscription']
     readonly_fields = ('numero_patient',)
     
     fieldsets = (
         ('Informations générales', {
-            'fields': ['user', 'numero_patient', 'date_naissance', 'adresse']
+            'fields': ['user', 'numero_patient', 'date_naissance', 'adresse', 'sexe', 'tel']
             }),
     )
 
 @admin.register(Medecin)
 class MedecinAdmin(admin.ModelAdmin):
-    list_display = ('user', 'numero_order', 'specialite', 'cabinet')
+    list_display = ('numero_order', 'user', 'specialite', 'cabinet', 'tel')
     search_fields = ['numero_order', 'user__nom', 'user__prenom', 'cabinet']
-    list_filter = ['specialite']
+    list_filter = ['sexe', 'specialite', 'user__date_inscription']
     
     fieldsets = (
         ('Informations générales', {
-            'fields': ['user', 'numero_order', 'specialite']
+            'fields': ['user', 'numero_order', 'sexe', 'specialite', 'tel']
             }),
         ('Cabinet', {
             'fields': ['cabinet', 'adresse_cabinet']
@@ -36,25 +36,28 @@ class MedecinAdmin(admin.ModelAdmin):
 
 @admin.register(Disponibilite)
 class DisponibiliteAdmin(admin.ModelAdmin):
-    list_display = ('medecin', 'jour', 'heure_debut', 'heure_fin')
-    search_fields = ['medecin__utilisateur__nom', 'jour']
-    list_filter = ['jour', 'heure_debut']
+    list_display = ('medecin', 'jour', 'date_specific', 'heure_debut', 'heure_fin', 'is_active')
+    search_fields = ['medecin__utilisateur__nom', 'medecin__utilisateur__prenom', 'jour']
+    list_filter = ['jour', 'date_specific', 'is_active', 'created_at']
 
 
     fieldsets = (
         ('Disponibilité', {
-            'fields' : ['medecin', 'jour']
+            'fields' : ['medecin', 'jour', 'date_specific'] 
         }),
         ('Horaires', {
             'fields': ['heure_debut', 'heure_fin']
+        }),
+        ('Statut', {
+            'fields': ['is_active']
         }),
     )
 
 @admin.register(RendezVous)
 class RendezVousAdmin(admin.ModelAdmin):
     list_display = ('patient', 'medecin', 'date_heure_rdv', 'duree_minutes', 'statut', 'motif', 'date_creation')
-    search_fields = ['patient__utilisateur__nom', 'medecin__utilisateur__nom', 'motif']
-    list_filter = ['statut', 'date_heure_rdv', 'medecin__specialite']
+    search_fields = ['patient__utilisateur__nom', 'patient__utilisateur__prenom', 'medecin__utilisateur__nom', 'medecin__utilisateur__prenom', 'motif']
+    list_filter = ['statut', 'date_creation']
     date_hierarchy = 'date_heure_rdv'
     
     fieldsets = (
@@ -70,13 +73,21 @@ class RendezVousAdmin(admin.ModelAdmin):
 
 @admin.register(Notification)
 class NotificationAdmin(admin.ModelAdmin):
-    list_display = ('user', 'message', 'type', 'date_envoi')
-    search_fields = ['user__nom', 'user__prenom', 'message']
-    list_filter = ['date_envoi']
+    list_display = ('user', 'message', 'type', 'category', 'is_read', 'date_envoi')
+    search_fields = ['user__nom', 'user__prenom']
+    list_filter = ['date_envoi', 'type', 'is_read']
     
     fieldsets = (
         ('Message', {
             'fields': ['user', 'message']
+        }),
+
+        ('Détails', {
+            'fields': ['type', 'category', 'is_read']
+        }),
+
+        ('Horaires', {
+            'fields': ['date_envoi']
         }),
     )
 

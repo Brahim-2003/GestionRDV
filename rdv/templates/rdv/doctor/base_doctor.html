@@ -11,17 +11,18 @@
   <link rel="stylesheet" href="{% static 'rdv/css/animations.css' %}">
   <link rel="stylesheet" href="{% static 'rdv/css/transformations.css' %}">
 
-    <!-- FEUILLES DE STYLE GLOBALES -->
-  <link rel="stylesheet" href="{% static 'rdv/css/base.css' %}">
-  <link rel="stylesheet" href="{% static 'rdv/css/doctor/doctor.css' %}">
-  <link rel="stylesheet" href="{% static 'rdv/css/doctor/rdvs.css' %}">
-  <link rel="stylesheet" href="{% static 'rdv/css/notifs/notifs.css' %}">
 
-
-
-  <!-- COMPOSANTS -->
+    <!-- COMPOSANTS -->
   <link rel="stylesheet" href="{% static 'rdv/css/composants/menu.css' %}">
   <link rel="stylesheet" href="{% static 'rdv/css/composants/card.css' %}">
+
+    <!-- FEUILLES DE STYLE GLOBALES -->
+
+  <link rel="stylesheet" href="{% static 'rdv/css/doctor/doctor.css' %}">
+  <link rel="stylesheet" href="{% static 'rdv/css/doctor/rdvs.css' %}">
+  <link rel="stylesheet" href="{% static 'rdv/css/doctor/disponibilites.css' %}">
+  <link rel="stylesheet" href="{% static 'rdv/css/notifs/notifs.css' %}">
+  <link rel="stylesheet" href="{% static 'rdv/css/base.css' %}">
 
 
   {% block extra_css %}{% endblock %}
@@ -31,7 +32,6 @@
   <div class="app-container">
     <div class="sidebar">
       <!-- Contenu de la sidebar -->
-      <!-- NAV TABS -->
       {% block menu_block %}
       {% endblock %}
     </div>
@@ -40,18 +40,14 @@
     <div id="ajax-content">
         {% block content %}{% endblock %}
 
-        {% block extra_js %}
+      {% block extra_js %}
         {{ block.super }}
           <script defer src="{% static 'rdv/js/admin/composants/menu.js' %}"></script>
-      {% endblock %}
-
-      <!-- SCRIPTS GLOBAUX & COMPOSANTS -->
-      <script src="{% static 'rdv/js/boxicons.min.js' %}"></script>
-      <script defer src="{% static 'rdv/js/doctor/base.js' %}"></script>         
+      {% endblock %}   
+         <!-- SCRIPTS GLOBAUX & COMPOSANTS -->
+      <script defer src="{% static 'rdv/js/doctor/base.js' %}"></script>      
     </div>
-             
-  </div>
-
+  </div>   
 </body>
 </html>
 

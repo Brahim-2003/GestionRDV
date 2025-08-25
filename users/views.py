@@ -1,21 +1,19 @@
-from multiprocessing import context
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
-from django.contrib.auth.decorators import login_required, permission_required, user_passes_test
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
-from django.http import JsonResponse, HttpResponseForbidden
+from django.contrib.auth.decorators import login_required, permission_required, user_passes_test
+from django.contrib.auth.forms import PasswordChangeForm
 from django.core.paginator import Paginator
 from django.db.models import Q, Max
-from django.views.decorators.http import require_POST
-from django.contrib.auth.forms import PasswordChangeForm
-from django.contrib import messages
-from .models import Utilisateur
-from rdv.models import Patient, Medecin
+from django.http import JsonResponse, HttpResponseForbidden
+from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.utils.dateparse import parse_datetime
 from django.utils.timezone import now
-from rdv.views import dashboard_admin_view
+from django.views.decorators.http import require_POST
+
+# App imports
+from .models import Utilisateur
+from rdv.models import Patient, Medecin
 from .forms import ConnexionForm, RegisterForm, UtilisateurCreationForm, UtilisateurUpdateForm
 
 # Create your views here.
@@ -152,78 +150,91 @@ def profil_view(request, user_id):
 
 
 
-# Liste des utilisateurs (admin uniquement)
 @login_required(login_url='users:login')
 @permission_required('users.can_view_all_users', raise_exception=True)
 def liste_utilisateurs(request):
-    search_query = request.GET.get('search', '')
-    role_filter  = request.GET.get('role', '')
-    
+    # paramètres
+    search_query = (request.GET.get('search') or '').strip()
+    role_filter = (request.GET.get('role') or '').strip()
+    active_param = (request.GET.get('active') or '').strip()
+
+    # base queryset
     qs = Utilisateur.objects.all()
-    
+
+    # recherche
     if search_query:
         qs = qs.filter(
             Q(nom__icontains=search_query) |
             Q(prenom__icontains=search_query) |
             Q(email__icontains=search_query)
         )
+
+    # filtre role (attend la clé de rôle)
     if role_filter:
         qs = qs.filter(role=role_filter)
-    
+
+    # filtre actif : accepte plusieurs formats
+    if active_param != '':
+        ap = active_param.lower()
+        if ap in ('1', 'true', 't', 'yes', 'y', 'actif', 'active'):
+            qs = qs.filter(is_actif=True)
+        elif ap in ('0', 'false', 'f', 'no', 'n', 'inactif', 'inactive'):
+            qs = qs.filter(is_actif=False)
+        # sinon : ignore (ne pas lever d'erreur)
+
+    # tri & pagination
     qs = qs.order_by('-date_inscription')
-    
-    paginator  = Paginator(qs, 25)
+    paginator = Paginator(qs, 25)
     page_number = request.GET.get('page')
-    page_obj    = paginator.get_page(page_number)
-    
+    page_obj = paginator.get_page(page_number)
+
     context = {
         'page_obj': page_obj,
         'search_query': search_query,
         'role_filter': role_filter,
-        'roles': Utilisateur.ROLE,
+        'active_filter': active_param,
+        'roles': Utilisateur.ROLE,  # utile pour rendre le select côté template
     }
-    # Déterminer quel template renvoyer
 
-    # Si on demande *seulement* le tableau (via fetchTable)
+    # si on demande *seulement* le tableau (via fetchTable AJAX)
     if request.GET.get('table-only') == '1':
         return render(request, 'rdv/admin/users/composants/users_table.html', context)
-    # Si c'est une requête AJAX classique (navigation ou refresh de contenu)
+
+    # si requête AJAX (navigation fragment)
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return render(request, 'rdv/admin/users/composants/users_content.html', context)
 
-    # Sinon → page complète (header + navbar + tout)
+    # sinon page complète
     return render(request, 'rdv/admin/users/users.html', context)
-
 
 
 # Liste des utilisateurs (admin uniquement)
 @login_required(login_url='users:login')
 @permission_required('users.can_view_all_users', raise_exception=True)
 def liste_utilisateurs_ajax(request):
-    last_check = request.GET.get('last_version')
+    # Query de base
     qs = Utilisateur.objects.all()
-
-    # Nombre d'utilisateurs et date max modif/créa
+    
+    # Infos actuelles
     current_count = qs.count()
-    last_update = qs.aggregate(Max('updated_at'))['updated_at__max'] or now()
+    last_update = qs.aggregate(Max('updated_at'))['updated_at__max'] or timezone.now()
 
-    # Si le client a une version, on compare
-    if last_check:
+    last_version = request.GET.get('last_version')
+    if last_version:
         try:
-            # last_version était encodé "iso|count"
-            iso, cnt = last_check.split('|')
-            dt = parse_datetime(iso)
-            cnt = int(cnt)
+            iso, cnt = last_version.split('|', 1)
+            client_dt = parse_datetime(iso)
+            client_cnt = int(cnt)
         except Exception:
-            dt = None
-            cnt = None
+            client_dt = None
+            client_cnt = None
 
-        # Si ni date ni count n'ont changé → rien à renvoyer
-        if dt and cnt is not None:
-            if dt >= last_update and cnt == current_count:
+        if client_dt is not None and client_cnt is not None:
+            # Si rien n'a changé par rapport à la version client
+            if client_dt >= last_update and client_cnt == current_count:
                 return JsonResponse({'changed': False})
 
-    # Sinon on renvoie
+    # Sinon on renvoie les données (ou un résumé si tu préfères)
     users_data = [
         {
             'id': u.id,
@@ -232,14 +243,15 @@ def liste_utilisateurs_ajax(request):
             'email': u.email,
             'role': u.role,
             'is_actif': u.is_actif,
+            'updated_at': (u.updated_at.isoformat() if getattr(u, 'updated_at', None) else None),
         }
-        for u in qs.order_by('-updated_at')
+        for u in qs.order_by('-updated_at')[:1000]  # limite raisonnable
     ]
 
     return JsonResponse({
-        'changed':     True,
+        'changed': True,
         'last_version': f"{last_update.isoformat()}|{current_count}",
-        'users':        users_data,
+        'users': users_data,
     })
 
 

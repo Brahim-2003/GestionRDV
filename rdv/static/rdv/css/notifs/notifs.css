@@ -1,22 +1,8 @@
-/* static/css/notifications.css */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-body {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-    background: #f8fafc;
-    color: #334155;
-    line-height: 1.5;
-}
-
-
 /* Centrer et limiter la largeur du centre de notifications */
 .notifications-container {
     max-width: 1000px;      /* largeur max lisible */
     margin: 2rem auto;      /* centre horizontalement */
+    margin-left: 1rem;
     padding: 0 1.5rem;      /* espace intérieur */
 }
 

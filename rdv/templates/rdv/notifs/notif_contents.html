@@ -1,5 +1,6 @@
 {% load static %}
 
+<link rel="stylesheet" href="{% static 'rdv/css/boxicons.min.css' %}">
 <link rel="stylesheet" href="{% static 'rdv/css/notifs/notifs.css' %}">
 
 {# Conteneur racine exposant toutes les routes #}
@@ -38,11 +39,11 @@
   {% if notifications %}
   <div class="notifications-actions">
       <button type="button" class="btn btn-primary" id="mark-all-read">
-          <i class="fas fa-check-double"></i>
+          <i class='bx bx-check-double' ></i>
           Marquer toutes comme lues
       </button>
       <button type="button" class="btn btn-secondary" id="delete-all">
-          <i class="fas fa-trash"></i>
+          <i class='bx bxs-trash' ></i>
           Supprimer toutes
       </button>
   </div>
@@ -68,13 +69,13 @@
           <div class="notification-header">
               <div class="notification-icon {{ notification.type }}">
                   {% if notification.type == 'info' %}
-                      <i class="fas fa-info-circle"></i>
+                      <i class='bx bxs-info-circle' ></i>
                   {% elif notification.type == 'success' %}
-                      <i class="fas fa-check-circle"></i>
+                      <i class='bx bxs-check-circle' ></i>
                   {% elif notification.type == 'warning' %}
-                      <i class="fas fa-exclamation-triangle"></i>
+                      <i class='bx bxs-exclamation-triangle' ></i>
                   {% elif notification.type == 'error' %}
-                      <i class="fas fa-times-circle"></i>
+                      <i class='bx bxs-x-circle' ></i>
                   {% endif %}
               </div>
               <div class="notification-content">
@@ -83,18 +84,18 @@
                   </div>
                   <div class="notification-meta">
                       <div class="notification-date">
-                          <i class="fas fa-clock"></i>
+                          <i class='bx bxs-time-five'></i>
                           Il y a {{ notification.time_since }}
                       </div>
                       <div class="notification-actions-item">
                           {% if not notification.is_read %}
                               <button type="button" class="action-btn mark-read" data-id="{{ notification.id }}">
-                                  <i class="fas fa-eye"></i>
+                                  <i class='bx bxs-message-check'></i>
                                   Marquer comme lu
                               </button>
                           {% endif %}
                           <button type="button" class="action-btn delete delete-single" data-id="{{ notification.id }}">
-                              <i class="fas fa-trash"></i>
+                              <i class="bx bxs-trash-alt" aria-hidden="true"></i>
                               Supprimer
                           </button>
                       </div>

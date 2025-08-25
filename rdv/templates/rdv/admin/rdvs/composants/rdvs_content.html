@@ -10,28 +10,55 @@
 
   <div id="users-content">
   <form id="filter-form" class="search-filter-bar">
-    <!-- type=search pour clear natif -->
-    <div class="search-input-container">
-  <i class="bx bx-search search-icon"></i>
-  <input 
-    type="search"
-    id="search-input"
-    value="{{ search_query }}"
-    placeholder="Rechercher par nom ou prénom du patient..." >
-</div>
-  <select id="rdv-status-select">
-    <option value="">Tous les statuts</option>
-    {% for code,label in statuses %}
-      <option value="{{ code }}" {% if status_filter == code %}selected{% endif %}>
-        {{ label }}
-      </option>
-    {% endfor %}
-  </select>
-  {# bouton reset retiré #}
-</form>
+        <div class="search-input-container">
+        <i class="bx bx-search search-icon"></i>
+        <input
+            type="search"
+            id="search-input"
+            value="{{ search_query }}"
+            placeholder="Rechercher par nom ou prenom du patient…"
+        >
+        </div>
+        <select class="filter-select" id="status-select" name="status">
+            <option value="">Tous les statuts</option>
+            <option value="programme">Programmé</option>
+            <option value="confirme">Confirmé</option>
+            <option value="en_cours">En cours</option>
+            <option value="termine">Terminé</option>
+            <option value="annule">Annulé</option>
+            <option value="reporte">Reporté</option>
+        </select>
+        <input type="date" class="date-input" id="date-input" placeholder="jj/mm/aaaa"/>
+    </form>
 
 <div id="rdv-table-container" data-url="{% url 'rdv:list_rdv' %}">
   {% include 'rdv/admin/rdvs/composants/rdvs_table.html' %}
+
+  {# pagination bloc — utilise page_obj #}
+{% if page_obj.has_other_pages %}
+  <div class="pagination">
+    <ul>
+      {% if page_obj.has_previous %}
+        <li>
+          <a href="?page=1" data-page="1">« Première</a>
+        </li>
+        <li>
+          <a href="?page={{ page_obj.previous_page_number }}" data-page="{{ page_obj.previous_page_number }}">‹ Précédent</a>
+        </li>
+      {% endif %}
+      <li>Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</li>
+      {% if page_obj.has_next %}
+        <li>
+          <a href="?page={{ page_obj.next_page_number }}" data-page="{{ page_obj.next_page_number }}">Suivant ›</a>
+        </li>
+        <li>
+          <a href="?page={{ page_obj.paginator.num_pages }}" data-page="{{ page_obj.paginator.num_pages }}">Dernière »</a>
+        </li>
+      {% endif %}
+    </ul>
+  </div>
+{% endif %}
+
 </div>
 
 <script defer src="{% static 'rdv/js/admin/rdvs/rdvs.js' %}"></script>

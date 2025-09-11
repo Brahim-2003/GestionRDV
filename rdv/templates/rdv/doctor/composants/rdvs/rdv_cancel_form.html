@@ -1,0 +1,33 @@
+{# templates/rdv/forms/annuler_form.html #}
+{% load static %}
+<form id="annuler-rdv-form"
+      class="modern-form"
+      method="post"
+      data-ajax="1"
+      action="{% url 'rdv:annuler_rdv' rdv.id %}">
+  {% csrf_token %}
+
+  <p class="form-meta" style="color:#555; margin-bottom:8px;">
+    <strong>Patient :</strong> {{ rdv.patient.user.nom }} {{ rdv.patient.user.prenom }} &nbsp; — &nbsp;
+    <strong>Date :</strong> {{ rdv.date_heure_rdv|date:"d/m/Y H:i" }}
+  </p>
+
+  {% if form and form.non_field_errors %}
+    <div class="nonfield-errors">{{ form.non_field_errors }}</div>
+  {% endif %}
+
+  <p>
+    <label for="id_raison">Raison d'annulation (optionnel)</label>
+    <textarea id="id_raison" name="raison" rows="4" placeholder="Expliquez brièvement pourquoi (ex : urgence, indisponibilité)..." style="width:100%;">{{ form.raison.value|default_if_none:'' }}</textarea>
+    {% if form.raison.errors %}<div class="errorlist">{{ form.raison.errors }}</div>{% endif %}
+  </p>
+
+  <div class="form-actions" style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
+    <button type="button" class="btn btn-secondary modal-cancel">
+      <i class='bx bxs-x-circle'></i> Annuler
+    </button>
+    <button type="submit" id="annuler-rdv-submit" class="btn btn-danger">
+      <i class='bx bxs-trash-alt'></i> Confirmer l'annulation
+    </button>
+  </div>
+</form>

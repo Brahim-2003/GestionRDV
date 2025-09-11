@@ -23,7 +23,7 @@
     box-sizing: border-box;
 }
 
-.content-grid .card {
+.content-grid .card, .rdv-recents {
     flex: 1 1 50%;               /* chaque carte prend ~50% */
     background: white;
     border-radius: 6px;
@@ -31,3 +31,65 @@
     padding: 0.75rem;
     box-sizing: border-box;
 }
+
+
+
+.rdv-recents h3 i, .rdv-recents h3 span {
+    color: #007bff;
+}
+
+.btn-view-more {
+  display: inline-block;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: #007bff;
+  text-decoration: none;
+}
+
+.btn-view-more:hover {
+  color: #14385f;
+}
+
+
+/* ================================
+   Rendez-vous récents
+   ================================ */
+.rdv-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.rdv-table th, .rdv-table td {
+  text-align: left;
+  padding: 0.8rem;
+  border-bottom: 1px solid #eee;
+  font-size: 0.9rem;
+}
+
+.rdv-table th {
+  background: #f5f7fa;
+  font-weight: 600;
+}
+
+.rdv-table .empty {
+  text-align: center;
+  color: #888;
+}
+
+
+/* Statuts des rendez-vous */
+.statut {
+  padding: 0.2rem 0.6rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  text-transform: capitalize;
+}
+
+.statut.confirme { background: #d4edda; color: #155724; }
+.statut.programme { background: #fff3cd; color: #856404; }
+.statut.annule   { background: #f8d7da; color: #721c24; }
+.statut.reporte  { background: #cce5ff; color: #004085; }
+.statut.termine  { background: #e2e3e5; color: #383d41; }
+

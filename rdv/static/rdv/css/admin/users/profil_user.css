@@ -63,6 +63,13 @@ body {
             color: #f57c00;
 }
 
+.password-field {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+
 .main-content {
             max-width: 1200px;
             margin: 0 auto;
@@ -94,13 +101,28 @@ body {
 }
 
 .section-title {
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: #2c3e50;
-            margin-bottom: 1.5rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
+    font-size: 1.25rem;  /* au lieu de 1.5rem */
+    margin-bottom: 1rem; /* un peu plus compact */
+    display: flex;
+    align-items: center;
+    justify-content: space-between; /* pour placer le bouton à droite */
+    gap: 0.5rem;
+}
+
+.edit-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: #6c757d;
+    font-size: 1.1rem; /* icône plus petite */
+    padding: 0.2rem 0.4rem;
+    border-radius: 4px;
+    transition: background 0.2s, color 0.2s;
+}
+
+.edit-btn:hover {
+    background: #e9ecef;
+    color: #007bff;
 }
 
 .section-icon {
@@ -127,27 +149,23 @@ body {
             gap: 0.25rem;
 }
 
+
 .info-label {
-            font-weight: 600;
-            color: #34383c;
-            font-size: 0.875rem;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+    font-size: 0.8rem; 
+    letter-spacing: 0.3px;
 }
 
 .info-value {
-            color: #387dc1;
-            font-size: 1rem;
-            padding: 0.5rem 0;
+    font-size: 0.9rem;
+    padding: 0.3rem 0;
 }
-
 .status-badge {
             display: inline-flex;
             align-items: center;
             gap: 0.25rem;
-            padding: 0.25rem 0.75rem;
+            padding: 0.3rem 0.6rem;
             border-radius: 20px;
-            font-size: 0.875rem;
+            font-size: 0.8rem;
             font-weight: 500;
 }
 
@@ -171,7 +189,7 @@ body {
 .specialite-badge {
             background: #e3f2fd;
             color: #1976d2;
-            padding: 0.5rem 1rem;
+            padding: 0.3rem 0.6rem;
             border-radius: 6px;
             font-weight: 500;
             display: inline-block;
@@ -182,7 +200,7 @@ body {
             font-weight: bold;
             color: #007bff;
             background: #f8f9fa;
-            padding: 0.5rem;
+            padding: 0.3rem 0.6rem;
             border-radius: 4px;
             border-left: 4px solid #007bff;
 }

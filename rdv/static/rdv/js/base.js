@@ -1,8 +1,5 @@
-// static/rdv/js/admin/base.js
+// static/rdv/js/doctor/base_doctor.js
 
-/**
- * Retire callback et eventListeners, puis recharge le script inline ou externe.
- */
 function injectAndExecuteScripts(container) {
   const scripts = Array.from(container.querySelectorAll('script'));
   const loads = [];
@@ -77,7 +74,21 @@ function loadContent(url, push = true) {
   fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
     .then(r => r.ok ? r.text() : Promise.reject(`HTTP ${r.status}`))
     .then(html => {
-      container.innerHTML = html;
+      // si le serveur renvoie une page complète contenant #ajax-content,
+      // on tente d'extraire le fragment pour éviter de mettre toute la page
+      let fragment = html;
+      if (html.includes('<html') || html.includes('<body') || html.includes('id="ajax-content"')) {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = html;
+        const extracted = tmp.querySelector('#ajax-content');
+        if (extracted) fragment = extracted.innerHTML;
+        else {
+          const body = tmp.querySelector('body');
+          fragment = body ? body.innerHTML : html;
+        }
+      }
+
+      container.innerHTML = fragment;
       return injectAndExecuteScripts(container);
     })
     .then(() => {
@@ -96,10 +107,12 @@ function loadContent(url, push = true) {
  */
 function setupNavTabs() {
   document.querySelectorAll('.nav-tab').forEach(link => {
-    link.onclick = e => {
+    // éviter duplication d'handlers si appelé plusieurs fois
+    try { link.onclick = null; } catch (e) {}
+    link.addEventListener('click', e => {
       e.preventDefault();
       loadContent(link.href);
-    };
+    });
   });
 }
 
@@ -118,7 +131,7 @@ window.addEventListener('DOMContentLoaded', () => {
   runAllInits();
 });
 
-// Expose
+// Expose pour debug / usage manuel
 window.loadContent = loadContent;
 window.highlightActiveNav = highlightActiveNav;
 window.runAllInits = runAllInits;

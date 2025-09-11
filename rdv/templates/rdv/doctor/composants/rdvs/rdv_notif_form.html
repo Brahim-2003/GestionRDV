@@ -1,0 +1,19 @@
+<form id="notifier-rdv-form" method="post" class="modern-form">
+  {% csrf_token %}
+  <p>
+    {{ form.subject.label_tag }}
+    {{ form.subject }}
+    {% if form.subject.errors %}<div class="errorlist">{{ form.subject.errors }}</div>{% endif %}
+  </p>
+
+  <p>
+    {{ form.message.label_tag }}
+    {{ form.message }}
+    {% if form.message.errors %}<div class="errorlist">{{ form.message.errors }}</div>{% endif %}
+  </p>
+
+  <div class="form-actions">
+    <button type="submit" class="btn-primary">Envoyer</button>
+    <button type="button" class="btn-secondary modal-cancel">Annuler</button>
+  </div>
+</form>

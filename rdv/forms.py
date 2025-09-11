@@ -221,3 +221,47 @@ class DisponibiliteEditForm(DisponibiliteBaseForm):
     def clean(self):
         # tu peux ajouter des validations spécifiques à l'édition ici
         return super().clean()
+    
+class AnnulerRdvForm(forms.Form):
+    raison = forms.CharField(
+        label="Raison d'annulation",
+        required=False,
+        widget=forms.Textarea(attrs={'rows':4}),
+        max_length=1000,
+    )
+
+class ReporterRdvForm(forms.Form):
+    nouvelle_date = forms.DateField(
+        label="Nouvelle date",
+        widget=forms.DateInput(attrs={'type': 'date'}),
+        required=True
+    )
+    nouvelle_heure = forms.TimeField(
+        label="Nouvelle heure",
+        widget=forms.TimeInput(attrs={'type': 'time'}),
+        required=True
+    )
+    raison = forms.CharField(
+        label="Raison du report (optionnel)",
+        widget=forms.Textarea(attrs={'rows':3}),
+        required=False,
+        max_length=1000
+    )
+
+
+class NotifierRdvForm(forms.Form):
+    subject = forms.CharField(
+        label="Sujet",
+        max_length=255,
+        required=True,
+        widget=forms.TextInput(attrs={"class": "form-control"})
+    )
+    
+    message = forms.CharField(
+        label="Message",
+        required=True,
+        widget=forms.Textarea(attrs={"rows": 5, "class": "form-control"})
+    )
+
+
+

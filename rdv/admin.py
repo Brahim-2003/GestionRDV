@@ -1,7 +1,7 @@
 
 # rdv/admin.py
 from django.contrib import admin
-from .models import Patient, Medecin, RendezVous, Disponibilite, Notification, MessageBot
+from .models import Patient, Medecin, RendezVous, Disponibilite, Notification, MessageBot, RdvHistory
 
 @admin.register(Patient)
 class PatientAdmin(admin.ModelAdmin):
@@ -76,6 +76,8 @@ class NotificationAdmin(admin.ModelAdmin):
     list_display = ('user', 'message', 'type', 'category', 'is_read', 'date_envoi')
     search_fields = ['user__nom', 'user__prenom']
     list_filter = ['date_envoi', 'type', 'is_read']
+
+    readonly_fields = ("date_envoi",)
     
     fieldsets = (
         ('Message', {
@@ -102,3 +104,10 @@ class MessageBotAdmin(admin.ModelAdmin):
             'fields': ['user', 'contenu', 'intention', 'reponse']
         }),
     )
+
+@admin.register(RdvHistory)
+class RdvHistoryAdmin(admin.ModelAdmin):
+    list_display = ('rdv', 'action', 'performed_by', 'timestamp')
+    list_filter = ('action', 'performed_by')
+    search_fields = ('rdv__id', 'performed_by__email', 'description', 'old_value', 'new_value')
+    readonly_fields = ('rdv', 'action', 'performed_by', 'timestamp', 'old_value', 'new_value', 'description', 'extra')

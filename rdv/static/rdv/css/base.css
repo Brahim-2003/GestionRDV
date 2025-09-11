@@ -271,13 +271,290 @@ button {
   transition: transform 0.2s;
 }
 .action-btn-edit:hover {
-  transform: scale(1.1);
+  transform: scale(1.02);
   color: #157f20;
 }
 .action-btn-delete:hover {
-  transform: scale(1.1);
+  transform: scale(1.02);
   color: #b1202e;
 }
+
+
+
+
+
+/* modal.css */
+
+/* ===== MODAL OVERLAY (fond fixe) ===== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;                    /* top/right/bottom/left = 0 */
+  background: rgba(12,20,30,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+  padding: 24px;
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+
+/* helper pour cacher le modal (utilisé par ton JS) */
+.modal-overlay.hidden { display: none; }
+
+/* ===== MODAL BOX ===== */
+
+.modal {
+  width: 100%;
+  max-width: 880px;           /* large enough for desktop */
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 18px 40px rgba(11,20,30,0.18);
+  overflow: hidden;
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== HEADER ===== */
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid rgba(20,30,40,0.04);
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+}
+.modal-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #0b2340; /* titre sombre */
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.modal-header .modal-close {
+  background: transparent;
+  border: none;
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  color: #222;
+  padding: 6px;
+  border-radius: 8px;
+}
+.modal-header .modal-close:hover { background: rgba(0,0,0,0.04); }
+
+/* ===== BODY (scrollable) ===== */
+.modal-body {
+  padding: 20px 24px;
+  overflow: auto;
+}
+
+
+/* ===== ANIMATION ===== */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ===== FORMULAIRE COMPACT ET MODERNE ===== */
+.modern-form {
+  font-family: "Inter", system-ui, -apple-system, "Helvetica Neue", Arial;
+  color: #24303b;
+  max-width: 100%;
+}
+
+/* titre du formulaire (dans le fragment) */
+.modern-form .form-title {
+  margin: 0 0 12px 0;
+  font-size: 18px;
+  font-weight: 700;
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+
+/* paragraph d'aide ou instructions */
+.modern-form p, .modern-form .helptext {
+  color: #55656f;
+  margin: 8px 0 14px;
+  line-height: 1.4;
+  font-size: 14px;
+}
+
+
+/* Label */
+.modern-form label {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: #374151;
+}
+
+/* Champs input/select */
+.modern-form .form-control,
+.modern-form input,
+.modern-form select {
+  padding: 0.5rem 0.75rem;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  width: 100%;
+  transition: all 0.2s ease-in-out;
+}
+.modern-form .form-control:focus,
+.modern-form input:focus,
+.modern-form select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* affichage des champs générés par form.as_p
+   on cible .form-control que tu utilises dans ton Form */
+.modern-form .form-control,
+.modern-form input[type="time"],
+.modern-form input[type="date"],
+.modern-form input[type="text"],
+.modern-form input[type="search"],
+.modern-form select,
+.modern-form textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(16,24,32,0.08);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 14px;
+  color: #12202a;
+  box-sizing: border-box;
+  transition: box-shadow .15s, border-color .15s;
+}
+
+/* Actions (boutons) */
+.form-actions {
+  display:flex;
+  gap:12px;
+  margin-top:16px;
+  align-items:center;
+}
+.form-actions .btn-primary,
+.form-actions .btn-secondary {
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 14px;
+  border: none;
+  cursor: pointer;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+}
+.form-actions .btn-primary {
+  background: #2c7be5;
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(44,123,229,0.14);
+}
+.form-actions .btn-primary:hover { background:#2369d6; }
+.form-actions .btn-secondary {
+  background: #f3f6f8;
+  color: #24303b;
+  border: 1px solid rgba(18,32,42,0.04);
+}
+
+.form-actions .btn-secondary:hover {
+  background: #dadfea;
+}
+.form-actions .modal-cancel { padding-left:10px; }
+
+
+/* labels générés par as_p (p > label etc.) */
+.modern-form label {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 6px;
+  color: #32414b;
+  font-weight: 600;
+}
+
+/* erreurs / help text */
+.modern-form .errorlist {
+  margin: 6px 0 12px;
+  color: #d64545;
+  font-size: 13px;
+  list-style: none;
+  padding-left: 0;
+}
+.modern-form .nonfield-errors {
+  color:#c41c1c;
+  font-size:14px;
+  margin-bottom:10px;
+}
+
+
+/* checkbox */
+.form-check {
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.form-check-input {
+  width:18px;
+  height:18px;
+  accent-color: #2c7be5; /* modern checkbox color in supporting browsers */
+}
+
+
+
+/* ===== SCROLLBAR PERSONNALISÉE POUR LE MODAL ===== */
+.modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+.modal-body::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+.modal-body::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+.modal-body::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* small screens: buttons stacked */
+@media (max-width:540px){
+  .modal { max-width: 92vw; }
+  .form-actions { flex-direction: column-reverse; gap:10px; }
+  .form-actions .btn-primary, .form-actions .btn-secondary { width: 100%; }
+}
+
+
+
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.35rem;
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: #212529;
+}
+
+.badge-programme  { background: #c0c4c750; } /* gris */
+.badge-confirme   { background: #9ff5b379; } /* vert */
+.badge-en_cours   { background: #36c5db81; } /* bleu */
+.badge-termine    { background: #4d53587e; } /* sombre */
+.badge-annule     { background: #ea75808d; } /* rouge */
+.badge-reporte    { background: #f2d6819a; } /* jaune (texte sombre) */
+
+
+
+
+
+
+
 
 /* Responsive */
 @media (max-width: 600px) {

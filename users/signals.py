@@ -26,40 +26,46 @@ def generate_unique_numero_medecin():
         if not Medecin.objects.filter(numero_order=numero).exists():
             return numero
 
-
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
 def manage_profiles_on_role_change(sender, instance, **kwargs):
-    """
-    À chaque sauvegarde de User, crée ou supprime les profils Patient/Médecin
-    en fonction de instance.role.
-    """
     role = getattr(instance, 'role', None)
 
     if role == 'patient':
-        # Crée un profil Patient si absent
         Patient.objects.get_or_create(
             user=instance,
-            defaults={'numero_patient': generate_unique_numero_patient()}
+            defaults={
+                'tel': instance.telephone,
+                'numero_patient': generate_unique_numero_patient()
+            }
         )
-        # Supprime tout profil Médecin
         Medecin.objects.filter(user=instance).delete()
 
     elif role == 'medecin':
-        # Crée un profil Médecin si absent
         Medecin.objects.get_or_create(
             user=instance,
             defaults={
+                'tel': instance.telephone,
                 'numero_order': generate_unique_numero_medecin(),
                 'specialite': 'generaliste'
             }
         )
-        # Supprime tout profil Patient
         Patient.objects.filter(user=instance).delete()
 
     else:
-        # Pour les autres rôles, on nettoie les deux profils
         Patient.objects.filter(user=instance).delete()
         Medecin.objects.filter(user=instance).delete()
+
+    # Attribution du groupe
+    instance.groups.clear()
+    role_group = {
+        'patient': 'Patients',
+        'medecin': 'Médecins',
+        'admin': 'Administrateurs'
+    }.get(role)
+
+    if role_group:
+        group, _ = Group.objects.get_or_create(name=role_group)
+        instance.groups.add(group)
 
 
 @receiver(post_migrate)

@@ -1,0 +1,57 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>{% block title %}Dashboard Patient{% endblock %}</title>
+
+
+  <!-- ICONES -->
+  <link rel="stylesheet" href="{% static 'rdv/css/boxicons.min.css' %}">
+  <link rel="stylesheet" href="{% static 'rdv/css/animations.css' %}">
+  <link rel="stylesheet" href="{% static 'rdv/css/transformations.css' %}">
+
+
+    <!-- COMPOSANTS -->
+  <link rel="stylesheet" href="{% static 'rdv/css/composants/menu.css' %}">
+  <link rel="stylesheet" href="{% static 'rdv/css/composants/card.css' %}">
+  <link rel="stylesheet" href="{% static 'rdv/css/composants/card_jour.css' %}">
+  <link rel="stylesheet" href="{% static 'rdv/css/composants/card_recent.css' %}">
+  <link rel="stylesheet" href="{% static 'rdv/css/composants/dashboard.css' %}">
+
+    <!-- FEUILLES DE STYLE GLOBALES -->
+
+  
+  <link rel="stylesheet" href="{% static 'rdv/css/admin/users/profil_user.css' %}">
+
+  <link rel="stylesheet" href="{% static 'rdv/css/notifs/notifs.css' %}">
+  <link rel="stylesheet" href="{% static 'rdv/css/base.css' %}">
+
+
+  {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+  <div class="app-container">
+    <div class="sidebar">
+      <!-- Contenu de la sidebar -->
+      {% block menu_block %}
+      {% endblock %}
+    </div>
+
+      <!-- CONTENU PRINCIPAL (AJAX INJECTÉ) -->
+    <div id="ajax-content">
+        {% block content %}{% endblock %}
+
+      {% block extra_js %}
+        {{ block.super }}
+          <script defer src="{% static 'rdv/js/admin/composants/menu.js' %}"></script>
+      {% endblock %}   
+         <!-- SCRIPTS GLOBAUX & COMPOSANTS -->
+      <script defer src="{% static 'rdv/js/base.js' %}"></script>      
+    </div>
+  </div>   
+</body>
+</html>
+
+

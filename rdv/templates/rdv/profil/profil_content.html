@@ -1,0 +1,148 @@
+<header class="header">
+    <div class="user-info">
+        <span class="user-role medecin">{{ user.role }}</span>
+        <span style="color: #6c757d;">{{ user.nom }} {{ user.prenom }}</span>
+        <span style="color: #6c757d;">({{ user.email }})</span>
+    </div>
+</header>
+
+<div class="main-content">
+    <div class="page-header">
+        <h1 class="page-title">Profil Utilisateur</h1>
+        <p class="page-subtitle">Informations détaillées du compte utilisateur</p>
+    </div>
+
+    <!-- Informations générales -->
+    <div class="profile-section">
+        <h2 class="section-title">
+            <span class="section-icon">
+                <i class='bx bxs-info-circle'></i>
+            </span>
+            Informations générales
+        </h2>
+        <div class="info-grid">
+            <div class="info-item">
+                <span class="info-label">Nom complet</span>
+                <span class="info-value">{{ utilisateur.nom }} {{ utilisateur.prenom }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Email</span>
+                <span class="info-value">{{ utilisateur.email }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Téléphone</span>
+                <span class="info-value">{{ utilisateur.telephone }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Rôle</span>
+                <span class="info-value">{{ utilisateur.role }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Date d'inscription</span>
+                <span class="info-value">{{ utilisateur.date_inscription }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Statut</span>
+                <span class="status-badge status-active">
+                    <span class="status-dot"></span>
+                    {% if utilisateur.is_actif %}Actif{% else %}Non Actif{% endif %}
+                </span>
+            </div>
+        </div>
+    </div>
+
+ 
+    {% if utilisateur.role == "medecin" %}
+     <!-- Informations professionnelles (pour médecin) -->
+    <div class="profile-section">
+        <h2 class="section-title">
+            <span class="section-icon">
+                <i class='bx bxs-contact'></i>
+            </span>
+            Informations professionnelles
+        </h2>
+        <div class="professional-info">
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label">Numéro d'ordre</span>
+                    <span class="info-value numero-patient">
+                        {{ user_profil.numero_order }}
+                    </span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Spécialité</span>
+                    <span class="info-value">
+                        <span class="specialite-badge">{{ user_profil.specialite}}</span>                        </span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Cabinet</span>
+                    <span class="info-value">{{ user_profil.cabinet}}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Adresse cabinet</span>
+                    <span class="info-value">{{ user_profil.adresse_cabinet}}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Téléphone cabinet</span>
+                    <span class="info-value">{{ user_profil.tel}}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Sexe</span>
+                    <span class="info-value">{{ user_profil.sexe}}</span>
+                </div>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="info-item">
+                <span class="info-label">Diplômes</span>
+                <span class="info-value">
+                    {{ user_profil.diplomes}}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    {% elif utilisateur.role == "patient" %}
+    <div class="profile-section">
+        <h2 class="section-title">
+            <span class="section-icon">
+                <i class='bx bxs-user'></i>
+            </span>
+            Informations patient
+        </h2>
+        <div class="medical-info">
+            <div class="info-grid">
+                <div class="info-item">
+                    <span class="info-label">Numéro patient</span>
+                    <span class="info-value numero-patient">
+                        {{ user_profil.numero_patient }}
+                    </span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Date de naissance</span>
+                    <span class="info-value">{{ user_profil.date_naissance }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Sexe</span>
+                    <span class="info-value">{{ user_profil.sexe }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">Téléphone</span>
+                    <span class="info-value">{{ user_profil.tel }}</span>
+                </div>
+            </div>
+            
+            <div class="divider"></div>
+            
+            <div class="info-item">
+                <span class="info-label">Adresse</span>
+                <span class="info-value">
+                    {{ user_profil.adresse }}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    {% endif %}
+</div>

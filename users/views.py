@@ -79,6 +79,11 @@ def connecter(request):
             return redirect('rdv:dashboard_medecin')
         except Medecin.DoesNotExist:
             pass
+        try:
+            _ = user.profil_patient
+            return redirect('rdv:dashboard_patient')
+        except Patient.DoesNotExist:
+            pass
         return redirect('rdv:acceuil')
 
     form = ConnexionForm(request.POST or None)
@@ -95,6 +100,11 @@ def connecter(request):
                 _ = user.profil_medecin
                 return redirect('rdv:dashboard_medecin')
             except Medecin.DoesNotExist:
+                pass
+            try:
+                _ = user.profil_patient
+                return redirect('rdv:dashboard_patient')
+            except Patient.DoesNotExist:
                 pass
             return redirect('rdv:acceuil')
         messages.error(request,
@@ -134,8 +144,10 @@ def deconnecter(request):
 
 
 # Vue du profil utilisateur
+
+# Vue du profil utilisateur
 @login_required(login_url='users:login')
-def profil_view(request, user_id):
+def profil(request, user_id):
     us = Utilisateur.objects.get(pk=user_id)
     if us.ROLE=='patient':  
         us_profil = Utilisateur.objects.filter(pk=user_id)
@@ -146,7 +158,42 @@ def profil_view(request, user_id):
     context = {"utilisateur" : get_object_or_404(Utilisateur, pk=user_id),
                "user_profil" : us_profil,
                }
+    
+    # si requête AJAX (navigation fragment)
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return render(request, 'rdv/profil/profil_content.html', context)
+
+    # Sinon page complète
     return render(request, 'rdv/admin/users/profil_user.html', context)
+
+
+@login_required(login_url='users:login')
+def profil_view(request):
+    us = request.user
+    if us.ROLE=='patient':  
+        us_profil = us
+    elif us.ROLE=='medecin':
+        us_profil = us
+    else:
+        us_profil = us
+    context = {"utilisateur" : us,
+               "user_profil" : us_profil,
+               }
+    
+    # si requête AJAX (navigation fragment)
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return render(request, 'rdv/profil/mon_profil.html', context)
+
+    # page complète selon rôle
+    if us.role == 'admin':
+        tpl = 'rdv/admin/users/profil.html'
+    elif us.role == 'medecin':
+        tpl = 'rdv/doctor/profil.html'
+    else:
+        tpl = 'rdv/patient/profil.html'
+    return render(request, tpl, context)
+
+ 
 
 
 

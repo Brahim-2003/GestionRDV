@@ -1,24 +1,31 @@
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 # Django imports (groupés et triés)
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
-from django.core.serializers.json import DjangoJSONEncoder
+from django.core.serializers.json import DjangoJSONEncoder 
 from django.db import IntegrityError, transaction
 from django.db.models import Q, Count
-from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse, HttpResponseBadRequest
 from django.shortcuts import render, redirect, get_object_or_404
 from django.template.loader import render_to_string
 from django.utils import timezone
-from django.views.decorators.http import require_POST, require_http_methods
+from django.views.decorators.http import require_POST, require_http_methods, require_GET
 from django.contrib.auth.decorators import login_required, permission_required
+import json
+import logging
+from django.utils.dateparse import parse_datetime
+
 
 
 # App imports
 from users.models import Utilisateur
-from .forms import UpdateRDVForm, DisponibiliteEditForm, DisponibiliteCreateForm
-from .models import RendezVous, Notification, Patient, Medecin, Disponibilite
+from .forms import UpdateRDVForm, DisponibiliteEditForm, DisponibiliteCreateForm, AnnulerRdvForm, ReporterRdvForm, NotifierRdvForm
+from .models import RendezVous, Notification, Patient, Medecin, Disponibilite, RdvHistory
+from . import notifications as notif_helpers
+from rdv.utils import user_can_manage_rdv, send_manual_notification
+
 
 
 
@@ -128,34 +135,6 @@ def get_user_type(user):
             return 'patient'
     return 'unknown'
 
-# Fonction utilitaire pour créer des notifications
-def create_notification(user, message, notification_type='info', category='system'):
-    """Crée une nouvelle notification pour un utilisateur"""
-    notification = Notification.objects.create(
-        user=user,
-        message=message,
-        type=notification_type,
-        category=category
-    )
-    return notification
-
-# Exemples de notifications spécifiques au système médical
-def notify_appointment_confirmed(patient, appointment):
-    """Notification de confirmation de rendez-vous pour le patient"""
-    message = f"Votre rendez-vous du {appointment.date} à {appointment.heure} avec Dr. {appointment.medecin.nom} a été confirmé."
-    create_notification(patient.user, message, 'success', 'appointment')
-
-def notify_appointment_cancelled(patient, appointment):
-    """Notification d'annulation de rendez-vous pour le patient"""  
-    message = f"Votre rendez-vous du {appointment.date} à {appointment.heure} avec Dr. {appointment.medecin.nom} a été annulé."
-    create_notification(patient.user, message, 'warning', 'appointment')
-
-def notify_new_appointment(medecin, appointment):
-    """Notification de nouveau rendez-vous pour le médecin"""
-    message = f"Nouveau rendez-vous programmé le {appointment.date} à {appointment.heure} avec {appointment.patient.nom}."
-    create_notification(medecin.user, message, 'info', 'appointment')
-
-
 
 
 """ Les vues de Admin """
@@ -191,16 +170,16 @@ def dashboard_admin_view(request):
             'total_programmes': RendezVous.objects.filter(statut='programme').count(),
             'total_termines': RendezVous.objects.filter(statut='termine').count(),
 
-            'rendez_vous_semaine': RendezVous.objects.filter(date_heure_rdv__gte=debut_semaine).count(),
-            'rendez_vous_mois': RendezVous.objects.filter(date_heure_rdv__gte=debut_mois).count(),
-            'rendez_vous_aujour': RendezVous.objects.filter(date_heure_rdv__gte=debut_jour).count(),
+            'rendez_vous_semaine': RendezVous.objects.filter(date_creation__gte=debut_semaine).count(),
+            'rendez_vous_mois': RendezVous.objects.filter(date_creation__gte=debut_mois).count(),
+            'rendez_vous_aujour': RendezVous.objects.filter(date_creation__gte=debut_jour).count(),
             'jours_semaine': jours_semaine,
             'rendez_vous_jour': [
-                RendezVous.objects.filter(date_heure_rdv__date=debut_jour + timezone.timedelta(days=i)).count()
+                RendezVous.objects.filter(date_creation__date=debut_jour + timezone.timedelta(days=i)).count()
                 for i in range(7)
             ],
             'notifications': Notification.objects.filter(user=request.user)[:5],
-            'rdvs_recents': RendezVous.objects.all().order_by('-date_heure_rdv')[:5]
+            'rdvs_recents': RendezVous.objects.all().order_by('-date_creation')[:5]
         }
     # Si c'est une requête AJAX, on renvoie JUSTE le fragment
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
@@ -423,7 +402,11 @@ def statistiques_generales(request):
 
 
 
-""" Les vues du medecin """
+""" 
+    
+    Les vues du medecin 
+    
+    """
 
 # Tableau de bord du medecin
 @login_required(login_url='users:login')
@@ -448,9 +431,16 @@ def dashboard_medecin_view(request):
         'total_programmes': RendezVous.objects.filter(statut='programme', medecin=med).count(),
         'total_termines': RendezVous.objects.filter(statut='termine', medecin=med).count(),
 
-        'rendez_vous_semaine': RendezVous.objects.filter(date_heure_rdv__gte=debut_semaine, medecin=med).count(),
-        'rendez_vous_mois': RendezVous.objects.filter(date_heure_rdv__gte=debut_mois, medecin=med).count(),
-        'rendez_vous_aujour': RendezVous.objects.filter(date_heure_rdv__gte=debut_jour, medecin=med).count(),
+        'rendez_vous_semaine': RendezVous.objects.filter(date_creation__gte=debut_semaine, medecin=med).count(),
+        'rendez_vous_mois': RendezVous.objects.filter(date_creation__gte=debut_mois, medecin=med).count(),
+        'rendez_vous_aujour': RendezVous.objects.filter(date_creation__gte=debut_jour, medecin=med).count(),
+
+         # Notifications récentes
+        'notifications': Notification.objects.filter(user=request.user).order_by('-date_envoi')[:5],
+    
+        # RDV récents
+        'rdvs_recents': RendezVous.objects.filter(medecin=med).order_by('-date_heure_rdv')[:5],
+    
     }
 
     # Si c'est une requête AJAX, on renvoie JUSTE le fragment
@@ -527,6 +517,308 @@ def liste_rdv_medecin(request):
 
     # Page complète
     return render(request, 'rdv/doctor/rdvs_doctor.html', context)
+
+try:
+    from .utils import create_and_send_notification
+except Exception:
+    create_and_send_notification = None
+
+
+logger = logging.getLogger(__name__)
+
+@login_required
+@require_POST
+def confirmer_rdv(request, rdv_id):
+    medecin = getattr(request.user, 'profil_medecin', None)
+    if medecin is None:
+        return HttpResponseForbidden("Accès refusé")
+
+    try:
+        with transaction.atomic():
+            rdv = RendezVous.objects.select_for_update().get(id=rdv_id)
+
+            if not user_can_manage_rdv(request.user, rdv):
+                return HttpResponseForbidden("Accès refusé")
+
+            if not rdv.can_transition_to('confirme'):
+                return JsonResponse({'success': False, 'error': 'Transition non autorisée'}, status=400)
+
+            rdv.confirm(by_user=request.user)
+
+            RdvHistory.objects.create(
+                rdv=rdv,
+                action="confirme",
+                performed_by=request.user,
+                description="Rendez-vous confirmé"
+            )
+
+    except RendezVous.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Rendez-vous introuvable'}, status=404)
+    except Exception as e:
+        logger.exception("Erreur lors de la confirmation RDV %s : %s", rdv_id, e)
+        return JsonResponse({'success': False, 'error': 'Erreur serveur'}, status=500)
+
+
+    # notification non bloquante (catch internals déjà gérés)
+    try:
+        subject = "Rendez-vous confirmé"
+        message = f"Bonjour {rdv.patient.user.nom_complet()}, votre rendez-vous du {rdv.date_heure_rdv.strftime('%d/%m/%Y %H:%M')} a été confirmé."
+        create_and_send_notification(rdv.patient.user, subject, message, notif_type='success', category='appointment', rdv=rdv)
+    except Exception as e:
+        logger.exception("Erreur envoi notification après confirmation rdv %s : %s", rdv.id, e)
+        # ne rien renvoyer d'autre ; la confirmation est persistée
+
+    return JsonResponse({
+        'success': True,
+        'statut': rdv.statut,
+        'statut_label': rdv.get_statut_display(),
+        'rdv_id': rdv.id,
+    })
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def annuler_rdv(request, rdv_id):
+    medecin = getattr(request.user, 'profil_medecin', None)
+    if medecin is None:
+        return HttpResponseForbidden("Accès refusé")
+
+    try:
+        rdv = RendezVous.objects.get(id=rdv_id, medecin=medecin)
+    except RendezVous.DoesNotExist:
+        return HttpResponseForbidden("Rendez-vous introuvable")
+
+    # --- GET ---
+    if request.method == 'GET':
+        form = AnnulerRdvForm(initial={'description': rdv.raison_annulation or ''})
+        return render(
+            request,
+            'rdv/doctor/composants/rdvs/rdv_cancel_form.html',
+            {'rdv': rdv, 'form': form}
+        )
+
+    # --- POST ---
+    data = {}
+    if request.content_type and request.content_type.startswith('application/json'):
+        try:
+            data = json.loads(request.body.decode('utf-8') or "{}")
+        except Exception:
+            return HttpResponseBadRequest("Payload JSON invalide")
+    else:
+        data = request.POST.dict() if request.POST else {}
+
+    form = AnnulerRdvForm(data)
+    if not form.is_valid():
+        return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+
+    description = form.cleaned_data.get('description', '').strip()[:1000]
+
+    try:
+        with transaction.atomic():
+            rdv = RendezVous.objects.select_for_update().get(id=rdv_id)
+            if not user_can_manage_rdv(request.user, rdv):
+                return HttpResponseForbidden("Accès refusé")
+            if not rdv.can_transition_to('annule'):
+                return JsonResponse({'success': False, 'error': 'Transition non autorisée'}, status=400)
+
+            rdv.cancel(description=description, by_user=request.user)
+
+            RdvHistory.objects.create(
+                rdv=rdv,   # ⚠️ adapter au vrai champ de ton modèle
+                action="annule",
+                performed_by=request.user,
+                description=f"Rendez-vous annulé. Raison: {description}"
+            )
+
+    except RendezVous.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Rendez-vous introuvable'}, status=404)
+    except Exception as e:
+        logger.exception("Erreur annuler_rdv %s: %s", rdv_id, e)
+        return JsonResponse({'success': False, 'error': 'Erreur serveur'}, status=500)
+
+    try:
+        subject = "Rendez-vous annulé"
+        message = f"Bonjour {rdv.patient.user.nom_complet()},\n\nVotre rendez-vous du {rdv.date_heure_rdv.strftime('%d/%m/%Y %H:%M')} a été annulé."
+        if description:
+            message += f"\nRaison : {description}"
+        create_and_send_notification(rdv.patient.user, subject, message, notif_type='warning', category='appointment', rdv=rdv)
+    except Exception as e:
+        logger.exception("Erreur envoi notification après annulation rdv %s : %s", rdv.id, e)
+
+    return JsonResponse({
+        'success': True,
+        'statut': rdv.statut,
+        'statut_label': rdv.get_statut_display(),
+        'rdv_id': rdv.id,
+    })
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def reporter_rdv(request, rdv_id):
+    is_medecin = hasattr(request.user, 'profil_medecin') or getattr(request.user, 'role', '') == 'medecin'
+    initiator = 'medecin' if is_medecin else 'patient'
+
+    try:
+        rdv = RendezVous.objects.get(id=rdv_id)
+    except RendezVous.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Rendez-vous introuvable'}, status=404)
+
+    if initiator == 'medecin':
+        if not hasattr(request.user, 'profil_medecin') or rdv.medecin != request.user.profil_medecin:
+            return HttpResponseForbidden("Accès refusé")
+    else:
+        if not hasattr(request.user, 'profil_patient') or rdv.patient != request.user.profil_patient:
+            return HttpResponseForbidden("Accès refusé")
+
+    # --- GET ---
+    if request.method == 'GET':
+        form = ReporterRdvForm()  # <--- garder ce form uniquement pour l'affichage
+        return render(
+            request,
+            'rdv/doctor/composants/rdvs/rdv_report_form.html',
+            {'rdv': rdv, 'form': form}
+        )
+
+    # --- POST ---
+    data = {}
+    if request.content_type and request.content_type.startswith('application/json'):
+        try:
+            data = json.loads(request.body.decode('utf-8') or "{}")
+        except Exception:
+            return HttpResponseBadRequest("Payload JSON invalide")
+    else:
+        data = request.POST.dict() if request.POST else {}
+
+    date_val = data.get('nouvelle_date')
+    time_val = data.get('nouvelle_heure')
+    raison = (data.get('raison') or '').strip()
+
+    if not date_val or not time_val:
+        return JsonResponse({'success': False, 'error': 'Date et heure requises'}, status=400)
+
+    try:
+        naive_dt = datetime.fromisoformat(f"{date_val}T{time_val}")
+    except Exception:
+        try:
+            naive_dt = datetime.strptime(f"{date_val} {time_val}", "%Y-%m-%d %H:%M")
+        except Exception:
+            return JsonResponse({'success': False, 'error': 'Format date/heure invalide'}, status=400)
+
+    tz = timezone.get_current_timezone()
+    new_dt = timezone.make_aware(naive_dt, tz) if timezone.is_naive(naive_dt) else naive_dt
+
+    if new_dt <= timezone.now():
+        return JsonResponse({'success': False, 'error': 'La nouvelle date doit être dans le futur'}, status=400)
+
+    # Vérification de conflit
+    duration = getattr(rdv, 'duree_minutes', 30) or 30
+    new_start = new_dt
+    new_end = new_dt + timedelta(minutes=duration)
+
+    window_start = new_start - timedelta(days=1)
+    window_end = new_end + timedelta(days=1)
+    candidates = RendezVous.objects.filter(
+        medecin=rdv.medecin,
+        date_heure_rdv__gte=window_start,
+        date_heure_rdv__lte=window_end
+    ).exclude(id=rdv.id)
+
+    for other in candidates:
+        other_start = other.date_heure_rdv
+        other_duration = getattr(other, 'duree_minutes', 30) or 30
+        other_end = other_start + timedelta(minutes=other_duration)
+        if other_start < new_end and other_end > new_start:
+            return JsonResponse({'success': False, 'error': 'Conflit avec un autre rendez-vous.'}, status=400)
+
+    try:
+        with transaction.atomic():
+            rdv = RendezVous.objects.select_for_update().get(id=rdv_id)
+            if not user_can_manage_rdv(request.user, rdv):
+                return HttpResponseForbidden("Accès refusé")
+            if not rdv.can_transition_to('reporte'):
+                return JsonResponse({'success': False, 'error': 'Transition non autorisée'}, status=400)
+
+            rdv.report(new_dt, raison=raison, initiator=initiator, by_user=request.user)
+
+            RdvHistory.objects.create(
+                rdv=rdv,  
+                action="reporte",
+                performed_by=request.user,
+                description=f"Rendez-vous déplacé au {new_dt} (raison: {raison})"
+            )
+
+    except RendezVous.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Rendez-vous introuvable'}, status=404)
+    except Exception as e:
+        logger.exception("Erreur reporter_rdv %s: %s", rdv_id, e)
+        return JsonResponse({'success': False, 'error': 'Erreur serveur'}, status=500)
+
+    try:
+        subject = "Rendez-vous reporté"
+        message = f"Bonjour {rdv.patient.user.nom_complet()},\n\nVotre rendez-vous a été reporté au {rdv.date_heure_rdv.strftime('%d/%m/%Y %H:%M')}."
+        if raison:
+            message += f"\nRaison : {raison}"
+        create_and_send_notification(rdv.patient.user, subject, message, notif_type='info', category='appointment', rdv=rdv)
+    except Exception as e:
+        logger.exception("Erreur envoi notification après report rdv %s : %s", rdv.id, e)
+
+    return JsonResponse({
+        'success': True,
+        'statut': rdv.statut,
+        'statut_label': rdv.get_statut_display(),
+        'rdv_id': rdv.id,
+        'nouvelle_date_iso': rdv.date_heure_rdv.isoformat(),
+        'report_initiator': rdv.report_initiator
+    })
+
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def notifier_rdv(request, rdv_id):
+    """
+    GET -> renvoie le fragment HTML du formulaire de notification
+    POST -> envoie la notification manuelle
+    """
+    try:
+        rdv = RendezVous.objects.get(id=rdv_id)
+    except RendezVous.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Rendez-vous introuvable'}, status=404)
+
+    # Seul le médecin propriétaire peut notifier
+    if not hasattr(request.user, 'profil_medecin') or rdv.medecin != request.user.profil_medecin:
+        return HttpResponseForbidden("Accès refusé")
+
+    # --- GET ---
+    if request.method == 'GET':
+        form = NotifierRdvForm()
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            # fragment uniquement
+            return render(request, "rdv/doctor/composants/rdvs/rdv_notif_form.html", {"rdv": rdv, "form": form})
+        else:
+            # éventuellement wrapper complet si tu veux
+            return render(request, "rdv/doctor/composants/rdvs/rdv_notif_form.html", {"rdv": rdv, "form": form})
+
+    # --- POST ---
+    try:
+        data = json.loads(request.body.decode("utf-8"))
+    except Exception:
+        return JsonResponse({'success': False, 'error': 'Payload JSON invalide'}, status=400)
+
+    subject = data.get("subject", "").strip()
+    message = data.get("message", "").strip()
+
+    if not subject or not message:
+        return JsonResponse({'success': False, 'error': 'Sujet et message sont requis'}, status=400)
+
+    # Notification manuelle (pas de message par défaut)
+    try:
+        send_manual_notification(rdv.patient.user, subject, message, rdv=rdv, by_user=request.user)
+    except Exception as e:
+        logger.exception("Erreur envoi notif manuelle rdv %s: %s", rdv.id, e)
+        return JsonResponse({'success': False, 'error': 'Erreur serveur'}, status=500)
+
+    return JsonResponse({'success': True})
 
 
 @login_required(login_url='users:login')
@@ -742,3 +1034,131 @@ def disponibilite_delete(request, pk):
     disponibilite = get_object_or_404(Disponibilite, pk=pk, medecin=medecin)
     disponibilite.delete()
     return JsonResponse({'success': True})
+
+
+
+
+
+
+
+""" 
+    
+    Les vues du Patient 
+    
+    """
+
+@login_required(login_url='users:login')
+def dashboard_patient_view(request):
+    """Vue du tableau de bord pour le patient"""
+    now = timezone.now()
+    debut_semaine = now - timezone.timedelta(days=now.weekday())
+    debut_mois = now.replace(day=1)
+    debut_jour = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    try:
+        patient = request.user.profil_patient
+    except Patient.DoesNotExist:
+        return HttpResponseForbidden("Vous n'êtes pas autorisé à accéder à cette page.")
+
+    context = {
+        # Statistiques générales
+        'total_rdv': RendezVous.objects.filter(patient=patient).count(),
+        'rdv_a_venir': RendezVous.objects.filter(patient=patient, date_heure_rdv__gte=now).count(),
+        'rdv_passes': RendezVous.objects.filter(patient=patient, date_heure_rdv__lt=now).count(),
+
+        # Statuts détaillés
+        'total_confirmes': RendezVous.objects.filter(patient=patient, statut='confirme').count(),
+        'total_annules': RendezVous.objects.filter(patient=patient, statut='annule').count(),
+        'total_programmes': RendezVous.objects.filter(patient=patient, statut='programme').count(),
+        'total_reportes': RendezVous.objects.filter(patient=patient, statut='reporte').count(),
+
+        # Périodes
+        'rdv_semaine': RendezVous.objects.filter(patient=patient, date_creation__gte=debut_semaine).count(),
+        'rdv_mois': RendezVous.objects.filter(patient=patient, date_creation__gte=debut_mois).count(),
+        'rdv_aujour': RendezVous.objects.filter(patient=patient, date_creation__date=now.date()).count(),
+
+        # Notifications récentes
+        'notifications': Notification.objects.filter(user=request.user).order_by('-date_envoi')[:5],
+
+        # RDV récents
+        'rdvs_recents': RendezVous.objects.filter(patient=patient).order_by('-date_heure_rdv')[:5],
+    }
+
+    # Requête AJAX → fragment HTML uniquement
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return render(request, 'rdv/patient/composants/dashboard/dash_content.html', context)
+
+    # Page complète
+    return render(request, 'rdv/patient/dash_patient.html', context)
+
+
+@login_required(login_url='users:login')
+def liste_rdv_patient(request):
+    # Récupérer le profil Patient lié à l’utilisateur
+    try:
+        patient = request.user.profil_patient
+    except Patient.DoesNotExist:
+        return HttpResponseForbidden("Vous n'êtes pas autorisé à accéder à cette page.")
+
+    # Préparer les filtres (lecture des params envoyés par le JS)
+    search_query  = request.GET.get('search', '').strip()
+    status_filter = request.GET.get('status', '').strip()
+    date_filter   = request.GET.get('date', '').strip()  # format YYYY-MM-DD
+
+    # Charger uniquement ses propres rendez-vous
+    qs = RendezVous.objects.filter(patient=patient)
+
+    # Appliquer la recherche (sur nom/prénom du Médecin seulement)
+    if search_query:
+        qs = qs.filter(
+            Q(medecin__user__nom__icontains=search_query) |
+            Q(medecin__user__prenom__icontains=search_query)
+        )
+
+    # Filtrer par statut si fourni (les valeurs doivent être les clés : 'programme', 'confirme', etc.)
+    if status_filter:
+        qs = qs.filter(statut=status_filter)
+
+    # Filtrer par date si fourni (on compare la date seulement)
+    if date_filter:
+        try:
+            # si date_filter au format YYYY-MM-DD
+            qs = qs.filter(date_heure_rdv__date=date_filter)
+        except Exception:
+            pass
+
+    # Trier
+    qs = qs.order_by('-date_heure_rdv')
+
+    # Pagination
+    paginator   = Paginator(qs, 25)
+    page_number = request.GET.get('page')
+    page_obj    = paginator.get_page(page_number)
+
+    context = {
+        'rdvs':          qs,           
+        'page_obj':      page_obj,
+        'search_query':  search_query,
+        'status_filter': status_filter,
+        'date_filter':   date_filter,
+        'statuses':      RendezVous.STATUT_CHOICES,
+    }
+
+    # Rendu AJAX table-only : renvoie le fragment du tableau
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' and request.GET.get('table-only'):
+        # Fournir les deux variables pour compatibilité template (rdvs ou page_obj)
+        return render(request, 'rdv/patient/composants/rdvs/rdvs_patient_table.html', {
+            'page_obj': page_obj,
+            'rdvs': page_obj.object_list,
+        })
+
+    # Rendu AJAX "contenu complet" (filtre + header)
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        return render(request, 'rdv/patient/composants/rdvs/rdvs_patient_content.html', context)
+
+    # Page complète
+    return render(request, 'rdv/patient/rdvs_patient.html', context)
+
+
+
+

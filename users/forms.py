@@ -158,9 +158,10 @@ class UtilisateurUpdateForm(UserChangeForm):
         widget=forms.Select(attrs={'class': 'form-control'})
     )
     est_actif = forms.BooleanField(
-        required=False,
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
     )
+    widget = forms.CheckboxInput(attrs={'class': 'form-check-input'})
+
     
     class Meta:
         model = Utilisateur

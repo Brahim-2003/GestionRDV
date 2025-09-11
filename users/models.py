@@ -26,9 +26,6 @@ class UtilisateurManager(BaseUserManager):
         user.set_password(mot_de_passe)
         user.save(using=self._db)
 
-        # Assigner automatiquement les permissions selon le rôle
-        self._assign_role_permissions(user)
-
         return user
 
     def create_superuser(self, email, nom, prenom, mot_de_passe=None, **extra_fields):

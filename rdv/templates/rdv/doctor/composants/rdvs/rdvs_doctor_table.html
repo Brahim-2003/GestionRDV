@@ -22,14 +22,66 @@
                     Aucune information
                     {% endif %}
                 </td>
-                <td><span class="stat">{{ rdv.statut }}</span></td>
+                <td><span class="badge badge-{{ rdv.statut|default:'programme' }}">{{ rdv.get_statut_display }}</span></td>
                 <td>
-                    <a href="{% url 'rdv:modifier_rendez_vous' rdv.id %}" class="action-btn-edit">
-                        <i class="bx bxs-edit"></i>
-                    </a>
-                    <a href="{% url 'rdv:supprimer_rendez_vous' rdv.id %}" class="action-btn-delete">
-                        <i class='bx bxs-trash-alt' aria-hidden="true"></i>
-                    </a>
+                    {# Bouton Confirmer #}
+                    {% if rdv.can_be_confirmed_by_medecin %}
+                        <button
+                        type="button"
+                        class="action-btn-confirm js-confirm-rdv"
+                        data-rdv-id="{{ rdv.id }}"
+                        data-statut="{{ rdv.statut }}"
+                        title="Confirmer le rendez-vous"
+                        aria-label="Confirmer le rendez-vous">
+                        <i class="bx bx-check" aria-hidden="true"></i>
+                        <span class="button">Confirmer</span>
+                    </button>
+                    
+                    {% endif %}
+
+                    {# Bouton Reporter (médecin peut reporter si programme ou confirme) #}
+                    {% if rdv.can_be_reported_by_medecin %}
+                        <button
+                        type="button"
+                        class="action-btn-report js-report-rdv"
+                        data-rdv-id="{{ rdv.id }}"
+                        data-statut="{{ rdv.statut }}"
+                        title="Reporter le rendez-vous"
+                        aria-label="Reporter le rendez-vous">
+                        <i class='bx bx-repost' aria-hidden="true"></i>
+                        <span class="button">Reporter</span>
+                        </button>
+                    {% endif %}
+
+                    {# Bouton Annuler (médecin peut annuler sauf si déjà annulé/termine) #}
+                    {% if rdv.can_be_cancelled_by_medecin %}
+                        <button
+                        type="button"
+                        class="action-btn-cancel js-cancel-rdv"
+                        data-rdv-id="{{ rdv.id }}"
+                        data-statut="{{ rdv.statut }}"
+                        data-patient-name="{{ rdv.patient.user.nom }} {{ rdv.patient.user.prenom }}"
+                        data-date-label="{{ rdv.date_heure_rdv|date:'d/m/Y H:i' }}"
+                        title="Annuler le rendez-vous"
+                        aria-label="Annuler le rendez-vous">
+                        <i class='bx bx-undo' aria-hidden="true"></i>
+                        <span class="button">Annuler</span>
+                        </button>
+                    {% endif %}
+
+                    {# Notifier le patient (toujours disponible si tu veux) #}
+                        <button
+                        type="button"
+                        class="action-btn-notifier js-notifier-rdv"
+                        data-rdv-id="{{ rdv.id }}"
+                        data-statut="{{ rdv.statut }}"
+                        data-patient-name="{{ rdv.patient.user.nom }} {{ rdv.patient.user.prenom }}"
+                        data-date-label="{{ rdv.date_heure_rdv|date:'d/m/Y H:i' }}"
+                        title="Notifier le patient"
+                        aria-label="Notifier le patient">
+                        <i class='bx bx-message-rounded-add' aria-hidden="true"></i>
+                        <span class="button">Notifier le patient</span>
+                        </button>
                 </td>
             </tr>
             {% empty %}

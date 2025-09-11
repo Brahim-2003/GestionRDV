@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, transaction
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.utils.timesince import timesince
@@ -6,6 +6,39 @@ from django.utils.translation import gettext_lazy as _
 from django.core.validators import RegexValidator
 from django.utils import timezone
 from django.db.models import Q, UniqueConstraint
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class RdvHistory(models.Model):
+    ACTION_CHOICES = [
+        ('create', 'Création'),
+        ('confirm', 'Confirmation'),
+        ('cancel', 'Annulation'),
+        ('report', 'Report'),
+        ('update', 'Mise à jour'),
+        ('delete', 'Suppression'),
+    ]
+
+    rdv = models.ForeignKey('RendezVous', on_delete=models.CASCADE, related_name='history')
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    performed_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                                     on_delete=models.SET_NULL, related_name='rdv_actions')
+    timestamp = models.DateTimeField(auto_now_add=True)
+    # stocker les valeurs utiles pour audit (ancienne / nouvelle date, ancien statut etc.)
+    old_value = models.TextField(blank=True, null=True)
+    new_value = models.TextField(blank=True, null=True)
+    description = models.TextField(blank=True, null=True)  # plus long que 255
+    extra = models.JSONField(blank=True, null=True, default=dict)  # info structurable (optionnel)
+
+    class Meta:
+        verbose_name = "Historique RDV"
+        verbose_name_plural = "Historique RDV"
+        ordering = ['-timestamp']
+
+    def __str__(self):
+        return f"[{self.timestamp:%Y-%m-%d %H:%M}] RDV#{self.rdv_id} {self.get_action_display()} par {self.performed_by or 'système'}"
 
 
 
@@ -195,6 +228,15 @@ class Disponibilite(models.Model):
         return slots
 
 
+ALLOWED_TRANSITIONS = {
+    'programme': {'confirme', 'annule', 'reporte'},
+    'confirme': {'annule', 'reporte', 'en_cours', 'termine'},
+    'reporte': {'confirme', 'annule', 'reporte'},
+    'en_cours': {'termine'},
+    'termine': set(),
+    'annule': set(),
+}
+
 class RendezVous(models.Model):
     STATUT_CHOICES = [
         ('programme', 'Programmé'),
@@ -213,6 +255,14 @@ class RendezVous(models.Model):
     statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='programme')
     raison_report = models.CharField(max_length=255, blank=True, null=True)
     raison_annulation = models.CharField(max_length=255, blank=True, null=True)
+    ancienne_date_heure = models.DateTimeField(null=True, blank=True)  # pour historiser l'ancienne date
+    REPORT_INITIATOR_CHOICES = [
+        ('medecin', 'Médecin'),
+        ('patient', 'Patient'),
+    ]
+    report_initiator = models.CharField(max_length=10, choices=REPORT_INITIATOR_CHOICES,
+                                        null=True, blank=True, help_text="Qui a initié le report")
+
     date_creation = models.DateTimeField(auto_now_add=True)
     date_modification = models.DateTimeField(auto_now=True)
 
@@ -226,7 +276,215 @@ class RendezVous(models.Model):
     def __str__(self):
         return f"RDV {self.patient.user.nom_complet()} - Dr. {self.medecin.user.nom_complet()} - {self.date_heure_rdv.strftime('%d/%m/%Y %H:%M')}"
 
-# models.py
+
+    @property
+    def is_programme(self):
+        return self.statut == 'programme'
+
+    @property
+    def is_confirme(self):
+        return self.statut == 'confirme'
+
+    @property
+    def is_annule(self):
+        return self.statut == 'annule'
+
+    @property
+    def is_reporte(self):
+        return self.statut == 'reporte'
+
+    @property
+    def is_termine(self):
+        return self.statut == 'termine'
+
+    # --------------------
+    # Autorisations simplifiées pour le 'médecin' (vues/templates docteur)
+    # --------------------
+    @property
+    def can_be_confirmed_by_medecin(self):
+        """Le médecin peut confirmer si RDV est programmé ou reporté par patient."""
+        return self.statut in ('programme', 'reporte')
+
+    @property
+    def can_be_reported_by_medecin(self):
+        """Le médecin peut demander à reporter si RDV est programmé ou confirmé."""
+        return self.statut in ('programme', 'confirme', 'reporte')
+
+    @property
+    def can_be_cancelled_by_medecin(self):
+        """Le médecin peut annuler sauf si déjà annulé / terminé."""
+        return self.statut in ('programme', 'confirme', 'reporte')
+
+    # --------------------
+    # Autorisations simplifiées pour le 'patient'
+    # (optionnel — adapte selon ton besoin)
+    # --------------------
+    @property
+    def can_request_report_by_patient(self):
+        """Le patient peut demander un report si RDV programmé ou confirmé (mais pas annulé/termine)."""
+        return self.statut in ('programme', 'confirme')
+
+
+    def can_transition_to(self, new_state: str) -> bool:
+        """Retourne True si la transition current->new_state est autorisée."""
+        return new_state in ALLOWED_TRANSITIONS.get(self.statut, set())
+
+    def _create_notification_safe(self, user, subject, message, **kwargs):
+        """Notification non bloquante"""
+        try:
+            from .utils import create_and_send_notification
+            # create_and_send_notification(user, subject, message, notif_type='info', category='appointment', rdv=self)
+            create_and_send_notification(user, subject, message, rdv=self, **kwargs)
+        except Exception as e:
+            logger.exception("Erreur notification non-bloquante pour RDV %s : %s", getattr(self, 'id', '?'), e)
+
+    def _log_history(self, action, performed_by=None, old_value=None, new_value=None, description=None, extra=None):
+        """
+        Helper pour créer une entrée RdvHistory non bloquante.
+        """
+        try:
+            RdvHistory.objects.create(
+                rdv=self,
+                action=action,
+                performed_by=performed_by,
+                old_value=(old_value if old_value is not None else ''),
+                new_value=(new_value if new_value is not None else ''),
+                description=(description if description is not None else ''),
+                extra=(extra or {})
+            )
+        except Exception as e:
+            logger.exception("Impossible de créer RdvHistory pour RDV %s : %s", getattr(self, 'id', '?'), e)
+
+    def confirm(self, by_user=None):
+        """Confirme le RDV et enregistre l'historique."""
+        if not self.can_transition_to('confirme'):
+            raise ValueError("Transition vers 'confirme' non autorisée depuis '%s'." % self.statut)
+
+        with transaction.atomic():
+            old = {'statut': self.statut, 'date_heure_rdv': self.date_heure_rdv.isoformat()}
+            self.statut = 'confirme'
+            self.date_modification = timezone.now()
+            self.save(update_fields=['statut', 'date_modification'])
+            new = {'statut': self.statut, 'date_heure_rdv': self.date_heure_rdv.isoformat()}
+
+            # log history
+            self._log_history(
+                action='confirm',
+                performed_by=by_user,
+                old_value=str(old),
+                new_value=str(new),
+                description='',
+                extra={}
+            )
+
+        # notification non-bloquante (déjà implémentée ailleurs)
+        try:
+            subject = "Rendez-vous confirmé"
+            message = f"Votre rendez-vous du {self.date_heure_rdv.strftime('%d/%m/%Y %H:%M')} a été confirmé."
+            self._create_notification_safe(self.patient.user, subject, message, notif_type='success', category='appointment')
+        except Exception:
+            pass
+
+        return self
+
+
+    def cancel(self, description: str = '', by_user=None):
+        """Annule le RDV et enregistre l'historique."""
+        if not self.can_transition_to('annule'):
+            raise ValueError("Transition vers 'annule' non autorisée depuis '%s'." % self.statut)
+
+        with transaction.atomic():
+            old = {'statut': self.statut, 'date_heure_rdv': self.date_heure_rdv.isoformat()}
+            self.statut = 'annule'
+            if hasattr(self, 'raison_annulation'):
+                self.raison_annulation = (description or '')[:2000]
+            self.date_modification = timezone.now()
+            update_fields = ['statut', 'date_modification']
+            if hasattr(self, 'raison_annulation'):
+                update_fields.append('raison_annulation')
+            self.save(update_fields=update_fields)
+            new = {'statut': self.statut, 'date_heure_rdv': self.date_heure_rdv.isoformat()}
+
+            # log history
+            self._log_history(
+                action='cancel',
+                performed_by=by_user,
+                old_value=str(old),
+                new_value=str(new),
+                description=description,
+                extra={}
+            )
+
+        # notification non-bloquante
+        try:
+            subject = "Rendez-vous annulé"
+            message = f"Votre rendez-vous prévu le {self.date_heure_rdv.strftime('%d/%m/%Y %H:%M')} a été annulé."
+            if description:
+                message += f"\nRaison : {description}"
+            self._create_notification_safe(self.patient.user, subject, message, notif_type='warning', category='appointment')
+        except Exception:
+            pass
+
+        return self
+
+
+    def report(self, new_datetime, raison: str = '', initiator: str = 'medecin', by_user=None):
+        """
+        Report in-place et log historique.
+        initiator: 'medecin' | 'patient'
+        """
+        if self.statut == 'annule':
+            raise ValueError("Impossible de reporter un rendez-vous annulé.")
+
+        if not self.can_transition_to('reporte'):
+            raise ValueError("Transition vers 'reporte' non autorisée depuis '%s'." % self.statut)
+
+        with transaction.atomic():
+            old = {'statut': self.statut, 'date_heure_rdv': self.date_heure_rdv.isoformat()}
+            self.ancienne_date_heure = self.date_heure_rdv
+            self.date_heure_rdv = new_datetime
+            self.raison_report = (raison or '')[:2000] if hasattr(self, 'raison_report') else ''
+            self.report_initiator = initiator
+            if initiator == 'medecin':
+                self.statut = 'confirme'
+            else:
+                self.statut = 'reporte'
+            self.date_modification = timezone.now()
+            update_fields = ['date_heure_rdv', 'report_initiator', 'date_modification', 'statut']
+            if hasattr(self, 'raison_report'):
+                update_fields.append('raison_report')
+            if hasattr(self, 'ancienne_date_heure'):
+                update_fields.append('ancienne_date_heure')
+            self.save(update_fields=update_fields)
+
+            new = {'statut': self.statut, 'date_heure_rdv': self.date_heure_rdv.isoformat(), 'initiator': initiator}
+
+            # log history
+            self._log_history(
+                action='report',
+                performed_by=by_user,
+                old_value=str(old),
+                new_value=str(new),
+                description=raison,
+                extra={'report_initiator': initiator}
+            )
+
+        # notifications
+        try:
+            if initiator == 'medecin':
+                subject = "Rendez-vous déplacé et confirmé"
+                message = f"Votre rendez-vous a été déplacé et confirmé au {self.date_heure_rdv.strftime('%d/%m/%Y %H:%M')}."
+            else:
+                subject = "Rendez-vous déplacé — en attente de confirmation"
+                message = f"Votre rendez-vous a été déplacé au {self.date_heure_rdv.strftime('%d/%m/%Y %H:%M')} et attend la confirmation du médecin."
+            if raison:
+                message += f"\nRaison : {raison}"
+            self._create_notification_safe(self.patient.user, subject, message, notif_type='info', category='appointment')
+        except Exception:
+            pass
+
+        return self
+
 
 class Notification(models.Model):
     TYPE_CHOICES = [
@@ -245,8 +503,8 @@ class Notification(models.Model):
     
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notifications')
     message = models.TextField()
-    type = models.CharField(max_length=20, choices=TYPE_CHOICES, default='info')
-    category = models.CharField(max_length=20, choices=CATEGORY_CHOICES, default='system')
+    type = models.CharField(max_length=50, choices=TYPE_CHOICES, default='info')
+    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default='system')
     is_read = models.BooleanField(default=False)
     date_envoi = models.DateTimeField(auto_now_add=True)
     date_read = models.DateTimeField(null=True, blank=True)

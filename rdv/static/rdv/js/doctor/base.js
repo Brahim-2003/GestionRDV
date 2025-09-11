@@ -1,9 +1,5 @@
 // static/rdv/js/doctor/base_doctor.js
 
-/**
- * Retire callback et eventListeners, puis recharge le script inline ou externe.
- * Semblable à static/rdv/js/admin/base.js
- */
 function injectAndExecuteScripts(container) {
   const scripts = Array.from(container.querySelectorAll('script'));
   const loads = [];

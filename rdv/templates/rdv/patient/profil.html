@@ -1,0 +1,14 @@
+{% extends 'rdv/patient/base_patient.html' %}
+
+{% block menu_block %}
+    {% include 'rdv/patient/composants/menu_patient.html' %}
+{% endblock %}
+
+{% block content %}
+    {% include 'rdv/profil/mon_profil.html' %}
+{% endblock %}
+
+{% block extra_js %}
+    {{ block.super }}
+{% endblock %}
+

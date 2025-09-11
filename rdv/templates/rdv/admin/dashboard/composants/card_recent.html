@@ -1,24 +1,41 @@
-<div class="card">
-    <div class="card-header">
-      <h3 class="card-title">Rendez-vous récents</h3>
-    </div>
-    <div class="card-body">
-      {% if rdv_recents %}
-      <ul class="recent-list">
-        {% for rdv in rdv_recents %}
-        <li class="recent-item">
-          <strong>{{ rdv.user.nom }} {{ rdv.user.prenom }}</strong><br>
-          <span>{{ rdv.date_heure_rdv|date:"d M Y H:i" }}</span><br>
-          <span>{{ rdv.statut }}</span>
-        </li>
-        {% endfor %}
-      </ul>
-      {% else %}
-      <div class="empty-state">
-        <div class="empty-icon">📝</div>
-        <p>Aucun rendez-vous récent</p>
-      </div>
-      {% endif %}
-    </div>
-  </div>
+{% load static %}
+
+<link rel="stylesheet" href="{% static 'rdv/css/boxicons.min.css' %}">
+<link rel="stylesheet" href="{% static 'rdv/css/notifs/notifs.css' %}">
+<div class="rdv-recents">
+  <h3>
+      <i class='bx bxs-calendar-week'></i>
+      <span>Rendez-vous récents</span>
+  </h3>
+
+    <table class="rdv-table">
+      <thead>
+        <tr>
+          <th>Date Heure</th>
+          <th>Médecin</th>
+          <th>Patient</th>
+          <th>Statut</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if rdvs_recents %}
+          {% for rdv in rdvs_recents %}
+            <tr>
+              <td>{{ rdv.date_heure_rdv|date:"d/m/Y H:i" }}</td>
+              <td>Dr. {{ rdv.medecin.user.nom }} {{ rdv.medecin.user.prenom }}</td>
+              <td>{{ rdv.patient.user.nom }} {{ rdv.patient.user.prenom }}</td>
+              <td>
+                <span class="statut {{ rdv.statut }}">{{ rdv.get_statut_display }}</span>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="3" class="empty">Aucun rendez-vous récent.</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+    <a href="{% url 'rdv:list_rdv' %}" class="btn-view-more">Voir tous les rendez-vous</a>
 </div>
+

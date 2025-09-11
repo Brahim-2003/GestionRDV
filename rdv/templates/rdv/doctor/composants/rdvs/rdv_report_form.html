@@ -1,0 +1,45 @@
+{# templates/rdv/forms/reporter_form.html #}
+{% load static %}
+<form id="reporter-rdv-form"
+      class="modern-form"
+      method="post"
+      data-ajax="1"
+      action="{% url 'rdv:reporter_rdv' rdv.id %}">
+  {% csrf_token %}
+
+  <p class="form-meta" style="color:#555; margin-bottom:8px;">
+    <strong>Patient :</strong> {{ rdv.patient.user.nom }} {{ rdv.patient.user.prenom }} &nbsp; — &nbsp;
+    <strong>Date actuelle :</strong> {{ rdv.date_heure_rdv|date:"d/m/Y H:i" }}
+  </p>
+
+  {% if form and form.non_field_errors %}
+    <div class="nonfield-errors">{{ form.non_field_errors }}</div>
+  {% endif %}
+
+  <p>
+    <label for="{{ form.nouvelle_date.id_for_label }}">{{ form.nouvelle_date.label }}</label>
+    {{ form.nouvelle_date }}
+    {% if form.nouvelle_date.errors %}<div class="errorlist">{{ form.nouvelle_date.errors }}</div>{% endif %}
+  </p>
+
+  <p>
+    <label for="{{ form.nouvelle_heure.id_for_label }}">{{ form.nouvelle_heure.label }}</label>
+    {{ form.nouvelle_heure }}
+    {% if form.nouvelle_heure.errors %}<div class="errorlist">{{ form.nouvelle_heure.errors }}</div>{% endif %}
+  </p>
+
+  <p>
+    <label for="{{ form.raison.id_for_label }}">{{ form.raison.label }}</label>
+    {{ form.raison }}
+    {% if form.raison.errors %}<div class="errorlist">{{ form.raison.errors }}</div>{% endif %}
+  </p>
+
+  <div class="form-actions" style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
+    <button type="button" class="btn btn-secondary modal-cancel">
+      <i class='bx bxs-x-circle'></i> Annuler
+    </button>
+    <button type="submit" id="reporter-rdv-submit" class="btn btn-primary">
+      <i class='bx bxs-refresh'></i> Reporter le rendez-vous
+    </button>
+  </div>
+</form>

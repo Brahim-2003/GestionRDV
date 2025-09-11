@@ -7,6 +7,50 @@
     </div>
 </div>
 
+<div id="reporter-rdv-modal" class="modal-overlay hidden" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="reporter-rdv-title">
+    <header class="modal-header">
+      <h2 id="reporter-rdv-title" class="modal-title"><i class='bx bxs-refresh'></i> Reporter le rendez-vous</h2>
+      <button class="modal-close" aria-label="Fermer">&times;</button>
+    </header>
+    <section class="modal-body">
+      <div id="reporter-modal-form-container">
+        <p>Chargement du formulaire…</p>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div id="annuler-rdv-modal" class="modal-overlay hidden" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="annuler-rdv-title">
+    <header class="modal-header">
+      <h2 id="annuler-rdv-title" class="modal-title"><i class='bx bxs-trash'></i> Annuler le rendez-vous</h2>
+      <button class="modal-close" aria-label="Fermer">&times;</button>
+    </header>
+    <section class="modal-body">
+      <div id="annuler-modal-form-container">
+        <!-- Le formulaire sera chargé ici via AJAX depuis /rdv/annuler/<id>/form/ -->
+        <p>Chargement du formulaire…</p>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div id="notifier-rdv-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <header class="modal-header">
+      <h2 class="modal-title">Notifier le patient</h2>
+      <button class="modal-close">&times;</button>
+    </header>
+    <section class="modal-body">
+      <div id="notifier-modal-form-container"><p>Chargement du formulaire…</p></div>
+    </section>
+  </div>
+</div>
+
+
+
+
 <div id="rdv-content" class="rdv-content">
     <form id="filter-form" class="search-filter-bar">
         <div class="search-input-container">
@@ -70,4 +114,6 @@
     </div>
 </div>
 
+<script defer src="{% static 'rdv/js/doctor/rdvs_modal.js' %}"></script>
 <script defer src="{% static 'rdv/js/doctor/rdvs_doctor.js' %}"></script>
+

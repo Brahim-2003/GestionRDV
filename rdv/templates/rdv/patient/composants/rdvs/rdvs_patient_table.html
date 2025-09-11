@@ -1,0 +1,66 @@
+<table class="data-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Heure</th>
+                <th>Médecin</th>
+                <th>Motif</th>
+                <th>Statut</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for rdv in rdvs %}
+            <tr>
+                <td>{{ rdv.date_heure_rdv|date:"d/m/Y" }}</td>
+                <td>{{ rdv.date_heure_rdv|time:"H:i" }}</td>
+                <td>{{ rdv.medecin.user.nom }} {{ rdv.medecin.user.prenom }}</td>
+                <td>
+                    {% if rdv.motif %}
+                    {{ rdv.motif }}
+                    {% else %}
+                    Aucune information
+                    {% endif %}
+                </td>
+                <td><span class="badge badge-{{ rdv.statut|default:'programme' }}">{{ rdv.get_statut_display }}</span></td>
+                <td>
+                    
+                    {# Bouton Reporter (médecin peut reporter si programme ou confirme) #}
+                    {% if rdv.can_be_reported_by_medecin %}
+                        <button
+                        type="button"
+                        class="action-btn-report js-report-rdv"
+                        data-rdv-id="{{ rdv.id }}"
+                        data-statut="{{ rdv.statut }}"
+                        title="Reporter le rendez-vous"
+                        aria-label="Reporter le rendez-vous">
+                        <i class='bx bx-repost' aria-hidden="true"></i>
+                        <span class="button">Reporter</span>
+                        </button>
+                    {% endif %}
+
+                    {# Bouton Annuler (médecin peut annuler sauf si déjà annulé/termine) #}
+                    {% if rdv.can_be_cancelled_by_medecin %}
+                        <button
+                        type="button"
+                        class="action-btn-cancel js-cancel-rdv"
+                        data-rdv-id="{{ rdv.id }}"
+                        data-statut="{{ rdv.statut }}"
+                        data-patient-name="{{ rdv.patient.user.nom }} {{ rdv.patient.user.prenom }}"
+                        data-date-label="{{ rdv.date_heure_rdv|date:'d/m/Y H:i' }}"
+                        title="Annuler le rendez-vous"
+                        aria-label="Annuler le rendez-vous">
+                        <i class='bx bx-undo' aria-hidden="true"></i>
+                        <span class="button">Annuler</span>
+                        </button>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="5" style="text-align:center; color:#6c757d;">Aucun Rendez-vous.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+</table>
+

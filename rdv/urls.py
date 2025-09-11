@@ -11,12 +11,22 @@ urlpatterns=[
     path('rdvs/', views.liste_rendez_vous, name='list_rdv'),
     path('modifier_rdv/<int:rdv_id>/', views.edit_rdv, name='modifier_rendez_vous'),
     path('supprimer_rdv/<int:rdv_id>/', views.delete_rdv, name='supprimer_rendez_vous'),
+
     path('dashboard_medecin/', views.dashboard_medecin_view, name='dashboard_medecin'),
     path('liste_rdv_medecin/', views.liste_rdv_medecin, name='liste_rdv_medecin'),
+    path('confirmer/<int:rdv_id>/', views.confirmer_rdv, name='confirmer_rdv'),       
+    path('annuler/<int:rdv_id>/', views.annuler_rdv, name='annuler_rdv'),               
+    path('reporter/<int:rdv_id>/', views.reporter_rdv, name='reporter_rdv'),           
+    path('notifier/<int:rdv_id>/', views.notifier_rdv, name='notifier_patient'),   
+
     path('disponibilites/', views.disponibilites_list, name='disponibilites_list'),
     path('disponibilites/add/', views.disponibilite_add, name='disponibilite_add'),
     path('disponibilites/<int:pk>/edit/', views.disponibilite_edit, name='disponibilite_edit'),
     path('disponibilites/<int:pk>/delete/', views.disponibilite_delete, name='disponibilite_delete'),
+
+    path('dashboard_patient/', views.dashboard_patient_view, name='dashboard_patient'),
+    path('liste_rdv_patient/', views.liste_rdv_patient, name='liste_rdv_patient'),
+
     path('notifs/', views.list_notif, name='notifs'),
     path('notifications/mark-read/<int:notification_id>/', views.mark_as_read, name='mark_read'),
     path('notifications/mark-all-read/', views.mark_all_as_read, name='mark_all_read'),

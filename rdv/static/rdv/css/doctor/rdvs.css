@@ -7,5 +7,110 @@
   font-family: 'Inter', Arial, sans-serif;
 }
 
+/* Assurer que la cellule actions n'écrase pas les boutons */
+.data-table td {
+  vertical-align: middle;
+  white-space: nowrap;      /* empêche le wrapping des icônes */
+  overflow: visible;        /* s'assurer qu'aucune icône n'est masquée */
+}
+
+/* Style commun à tous les boutons d'action */
+.data-table a[class^="action-btn-"], button[class^="action-btn-"] {
+  display: inline-flex;           /* rend l'élément un bouton flexible */
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;                /* largeur minimum pour que l'icône soit visible */
+  height: 36px;                   /* hauteur uniforme */
+  padding: 6px;                   /* espace autour de l'icône */
+  margin-right: 0.4rem;           /* espacement entre boutons */
+  text-decoration: none;          /* enlever soulignement éventuel */
+  box-sizing: border-box;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.03);
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+/* Focus / accessibilité */
+.data-table a[class^="action-btn-"], button[class^="action-btn-"]:focus {
+
+  outline-offset: 2px;
+  transform: translateY(-1px);
+}
+
+/* Couleurs de fond légères et couleur d'icône foncée pour contraste */
+.action-btn-confirm {
+  color: #499e10; /* icône foncée */
+  background: none;
+}
+.action-btn-confirm:hover,
+.action-btn-confirm:active {
+  color: #2a5e08;
+  transform: scale(1.01);
+}
+
+
+
+
+.action-btn-report {
+  color: #a9ac0c; /* icône foncée (contrastée) */
+  background: none;
+}
+.action-btn-report:hover,
+.action-btn-report:active {
+  color: #998d04;
+  transform: scale(1.01);
+}
+
+.action-btn-cancel {
+  color: #da1c1c; /* icône foncée */
+  background: none;
+}
+.action-btn-cancel:hover,
+.action-btn-cancel:active {
+  color: rgb(162, 10, 10);
+  transform: scale(1.01);
+}
+
+.action-btn-notifier {
+  color: #2498eb; /* icône foncée */
+  background: none;
+}
+.action-btn-notifier:hover,
+.action-btn-notifier:active {
+  color: #145383;
+  transform: scale(1.01);
+}
+
+
+.button {
+  font-size: 12px;
+}
+
+/* Si l'icône est une police (boxicons), s'assurer qu'elle ne dépasse pas */
+.data-table a[class^="action-btn-"] i {
+  pointer-events: none;
+  font-size: 1.05rem;
+  vertical-align: middle;
+}
+
+/* Réduction d'espace sur petits écrans tout en gardant visibilité */
+@media (max-width: 520px) {
+  .data-table a[class^="action-btn-"] {
+    min-width: 34px;
+    height: 32px;
+    padding: 4px;
+    margin-right: 0.25rem;
+  }
+  .data-table td {
+    white-space: nowrap;
+  }
+}
+
+/* Optionnel : si ta colonne actions comporte beaucoup d'éléments,
+   forcer un alignement à droite pour éviter overflow */
+.data-table td:last-child {
+  text-align: right;
+}
 
 

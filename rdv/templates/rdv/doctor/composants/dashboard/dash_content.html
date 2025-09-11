@@ -16,7 +16,16 @@
     <div class="stats-grid">
         {% include 'rdv/admin/dashboard/composants/card.html' with title="Total Rendez-vous" value=total_rendez_vous color="blue" icon="<i class='bx bxs-calendar' ></i>" %}
         {% include 'rdv/admin/dashboard/composants/card.html' with title="Total Rendez-vous programmés" value=total_programmes color="green" icon="<i class='bx bxs-calendar' ></i>" %}
-        {% include 'rdv/admin/dashboard/composants/card.html' with title="Total Rendez-vous aujourd'hui" value=rendez_vous_aujour color="blue" icon="<i class='bx bxs-calendar' ></i>" %}
+        {% include 'rdv/admin/dashboard/composants/card.html' with title="Total Rendez-vous aujourd'hui" value=rendez_vous_aujour color="orange" icon="<i class='bx bxs-calendar' ></i>" %}
+        {% include 'rdv/admin/dashboard/composants/card.html' with title="Total Rendez-vous cette semaine" value=rendez_vous_semaine color="purple" icon="<i class='bx bxs-calendar' ></i>" %}
+    </div>
+
+    <div class="notifs-recents">
+        {% include 'rdv/doctor/composants/dashboard/notifs_recents.html' %}
+    </div>
+
+    <div class="rdv-recents">
+        {% include 'rdv/doctor/composants/dashboard/rdv_recents.html' %}
     </div>
 </div>
 

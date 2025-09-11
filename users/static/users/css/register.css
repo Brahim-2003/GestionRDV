@@ -159,7 +159,8 @@ input[type="submit"]:active {
 }
 
 .contenu > p:last-child a:hover {
-    text-decoration: underline;
+    text-decoration: none;
+    color: #1a202c;
 }
 
 /* Animation pour les champs obligatoires */
@@ -206,6 +207,7 @@ input[type="submit"]:active {
 .btn-primary:active {
     transform: translateY(0);
 }
+
 
 /* Responsive design */
 @media (max-width: 600px) {

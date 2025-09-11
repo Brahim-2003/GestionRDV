@@ -1,0 +1,71 @@
+<!-- Overlay pour mobile -->
+<div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+    <!-- Header avec brand -->
+    <div class="sidebar-header">
+        <div class="brand">
+            <div class="brand-icon">CL</div>
+            <div class="brand-info">
+                <h3>Tableau de bord</h3>
+                <span>Panneau Patient</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Barre de recherche -->
+    <div class="sidebar-search">
+        <div class="search-container">
+            <i class="bx bx-search search-icon"></i>
+            <input type="text" class="search-input" placeholder="Rechercher...">
+        </div>
+    </div>
+
+    <!-- Menu de navigation -->
+    <div class="sidebar-menu">
+        <div class="nav-section">
+            <h6 class="nav-section-title">Navigation</h6>
+
+                <!-- Votre structure HTML adaptée -->
+                <nav class="nav-tabs">
+                    <a href="{% url 'rdv:dashboard_patient' %}" class="nav-tab active">
+                        <i class='bx bx-home'></i>
+                        <span>Tableau de bord</span>
+                    </a>
+
+                    <a href="{% url 'users:mon_profil' %}" class="nav-tab">
+                        <i class='bx bx-user'></i>  
+                        <span>Mon Profil</span>
+                    </a>
+                    
+                    <a href="{% url 'rdv:liste_rdv_patient' %}" class="nav-tab">
+                        <i class='bx bx-calendar-check'></i>
+                        <span>Mes Rendez-vous</span>
+                    </a>
+
+                    <a href="{% url 'rdv:notifs' %}" class="nav-tab">
+                        <i class='bx bx-bell'></i>
+                        <span>Notifications</span>
+                    </a>
+                </nav>
+            </div>
+        </div>
+
+        <!-- Section utilisateur en bas -->
+        <div class="sidebar-bottom">
+
+          <a href="{% url 'users:logout' %}" class="logout" id="logout-link">
+                    <i class='bx bxs-log-out bx-sm'></i>
+                    <span>Déconnexion</span>
+            </a>
+
+            <div class="user-profile">
+                <div class="user-avatar">{{ user.nom|slice:":1" }} {{ user.prenom|slice:":1" }}</div>
+                <div class="user-info">
+                    <h4>{{ user.nom }} {{ user.prenom }}</h4>
+                    <span>{{ user.role }}</span>
+                </div>
+                <div class="status-dot online"></div>
+            </div>
+
+            
+        </div>

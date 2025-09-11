@@ -12,7 +12,7 @@
         {% for user in page_obj.object_list %}
             <tr data-user-id="{{ user.id }}">
                 <td>
-                    <a href="{% url 'users:profil_user' user.id %}" class="btn-profil">{{ user.nom }} {{ user.prenom }}</a>
+                    <a href="{% url 'users:profil' user.id %}" class="btn-profil">{{ user.nom }} {{ user.prenom }}</a>
                 </td>
                 <td>{{ user.email }}</td>
                 <td><span class="user-role">{{ user.role }}</span></td>

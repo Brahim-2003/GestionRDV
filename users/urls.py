@@ -12,6 +12,7 @@ urlpatterns=[
     path('users/add/', views.creer_utilisateur, name='creer_utilisateur'),
     path('modifier_user/, <int:user_id>', views.modifier_utilisateur, name='modifier_utilisateur'),
     path('supprimer_user/, <int:user_id>', views.supprimer_utilisateur, name='supprimer_utilisateur'),
-    path('profil_user/, <int:user_id>', views.profil_view, name="profil_user"),
+    path('profil_user/, <int:user_id>', views.profil, name="profil"),
+    path('mon_profil/', views.profil_view, name="mon_profil"),
     
 ]

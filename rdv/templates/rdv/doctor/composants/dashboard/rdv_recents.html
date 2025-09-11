@@ -1,0 +1,38 @@
+{% load static %}
+
+<link rel="stylesheet" href="{% static 'rdv/css/boxicons.min.css' %}">
+<link rel="stylesheet" href="{% static 'rdv/css/notifs/notifs.css' %}">
+
+    <h3>
+        <i class='bx bxs-calendar-week'></i>
+        <span>Rendez-vous récents</span>
+    </h3>
+    <table class="rdv-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Patient</th>
+          <th>Statut</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% if rdvs_recents %}
+          {% for rdv in rdvs_recents %}
+            <tr>
+              <td>{{ rdv.date_heure_rdv|date:"d/m/Y H:i" }}</td>
+              <td>{{ rdv.patient.user.nom }} {{ rdv.patient.user.prenom }}</td>
+              <td>
+                <span class="statut {{ rdv.statut }}">{{ rdv.get_statut_display }}</span>
+              </td>
+            </tr>
+          {% endfor %}
+        {% else %}
+          <tr>
+            <td colspan="3" class="empty">Aucun rendez-vous récent.</td>
+          </tr>
+        {% endif %}
+      </tbody>
+    </table>
+    <a href="{% url 'rdv:liste_rdv_medecin' %}" class="btn-view-more">Voir tous mes rendez-vous</a>
+
+

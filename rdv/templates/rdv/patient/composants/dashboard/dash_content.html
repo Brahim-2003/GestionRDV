@@ -1,0 +1,29 @@
+{% load static %}
+
+<div class="section-header">
+    <div class="welcome-section">
+        <h2 class="welcome-title">Bonjour M. {{ user.nom }} {{ user.prenom }}</h2>
+    </div>
+    
+</div>
+
+<div id="dashboard-content" class="dashboard-content">
+    <div class="stats-grid">
+        {% include 'rdv/admin/dashboard/composants/card.html' with title="Total Rendez-vous" value=total_rdv color="blue" icon="<i class='bx bxs-calendar' ></i>" %}
+        {% include 'rdv/admin/dashboard/composants/card.html' with title="Rendez-vous à venir" value=rdv_a_venir color="green" icon="<i class='bx bxs-calendar' ></i>" %}
+        {% include 'rdv/admin/dashboard/composants/card.html' with title="Rendez-vous passés" value=rdv_passes color="orange" icon="<i class='bx bxs-calendar' ></i>" %}
+        {% include 'rdv/admin/dashboard/composants/card.html' with title="Rendez-vous ce mois" value=rdv_mois color="purple" icon="<i class='bx bxs-calendar' ></i>" %}
+    </div>
+
+    <div class="notifs-recents">
+        {% include 'rdv/patient/composants/dashboard/notifs_recents.html' %}
+    </div>
+
+    <div class="rdv-recents">
+        {% include 'rdv/patient/composants/dashboard/rdv_recents.html' %}
+    </div>
+
+
+</div>
+
+

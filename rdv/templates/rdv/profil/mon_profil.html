@@ -40,6 +40,18 @@
   </div>
 </div>
 
+<div id="edit-password-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <header class="modal-header">
+      <h2 class="modal-title">Modifier mon mot de passe</h2>
+      <button class="modal-close">&times;</button>
+    </header>
+    <section class="modal-body">
+      <div id="edit-password-modal-form-container"><p>Chargement du formulaire…</p></div>
+    </section>
+  </div>
+</div>
+
 <div class="main-content">
     <div class="page-header">
         <h1 class="page-title">Profil Utilisateur</h1>
@@ -53,7 +65,12 @@
             <i class='bx bxs-info-circle'></i>
         </span>
         Informations générales
-        <button class="edit-btn" data-target="#edit-user-modal">
+        <button 
+            class="edit-btn" 
+            data-form-url="{% url 'users:edit_user' %}"
+            data-target="#edit-user-modal"
+            data-container="#edit-user-modal-form-container"
+            >
             <i class='bx bx-edit'></i>
         </button>
     </h2>
@@ -87,7 +104,15 @@
             </div>
             <div class="info-item">
                 <span class="info-label">Mot de passe</span>
-                <span class="info-value password-field">********</span>
+                <span class="info-value password-field">
+                    ••••••••
+                    
+                    <button class="edit-btn small"
+                            data-target="#edit-password-modal"
+                            data-form-url="{% url 'users:edit_password' %}">
+                    <i class='bx bx-edit'></i>
+                    </button>
+                </span>
             </div>
         </div>
     </div>
@@ -101,7 +126,11 @@
             <i class='bx bxs-contact'></i>
         </span>
         Informations professionnelles
-        <button class="edit-btn" data-target="#edit-medecin-modal">
+        <button 
+            class="edit-btn" 
+            data-form-url="{% url 'users:edit_medecin' %}"
+            data-target="#edit-medecin-modal"
+            data-container="#edit-medecin-modal-form-container">
             <i class='bx bx-edit'></i>
         </button>
     </h2>
@@ -154,7 +183,11 @@
             <i class='bx bxs-contact'></i>
         </span>
         Informations professionnelles
-        <button class="edit-btn" data-target="#edit-patient-modal">
+        <button 
+            class="edit-btn" 
+            data-form-url="{% url 'users:edit_patient' %}"
+            data-target="#edit-patient-modal"
+            data-container="#edit-patient-modal-form-container">
             <i class='bx bx-edit'></i>
         </button>
     </h2>
@@ -194,4 +227,8 @@
     {% endif %}
 </div>
 
-<script defer src="{% static 'rdv/js/patient/profile_modal.js' %}"></script>
+
+<script defer src="{% static 'rdv/js/profil/profile_modal.js' %}"></script>
+<script defer src="{% static 'rdv/js/profil/password_edit.js' %}"></script>
+<script defer src="{% static 'rdv/js/profil/profil.js' %}"></script>
+

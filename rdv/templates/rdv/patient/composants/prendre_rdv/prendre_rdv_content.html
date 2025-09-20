@@ -1,0 +1,220 @@
+{% load static %}
+
+
+<div class="container">
+        <!-- Progress Steps -->
+        <div class="steps-container">
+            <div class="steps">
+                <div class="step active" data-step="1">
+                    <div class="step-number">1</div>
+                    <div class="step-label">Choisir spécialité</div>
+                    <div class="step-line"></div>
+                </div>
+                <div class="step" data-step="2">
+                    <div class="step-number">2</div>
+                    <div class="step-label">Sélectionner médecin</div>
+                    <div class="step-line"></div>
+                </div>
+                <div class="step" data-step="3">
+                    <div class="step-number">3</div>
+                    <div class="step-label">Choisir créneau</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 1: Speciality Selection -->
+        <div class="content-section active" id="step-1">
+            <div class="search-container-speciality">
+                <i class="bx bx-search search-icon-speciality"></i>
+                <input type="text" class="search-input-speciality" placeholder="Rechercher par spécialité..." id="specialty-search">
+            </div>
+            
+            <div class="filters">
+                <div class="filter-chip" data-filter="disponible">
+                    <i class="bx bx-time"></i>
+                    Disponible cette semaine
+                </div>
+                <div class="filter-chip" data-filter="proximite">
+                    <i class="bx bx-map"></i>
+                    Proximité
+                </div>
+                <div class="filter-chip" data-filter="urgence">
+                    <i class="bx bx-plus-medical"></i>
+                    Urgence
+                </div>
+            </div>
+            
+            <div class="speciality-grid" id="speciality-grid">
+              <div class="speciality-card" data-speciality="generaliste">
+                  <i class="bx bx-user-check speciality-icon"></i>
+                  <div class="speciality-name">Médecin Généraliste</div>
+                  <div class="speciality-count">{{ medecins_counts.generaliste|default:"0" }} médecins disponibles</div>
+              </div>
+              <div class="speciality-card" data-speciality="cardiologue">
+                  <i class="bx bx-heart speciality-icon"></i>
+                  <div class="speciality-name">Cardiologue</div>
+                  <div class="speciality-count">{{ medecins_counts.cardiologue|default:"0" }} médecins disponibles</div>
+              </div>
+              <div class="speciality-card" data-speciality="dermatologue">
+                  <i class="bx bx-face speciality-icon"></i>
+                  <div class="speciality-name">Dermatologue</div>
+                  <div class="speciality-count">{{ medecins_counts.dermatologue|default:"0" }} médecins disponibles</div>
+              </div>
+              <div class="speciality-card" data-speciality="pediatre">
+                  <i class="bx bx-child speciality-icon"></i>
+                  <div class="speciality-name">Pédiatre</div>
+                  <div class="speciality-count">{{ medecins_counts.pediatre|default:"0" }} médecins disponibles</div>
+              </div>
+              <div class="speciality-card" data-speciality="gynecologue">
+                  <i class="bx bx-female speciality-icon"></i>
+                  <div class="speciality-name">Gynécologue</div>
+                  <div class="speciality-count">{{ medecins_counts.gynecologue|default:"0" }} médecins disponibles</div>
+              </div>
+              <div class="speciality-card" data-speciality="ophtalmologue">
+                  <i class="bx bx-low-vision speciality-icon"></i>
+                  <div class="speciality-name">Ophtalmologue</div>
+                  <div class="speciality-count">{{ medecins_counts.ophtalmologue|default:"0" }} médecins disponibles</div>
+              </div>
+              <div class="speciality-card" data-speciality="orl">
+                  <i class="bx bx-headphone speciality-icon"></i>
+                  <div class="speciality-name">ORL</div>
+                  <div class="speciality-count">{{ medecins_counts.orl|default:"0" }} médecins disponibles</div>
+              </div>
+              <div class="speciality-card" data-speciality="neurologue">
+                  <i class="bx bx-brain speciality-icon"></i>
+                  <div class="speciality-name">Neurologue</div>
+                  <div class="speciality-count">{{ medecins_counts.neurologue|default:"0" }} médecins disponibles</div>
+              </div>
+              <div class="speciality-card" data-speciality="psychiatre">
+                  <i class="bx bx-heart-circle speciality-icon"></i>
+                  <div class="speciality-name">Psychiatre</div>
+                  <div class="speciality-count">{{ medecins_counts.psychiatre|default:"0" }} médecins disponibles</div>
+              </div>
+              <div class="speciality-card" data-speciality="orthopediste">
+                  <i class="bx bx-walk speciality-icon"></i>
+                  <div class="speciality-name">Orthopédiste</div>
+                  <div class="speciality-count">{{ medecins_counts.orthopediste|default:"0" }} médecins disponibles</div>
+              </div>
+          </div>
+            
+            <div class="button-group">
+                <button class="btn btn-primary" onclick="nextStep()" disabled id="step1-continue">
+                    Continuer <i class="bx bx-right-arrow-alt"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 2: Doctor Selection -->
+        <div class="content-section" id="step-2">
+            <div class="doctors-container">
+                <div class="doctor-list" id="doctor-list">
+                    <!-- Doctors will be loaded here -->
+                </div>
+            </div>
+            
+            <div class="button-group">
+                <button class="btn btn-secondary" onclick="previousStep()">
+                    <i class="bx bx-left-arrow-alt"></i> Retour
+                </button>
+                <button class="btn btn-primary" onclick="nextStep()" disabled id="step2-continue">
+                    Continuer <i class="bx bx-right-arrow-alt"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Step 3: Time Slot Selection -->
+        <div class="content-section" id="step-3">
+            <div class="calendar-container">
+                <div class="calendar-header">
+                    <div class="calendar-nav">
+                        <button class="calendar-nav-btn" onclick="previousMonth()">
+                            <i class="bx bx-chevron-left"></i>
+                        </button>
+                    </div>
+                    <h2 class="calendar-title" id="calendar-title">Décembre 2024</h2>
+                    <div class="calendar-nav">
+                        <button class="calendar-nav-btn" onclick="nextMonth()">
+                            <i class="bx bx-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="calendar-grid" id="calendar-grid">
+                    <div class="calendar-day-header">Lun</div>
+                    <div class="calendar-day-header">Mar</div>
+                    <div class="calendar-day-header">Mer</div>
+                    <div class="calendar-day-header">Jeu</div>
+                    <div class="calendar-day-header">Ven</div>
+                    <div class="calendar-day-header">Sam</div>
+                    <div class="calendar-day-header">Dim</div>
+                    <!-- Calendar days will be generated here -->
+                </div>
+                
+                <div class="time-slots-section" id="time-slots-section" style="display: none;">
+                    <h3 class="time-slots-title">Créneaux disponibles</h3>
+                    <div class="time-slots" id="time-slots">
+                        <!-- Time slots will be generated here -->
+                    </div>
+                </div>
+            </div>
+            
+            <div class="button-group">
+                <button class="btn btn-secondary" onclick="previousStep()">
+                    <i class="bx bx-left-arrow-alt"></i> Retour
+                </button>
+                <button class="btn btn-primary" onclick="confirmAppointment()" disabled id="step3-continue">
+                    Confirmer le rendez-vous <i class="bx bx-check"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div class="modal-overlay hidden" id="confirmation-modal">
+        <div class="modal">
+            <h3 class="modal-title">Confirmer votre rendez-vous</h3>
+            
+            <div class="appointment-summary" id="appointment-summary">
+                <div class="summary-item">
+                    <span class="summary-label">Médecin :</span>
+                    <span class="summary-value" id="summary-doctor">-</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Spécialité :</span>
+                    <span class="summary-value" id="summary-specialty">-</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Date :</span>
+                    <span class="summary-value" id="summary-date">-</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Heure :</span>
+                    <span class="summary-value" id="summary-time">-</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Cabinet :</span>
+                    <span class="summary-value" id="summary-cabinet">-</span>
+                </div>
+                <div class="summary-item">
+                    <span class="summary-label">Tarif :</span>
+                    <span class="summary-value" id="summary-price">-</span>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label class="form-label" for="motif">Motif de consultation (optionnel)</label>
+                <textarea class="form-control" id="motif" rows="3" placeholder="Décrivez brièvement le motif de votre consultation..."></textarea>
+            </div>
+            
+            <div class="button-group">
+                <button class="btn btn-secondary" onclick="closeModal()">Annuler</button>
+                <button class="btn btn-primary" onclick="submitAppointment()" id="submit-btn">
+                    <span id="submit-text">Confirmer</span>
+                    <span class="loading" id="submit-loading" style="display: none;"></span>
+                </button>
+            </div>
+    </div>
+
+<script defer src="{% static 'rdv/js/patient/prendre_rdv.js' %}"></script>
+
+

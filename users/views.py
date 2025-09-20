@@ -1,20 +1,22 @@
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout, update_session_auth_hash
-from django.contrib.auth.decorators import login_required, permission_required, user_passes_test
+from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.forms import PasswordChangeForm
-from django.core.paginator import Paginator
+from django.core.paginator import Paginator 
 from django.db.models import Q, Max
 from django.http import JsonResponse, HttpResponseForbidden
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.utils.dateparse import parse_datetime
 from django.utils.timezone import now
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_http_methods
+
 
 # App imports
 from .models import Utilisateur
 from rdv.models import Patient, Medecin
-from .forms import ConnexionForm, RegisterForm, UtilisateurCreationForm, UtilisateurUpdateForm
+from .forms import ConnexionForm, RegisterForm, UtilisateurCreationForm, UtilisateurUpdateForm, UserEditForm, PatientEditForm, MedecinEditForm, CustomPasswordChangeForm
+
 
 # Create your views here.
 
@@ -147,7 +149,7 @@ def deconnecter(request):
 
 # Vue du profil utilisateur
 @login_required(login_url='users:login')
-def profil(request, user_id):
+def profil_user(request, user_id):
     us = Utilisateur.objects.get(pk=user_id)
     if us.ROLE=='patient':  
         us_profil = Utilisateur.objects.filter(pk=user_id)
@@ -169,31 +171,123 @@ def profil(request, user_id):
 
 @login_required(login_url='users:login')
 def profil_view(request):
-    us = request.user
-    if us.ROLE=='patient':  
-        us_profil = us
-    elif us.ROLE=='medecin':
-        us_profil = us
+    user = request.user
+
+    # Récupérer le profil lié selon le rôle
+    if user.role == 'patient':
+        try:
+            profil = user.profil_patient
+        except:
+            profil = None
+    elif user.role == 'medecin':
+        try:
+            profil = user.profil_medecin
+        except:
+            profil = None
     else:
-        us_profil = us
-    context = {"utilisateur" : us,
-               "user_profil" : us_profil,
-               }
-    
-    # si requête AJAX (navigation fragment)
+        profil = None  # admin n'a pas de profil associé
+
+    context = {
+        "utilisateur": user,
+        "user_profil": profil,
+    }
+
+    # si requête AJAX
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return render(request, 'rdv/profil/mon_profil.html', context)
 
     # page complète selon rôle
-    if us.role == 'admin':
+    if user.role == 'admin':
         tpl = 'rdv/admin/users/profil.html'
-    elif us.role == 'medecin':
+    elif user.role == 'medecin':
         tpl = 'rdv/doctor/profil.html'
     else:
         tpl = 'rdv/patient/profil.html'
+
     return render(request, tpl, context)
 
- 
+@login_required
+@require_http_methods(["GET", "POST"])
+def edit_user_view(request):
+    """Éditer les infos utilisateur (communes)"""
+    user = request.user
+    if request.method == "POST":
+        form = UserEditForm(request.POST, instance=user)
+        if form.is_valid():
+            form.save()
+            return JsonResponse({"success": True, "message": "Informations utilisateur mises à jour."})
+    else:
+        form = UserEditForm(instance=user)
+
+    return render(request, "rdv/profil/forms/edit_user_form.html", {"form": form})
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def edit_patient_view(request):
+    """Éditer les infos patient"""
+    if not hasattr(request.user, "profil_patient"):
+        return HttpResponseForbidden("Vous n'êtes pas un patient.")
+
+    patient = request.user.profil_patient
+    if request.method == "POST":
+        form = PatientEditForm(request.POST, instance=patient)
+        if form.is_valid():
+            form.save()
+            return JsonResponse({"success": True, "message": "Informations patient mises à jour."})
+    else:
+        form = PatientEditForm(instance=patient)
+
+    return render(request, "rdv/profil/forms/edit_patient_form.html", {"form": form})
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def edit_medecin_view(request):
+    """Éditer les infos médecin"""
+    if not hasattr(request.user, "profil_medecin"):
+        return HttpResponseForbidden("Vous n'êtes pas un médecin.")
+
+    medecin = request.user.profil_medecin
+    if request.method == "POST":
+        form = MedecinEditForm(request.POST, instance=medecin)
+        if form.is_valid():
+            form.save()
+            return JsonResponse({"success": True, "message": "Informations médecin mises à jour."})
+    else:
+        form = MedecinEditForm(instance=medecin)
+
+    return render(request, "rdv/profil/forms/edit_medecin_form.html", {"form": form})
+
+
+
+@login_required
+def edit_password(request):
+    if request.method == "POST":
+        form = CustomPasswordChangeForm(user=request.user, data=request.POST)
+        if form.is_valid():
+            user = form.save()  # 🔑 met à jour le mot de passe
+            update_session_auth_hash(request, user)  # évite la déconnexion
+
+            # AJAX → JSON
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return JsonResponse({"success": True})
+
+            # fallback classique
+            return redirect("users:profile")
+        else:
+            # si POST avec erreurs → AJAX renvoie fragment, sinon page complète
+            if request.headers.get("x-requested-with") == "XMLHttpRequest":
+                return render(request, "rdv/profil/forms/edit_password.html", {"form": form})
+
+    else:
+        form = CustomPasswordChangeForm(user=request.user)
+
+    # fallback page entière seulement
+    return render(request, "rdv/profil/forms/edit_password.html", {"form": form})
+
+
+
 
 
 

@@ -265,3 +265,22 @@ class NotifierRdvForm(forms.Form):
 
 
 
+class RendezVousForm(forms.Form):
+    specialite = forms.ChoiceField(
+        choices=Medecin.SPECIALITES, required=True, label="Spécialité"
+    )
+    medecin = forms.ModelChoiceField(
+        queryset=Medecin.objects.all(), required=True, label="Médecin"
+    )
+    date = forms.DateField(
+        widget=forms.DateInput(attrs={'type': 'date'}), required=True, label="Date"
+    )
+    heure = forms.TimeField(
+        widget=forms.TimeInput(attrs={'type': 'time'}), required=True, label="Heure"
+    )
+    motif = forms.CharField(
+        widget=forms.Textarea(attrs={'rows': 2}), required=False, label="Motif"
+    )
+
+
+

@@ -26,6 +26,11 @@ urlpatterns=[
 
     path('dashboard_patient/', views.dashboard_patient_view, name='dashboard_patient'),
     path('liste_rdv_patient/', views.liste_rdv_patient, name='liste_rdv_patient'),
+    path('prendre_rdv/', views.prendre_rdv, name='prendre_rdv'),
+    path("api/search/medecins/", views.api_search_medecins, name="api_search_medecins"),
+    path("api/creneaux/medecins/<int:medecin_id>/", views.api_creneaux_medecin, name="api_creneaux_medecin"),
+    path("api/reserver/rdv/", views.api_reserver_rdv, name="api_reserver_rdv"),
+    path("api/api_toggle_favori/<int:medecin_id>/", views.api_toggle_favori, name="api_toggle_favori"),
 
     path('notifs/', views.list_notif, name='notifs'),
     path('notifications/mark-read/<int:notification_id>/', views.mark_as_read, name='mark_read'),

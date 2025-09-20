@@ -1,7 +1,10 @@
 from django import forms
-from django.contrib.auth.forms import UserCreationForm, UserChangeForm
+from django.contrib.auth.forms import UserCreationForm, UserChangeForm, PasswordChangeForm
 from django.core.exceptions import ValidationError
 from users.models import Utilisateur
+from rdv.models import Patient, Medecin
+from django.contrib.auth import get_user_model
+from django.contrib.auth import password_validation
 
 # Formulaire de connexion
 class ConnexionForm(forms.Form):
@@ -174,4 +177,42 @@ class UtilisateurUpdateForm(UserChangeForm):
         if hasattr(self, 'request') and self.request.user == self.instance and self.request.user.role != 'admin':
             del self.fields['role']
             del self.fields['est_actif']
+
+
+User = get_user_model()
+
+class UserEditForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ["nom", "prenom", "email", "telephone"]
+
+
+class PatientEditForm(forms.ModelForm):
+    class Meta:
+        model = Patient
+        fields = ["date_naissance", "sexe", "tel", "adresse"]
+
+
+class MedecinEditForm(forms.ModelForm):
+    class Meta:
+        model = Medecin
+        fields = ["numero_order", "specialite", "cabinet", "adresse_cabinet", "tel", "sexe", "diplomes"]
+
+
+
+class CustomPasswordChangeForm(PasswordChangeForm):
+    old_password = forms.CharField(
+        label="Ancien mot de passe",
+        widget=forms.PasswordInput(attrs={"class": "form-control", "placeholder": "Ancien mot de passe"})
+    )
+    new_password1 = forms.CharField(
+        label="Nouveau mot de passe",
+        widget=forms.PasswordInput(attrs={"class": "form-control", "placeholder": "Nouveau mot de passe"}),
+        help_text=password_validation.password_validators_help_text_html()
+    )
+    new_password2 = forms.CharField(
+        label="Confirmer le mot de passe",
+        widget=forms.PasswordInput(attrs={"class": "form-control", "placeholder": "Confirmez le mot de passe"})
+    )
+
 

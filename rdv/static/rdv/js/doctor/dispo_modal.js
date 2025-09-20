@@ -245,12 +245,6 @@
         return;
       }
 
-      // 4) Click on overlay (outside modal) should close it
-      const overlayClick = e.target.closest('.modal-overlay');
-      if (overlayClick && e.target === overlayClick) {
-        overlayClick.classList.add('hidden');
-        return;
-      }
     });
   }
 

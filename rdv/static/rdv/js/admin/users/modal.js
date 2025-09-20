@@ -28,10 +28,6 @@ function initCreateUserModal() {
     modal.classList.add('hidden');
   });
 
-  // Clique hors de la boîte pour fermer
-  modal.addEventListener('click', e => {
-    if (e.target === modal) modal.classList.add('hidden');
-  });
 }
 
 document.addEventListener('click', function(e) {

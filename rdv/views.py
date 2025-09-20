@@ -21,8 +21,8 @@ from django.utils.dateparse import parse_datetime
 
 # App imports
 from users.models import Utilisateur
-from .forms import UpdateRDVForm, DisponibiliteEditForm, DisponibiliteCreateForm, AnnulerRdvForm, ReporterRdvForm, NotifierRdvForm
-from .models import RendezVous, Notification, Patient, Medecin, Disponibilite, RdvHistory
+from .forms import UpdateRDVForm, DisponibiliteEditForm, DisponibiliteCreateForm, AnnulerRdvForm, ReporterRdvForm, NotifierRdvForm, RendezVousForm
+from .models import RendezVous, Notification, Patient, Medecin, Disponibilite, RdvHistory, FavoriMedecin, RechercheSymptome
 from . import notifications as notif_helpers
 from rdv.utils import user_can_manage_rdv, send_manual_notification
 
@@ -558,16 +558,6 @@ def confirmer_rdv(request, rdv_id):
         logger.exception("Erreur lors de la confirmation RDV %s : %s", rdv_id, e)
         return JsonResponse({'success': False, 'error': 'Erreur serveur'}, status=500)
 
-
-    # notification non bloquante (catch internals déjà gérés)
-    try:
-        subject = "Rendez-vous confirmé"
-        message = f"Bonjour {rdv.patient.user.nom_complet()}, votre rendez-vous du {rdv.date_heure_rdv.strftime('%d/%m/%Y %H:%M')} a été confirmé."
-        create_and_send_notification(rdv.patient.user, subject, message, notif_type='success', category='appointment', rdv=rdv)
-    except Exception as e:
-        logger.exception("Erreur envoi notification après confirmation rdv %s : %s", rdv.id, e)
-        # ne rien renvoyer d'autre ; la confirmation est persistée
-
     return JsonResponse({
         'success': True,
         'statut': rdv.statut,
@@ -635,14 +625,6 @@ def annuler_rdv(request, rdv_id):
         logger.exception("Erreur annuler_rdv %s: %s", rdv_id, e)
         return JsonResponse({'success': False, 'error': 'Erreur serveur'}, status=500)
 
-    try:
-        subject = "Rendez-vous annulé"
-        message = f"Bonjour {rdv.patient.user.nom_complet()},\n\nVotre rendez-vous du {rdv.date_heure_rdv.strftime('%d/%m/%Y %H:%M')} a été annulé."
-        if description:
-            message += f"\nRaison : {description}"
-        create_and_send_notification(rdv.patient.user, subject, message, notif_type='warning', category='appointment', rdv=rdv)
-    except Exception as e:
-        logger.exception("Erreur envoi notification après annulation rdv %s : %s", rdv.id, e)
 
     return JsonResponse({
         'success': True,
@@ -753,14 +735,6 @@ def reporter_rdv(request, rdv_id):
         logger.exception("Erreur reporter_rdv %s: %s", rdv_id, e)
         return JsonResponse({'success': False, 'error': 'Erreur serveur'}, status=500)
 
-    try:
-        subject = "Rendez-vous reporté"
-        message = f"Bonjour {rdv.patient.user.nom_complet()},\n\nVotre rendez-vous a été reporté au {rdv.date_heure_rdv.strftime('%d/%m/%Y %H:%M')}."
-        if raison:
-            message += f"\nRaison : {raison}"
-        create_and_send_notification(rdv.patient.user, subject, message, notif_type='info', category='appointment', rdv=rdv)
-    except Exception as e:
-        logger.exception("Erreur envoi notification après report rdv %s : %s", rdv.id, e)
 
     return JsonResponse({
         'success': True,
@@ -1092,6 +1066,7 @@ def dashboard_patient_view(request):
     return render(request, 'rdv/patient/dash_patient.html', context)
 
 
+
 @login_required(login_url='users:login')
 def liste_rdv_patient(request):
     # Récupérer le profil Patient lié à l’utilisateur
@@ -1151,7 +1126,7 @@ def liste_rdv_patient(request):
             'page_obj': page_obj,
             'rdvs': page_obj.object_list,
         })
-
+    
     # Rendu AJAX "contenu complet" (filtre + header)
     if request.headers.get('x-requested-with') == 'XMLHttpRequest':
         return render(request, 'rdv/patient/composants/rdvs/rdvs_patient_content.html', context)
@@ -1160,5 +1135,216 @@ def liste_rdv_patient(request):
     return render(request, 'rdv/patient/rdvs_patient.html', context)
 
 
+@login_required
+def prendre_rdv(request):
+    """Interface principale pour prendre RDV"""
+    patient = get_object_or_404(Patient, user=request.user)
+    
+    # Médecins favoris
+    favoris = FavoriMedecin.objects.filter(patient=patient).select_related('medecin__user')
+    
+    # Historique des RDV pour suggestions
+    historique = RendezVous.objects.filter(
+        patient=patient,
+        statut='termine'
+    ).values('medecin__specialite').annotate(count=Count('id')).order_by('-count')[:3]
 
+    from types import SimpleNamespace
+    medecins_par_specialite = Medecin.objects.values('specialite').annotate(count=Count('id'))
+    counts_dict = {item['specialite']: item['count'] for item in medecins_par_specialite}
+    medecins_counts = SimpleNamespace(**counts_dict)
 
+    context = {
+        'medecins_counts': medecins_counts,
+        'medecins': Medecin.objects.all(),
+        'specialites': Medecin.SPECIALITES,
+        'medecins_favoris': favoris,
+        'specialites_frequentes': historique,
+        'patient': patient
+    }
+    
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return render(request, 'rdv/patient/composants/prendre_rdv/prendre_rdv_content.html', context)
+    return render(request, 'rdv/patient/prendre_rdv.html', context)
+
+@login_required
+def api_search_medecins(request):
+    """API recherche médecins avec filtres"""
+    specialite = request.GET.get('specialite')
+    search = request.GET.get('q', '')
+    disponible_semaine = request.GET.get('dispo_semaine') == '1'
+    
+    medecins = Medecin.objects.filter(accepte_nouveaux_patients=True)
+    
+    if specialite:
+        medecins = medecins.filter(specialite=specialite)
+    
+    if search:
+        medecins = medecins.filter(
+            Q(user__nom__icontains=search) |
+            Q(user__prenom__icontains=search) |
+            Q(cabinet__icontains=search)
+        )
+    
+    # Calcul disponibilités si demandé
+    if disponible_semaine:
+        fin_semaine = timezone.now() + timedelta(days=7)
+        medecins_ids = []
+        for m in medecins:
+            if m.prochaine_disponibilite and m.prochaine_disponibilite <= fin_semaine:
+                medecins_ids.append(m.id)
+        medecins = medecins.filter(id__in=medecins_ids)
+    
+    # Limiter résultats
+    medecins = medecins[:20]
+    
+    data = []
+    for m in medecins:
+        prochaine = m.prochaine_disponibilite
+        data.append({
+            'id': m.id,
+            'nom': m.user.nom_complet(),
+            'specialite': m.specialite, 
+            'specialite_label': m.get_specialite_display(),
+            'cabinet': m.cabinet,
+            'photo_url': m.photo.url if m.photo else None,
+            'tarif': str(m.tarif_consultation) if m.tarif_consultation else None,
+            'langues': m.langues_parlees,
+            'prochaine_dispo': prochaine.isoformat() if prochaine else None,
+            'delai_moyen': m.delai_moyen_rdv
+        })
+    
+    return JsonResponse({'medecins': data})
+
+@login_required
+def api_creneaux_medecin(request, medecin_id):
+    """API créneaux disponibles d'un médecin"""
+    medecin = get_object_or_404(Medecin, id=medecin_id)
+    date_debut = request.GET.get('date_debut')
+    date_fin = request.GET.get('date_fin')
+    
+    if not date_debut:
+        date_debut = timezone.now()
+    else:
+        date_debut = datetime.fromisoformat(date_debut)
+    
+    if not date_fin:
+        date_fin = date_debut + timedelta(days=30)
+    else:
+        date_fin = datetime.fromisoformat(date_fin)
+    
+    # Récupérer disponibilités
+    creneaux = []
+    current = date_debut.date()
+    
+    while current <= date_fin.date():
+        # Disponibilités hebdomadaires
+        jour_semaine = ['mon','tue','wed','thu','fri','sat','sun'][current.weekday()]
+        dispos_jour = Disponibilite.objects.filter(
+            medecin=medecin,
+            jour=jour_semaine,
+            is_active=True,
+            date_specific__isnull=True
+        )
+        
+        # Disponibilités spécifiques
+        dispos_spec = Disponibilite.objects.filter(
+            medecin=medecin,
+            date_specific=current,
+            is_active=True
+        )
+        
+        for dispo in list(dispos_jour) + list(dispos_spec):
+            # Générer créneaux de 30 min
+            heure = dispo.heure_debut
+            while heure < dispo.heure_fin:
+                dt = timezone.make_aware(
+                    datetime.combine(current, heure)
+                )
+                
+                # Vérifier si créneau libre
+                if not RendezVous.objects.filter(
+                    medecin=medecin,
+                    date_heure_rdv=dt,
+                    statut__in=['programme', 'confirme', 'en_cours']
+                ).exists():
+                    creneaux.append({
+                        'datetime': dt.isoformat(),
+                        'date': current.isoformat(),
+                        'heure': heure.strftime('%H:%M'),
+                        'disponible': True
+                    })
+                
+                # Incrémenter de 30 min
+                heure = (datetime.combine(current, heure) + timedelta(minutes=30)).time()
+        
+        current += timedelta(days=1)
+    
+    return JsonResponse({
+        'medecin_id': medecin.id,
+        'creneaux': creneaux
+    })
+
+@login_required
+@require_POST
+def api_reserver_rdv(request):
+    """API pour confirmer la réservation"""
+    data = json.loads(request.body)
+    patient = get_object_or_404(Patient, user=request.user)
+    medecin = get_object_or_404(Medecin, id=data['medecin_id'])
+    
+    # Parser datetime
+    dt = datetime.fromisoformat(data['datetime'])
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt)
+    
+    # Vérifier disponibilité
+    if RendezVous.objects.filter(
+        medecin=medecin,
+        date_heure_rdv=dt,
+        statut__in=['programme', 'confirme']
+    ).exists():
+        return JsonResponse({'success': False, 'error': 'Créneau déjà pris'}, status=400)
+    
+    # Créer RDV
+    rdv = RendezVous.objects.create(
+        patient=patient,
+        medecin=medecin,
+        date_heure_rdv=dt,
+        motif=data.get('motif', ''),
+        statut='programme',
+        duree_minutes=30
+    )
+    
+    # Notification
+    from rdv.utils import create_and_send_notification
+    create_and_send_notification(
+        patient.user,
+        "Rendez-vous programmé",
+        f"Votre RDV avec Dr. {medecin.user.nom_complet()} le {dt.strftime('%d/%m/%Y à %H:%M')} est confirmé.",
+        rdv=rdv
+    )
+    
+    return JsonResponse({
+        'success': True,
+        'rdv_id': rdv.id,
+        'message': 'Rendez-vous réservé avec succès'
+    })
+
+@login_required
+@require_POST  
+def api_toggle_favori(request, medecin_id):
+    """Ajouter/retirer médecin des favoris"""
+    patient = get_object_or_404(Patient, user=request.user)
+    medecin = get_object_or_404(Medecin, id=medecin_id)
+    
+    favori, created = FavoriMedecin.objects.get_or_create(
+        patient=patient,
+        medecin=medecin
+    )
+    
+    if not created:
+        favori.delete()
+        return JsonResponse({'added': False})
+    
+    return JsonResponse({'added': True})

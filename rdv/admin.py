@@ -30,7 +30,7 @@ class MedecinAdmin(admin.ModelAdmin):
             'fields': ['cabinet', 'adresse_cabinet']
         }),
         ('Qualifications', {
-            'fields': ['diplomes']
+            'fields': ['diplomes', 'langues_parlees', ]
         }),
     )
 

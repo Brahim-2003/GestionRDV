@@ -243,12 +243,10 @@ function initDispoPolling() {
 
 // Auto-init on DOMContentLoaded
 document.addEventListener('DOMContentLoaded', () => {
-  // flatpickr init if present (keeps date input usable)
   if (window.flatpickr) {
     try { flatpickr(".date-input", { dateFormat: "Y-m-d" }); } catch (e) { /* ignore */ }
   }
 
-  // Bind any inline ajax forms already present
   document.querySelectorAll('form[data-ajax="1"]').forEach(node => {
     const container = node.closest('[data-ajax-container]') || node.parentElement;
     if (typeof bindDispoForm === 'function') {

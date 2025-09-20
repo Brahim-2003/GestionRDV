@@ -1,0 +1,32 @@
+{% load static %}
+<form id="edit-user-form"
+      class="modern-form"
+      method="post"
+      data-ajax="1"
+      action="{% url 'users:edit_user' %}">
+  {% csrf_token %}
+
+
+  {% if form and form.non_field_errors %}
+    <div class="nonfield-errors">{{ form.non_field_errors }}</div>
+  {% endif %}
+
+  {% for field in form %}
+    <p>
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+      {{ field }}
+      {% if field.errors %}
+        <div class="errorlist">{{ field.errors }}</div>
+      {% endif %}
+    </p>
+  {% endfor %}
+
+  <div class="form-actions" style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
+    <button type="button" class="btn btn-secondary modal-cancel">
+      <i class='bx bxs-x-circle'></i> Fermer
+    </button>
+    <button type="submit" id="edit-user-submit" class="btn btn-primary">
+      <i class='bx bxs-save'></i> Enregistrer
+    </button>
+  </div>
+</form>

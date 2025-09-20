@@ -12,7 +12,11 @@ urlpatterns=[
     path('users/add/', views.creer_utilisateur, name='creer_utilisateur'),
     path('modifier_user/, <int:user_id>', views.modifier_utilisateur, name='modifier_utilisateur'),
     path('supprimer_user/, <int:user_id>', views.supprimer_utilisateur, name='supprimer_utilisateur'),
-    path('profil_user/, <int:user_id>', views.profil, name="profil"),
+    path('profil_user/, <int:user_id>', views.profil_user, name="profil"),
     path('mon_profil/', views.profil_view, name="mon_profil"),
+    path("profil/edit/user/", views.edit_user_view, name="edit_user"),
+    path("profil/edit/patient/", views.edit_patient_view, name="edit_patient"),
+    path("profil/edit/medecin/", views.edit_medecin_view, name="edit_medecin"),
+    path("edit-password/", views.edit_password, name="edit_password"),
     
 ]

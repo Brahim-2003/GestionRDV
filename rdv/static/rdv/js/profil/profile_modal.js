@@ -1,56 +1,57 @@
-// static/rdv/js/modal/rdv_modal.js
+// static/rdv/js/modal/profile_modal.js
 (function () {
   'use strict';
 
   const DEFAULTS = {
-    modalSelector: '#annuler-rdv-modal',
-    containerSelector: '#annuler-modal-form-container',
+    modalSelector: '#edit-user-modal',
+    containerSelector: '#edit-user-modal-form-container',
     hiddenClass: 'hidden',
     ajaxHeader: { 'X-Requested-With': 'XMLHttpRequest' },
     autoInjectMissing: true,
   };
 
   // HTML templates pour injection automatique
-  const ANNULER_HTML = `
-  <div id="annuler-rdv-modal" class="modal-overlay hidden" aria-hidden="true">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="annuler-rdv-title">
-      <header class="modal-header">
-        <h2 id="annuler-rdv-title" class="modal-title"><i class='bx bxs-trash'></i> Annuler le rendez-vous</h2>
-        <button class="modal-close" aria-label="Fermer">&times;</button>
-      </header>
-      <section class="modal-body">
-        <div id="annuler-modal-form-container"><p>Chargement du formulaire…</p></div>
-      </section>
-    </div>
-  </div>`;
+  const EDIT_USER_HTML = `
+  <div id="edit-user-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <header class="modal-header">
+      <h2 class="modal-title">Modifier mes informations utilisateur</h2>
+      <button class="modal-close">&times;</button>
+    </header>
+    <section class="modal-body">
+      <div id="edit-user-modal-form-container"><p>Chargement du formulaire…</p></div>
+    </section>
+  </div>
+</div>`;
 
-  const REPORTER_HTML = `
-  <div id="reporter-rdv-modal" class="modal-overlay hidden" aria-hidden="true">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="reporter-rdv-title">
-      <header class="modal-header">
-        <h2 id="reporter-rdv-title" class="modal-title"><i class='bx bxs-refresh'></i> Reporter le rendez-vous</h2>
-        <button class="modal-close" aria-label="Fermer">&times;</button>
-      </header>
-      <section class="modal-body">
-        <div id="reporter-modal-form-container"><p>Chargement du formulaire…</p></div>
-      </section>
-    </div>
-  </div>`;
+  const EDIT_PATIENT_HTML = `
+  <div id="edit-patient-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <header class="modal-header">
+      <h2 class="modal-title">Modifier mes informations patient</h2>
+      <button class="modal-close">&times;</button>
+    </header>
+    <section class="modal-body">
+      <div id="edit-patient-modal-form-container"><p>Chargement du formulaire…</p></div>
+    </section>
+  </div>
+</div>`;
 
-  const NOTIFIER_HTML = `
-  <div id="notifier-rdv-modal" class="modal-overlay hidden" aria-hidden="true">
-    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="notifier-rdv-title">
-      <header class="modal-header">
-        <h2 id="notifier-rdv-title" class="modal-title"><i class='bx bxs-message-rounded-add'></i> Notifier le patient</h2>
-        <button class="modal-close" aria-label="Fermer">&times;</button>
-      </header>
-      <section class="modal-body">
-        <div id="notifier-modal-form-container"><p>Chargement du formulaire…</p></div>
-      </section>
-    </div>
-  </div>`;                 
+  const EDIT_MEDECIN_HTML = `
+  <div id="edit-medecin-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <header class="modal-header">
+      <h2 class="modal-title">Modifier mes informations médecin</h2>
+      <button class="modal-close">&times;</button>
+    </header>
+    <section class="modal-body">
+      <div id="edit-medecin-modal-form-container"><p>Chargement du formulaire…</p></div>
+    </section>
+  </div>
+</div>`;
 
-  const STYLE_ID = 'rdv-modal-default-styles';
+
+  const STYLE_ID = 'edit-modal-default-styles';
   const DEFAULT_STYLES = `
   .modal-overlay { position: fixed; inset: 0; display:flex; align-items:center; justify-content:center; background: rgba(0,0,0,0.45); z-index:9999; }
   .modal-overlay.hidden { display:none; }
@@ -66,7 +67,7 @@
   .btn-secondary { background:#f0f0f0; color:#111; }
   `;
 
-  const RdvModal = (function () {
+  const UserModal = (function () {
     let opts = Object.assign({}, DEFAULTS);
     let modalEl = null;
     let containerEl = null;
@@ -83,19 +84,19 @@
 
     function _injectIfMissing() {
       if (!opts.autoInjectMissing) return;
-      if (!document.getElementById('annuler-rdv-modal')) {
+      if (!document.getElementById('edit-user-modal')) {
         const frag = document.createElement('div');
-        frag.innerHTML = ANNULER_HTML;
+        frag.innerHTML = EDIT_USER_HTML;
         document.body.appendChild(frag.firstElementChild);
       }
-      if (!document.getElementById('reporter-rdv-modal')) {
+      if (!document.getElementById('edit-patient-modal')) {
         const frag = document.createElement('div');
-        frag.innerHTML = REPORTER_HTML;
+        frag.innerHTML = EDIT_PATIENT_HTML;
         document.body.appendChild(frag.firstElementChild);
       }
-      if (!document.getElementById('notifier-rdv-modal')) {
+      if (!document.getElementById('edit-medecin-modal')) {
         const frag = document.createElement('div');
-        frag.innerHTML = NOTIFIER_HTML;
+        frag.innerHTML = EDIT_MEDECIN_HTML;
         document.body.appendChild(frag.firstElementChild);
       }
       _ensureStyles();
@@ -115,17 +116,6 @@
 
     function init(custom = {}) {
       opts = Object.assign({}, opts, custom);
-
-      if (!custom.containerSelector && String(opts.modalSelector).includes('reporter')) {
-        opts.containerSelector = '#reporter-modal-form-container';
-      }
-      if (!custom.containerSelector && String(opts.modalSelector).includes('annuler')) {
-        opts.containerSelector = '#annuler-modal-form-container';
-      }
-      if (!custom.containerSelector && String(opts.modalSelector).includes('notifier')) {
-        opts.containerSelector = '#notifier-modal-form-container';
-      }
-
       _ensureElements();
 
       if (!modalEl) return;
@@ -134,7 +124,6 @@
         closeBtn.dataset.bound = '1';
         closeBtn.addEventListener('click', (e) => { e.preventDefault(); close(); });
       }
-
     }
 
     function open() {
@@ -164,11 +153,11 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     try {
-      RdvModal.init();
-      RdvModal.init({ modalSelector: '#reporter-rdv-modal', containerSelector: '#reporter-modal-form-container' });
-      RdvModal.init({ modalSelector: '#notifier-rdv-modal', containerSelector: '#notifier-modal-form-container' });
-    } catch (e) { /* ignore */ }
+      UserModal.init({ modalSelector: '#edit-user-modal', containerSelector: '#edit-user-modal-form-container' });
+      UserModal.init({ modalSelector: '#edit-patient-modal', containerSelector: '#edit-patient-modal-form-container' });
+      UserModal.init({ modalSelector: '#edit-medecin-modal', containerSelector: '#edit-medecin-modal-form-container' });
+      } catch (e) { /* ignore */ }
   });
 
-  window.RdvModal = RdvModal;
+  window.UserModal = UserModal;
 })();

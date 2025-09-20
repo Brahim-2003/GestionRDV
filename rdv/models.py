@@ -53,6 +53,7 @@ class Patient(models.Model):
         blank=True,
         validators=[RegexValidator(regex=r'^\+?[0-9\s\-\(\)]+$', message="Numéro de téléphone invalide")]
     )
+    photo = models.ImageField(upload_to='patients/', blank=True, null=True)
 
 
     class Meta:
@@ -99,13 +100,68 @@ class Medecin(models.Model):
     )
     sexe = models.CharField(max_length=10, choices=[('F', 'Féminin'), ('M', 'Masculin')], default='F')
     diplomes = models.TextField(blank=True)
-
+    photo = models.ImageField(upload_to='medecins/', blank=True, null=True)
+    tarif_consultation = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    langues_parlees = models.CharField(max_length=200, blank=True, help_text="Ex: Français, Anglais, Arabe")
+    accepte_nouveaux_patients = models.BooleanField(default=True)
+    delai_moyen_rdv = models.IntegerField(null=True, blank=True, help_text="En jours")
+    
     class Meta:
         verbose_name = "Médecin"
         verbose_name_plural = "Médecins"
 
     def __str__(self):
         return f"Dr. {self.user.nom_complet()} - {self.specialite}"
+    
+    @property
+    def prochaine_disponibilite(self):
+        """Retourne le prochain créneau disponible"""
+        now = timezone.now()
+        # Créneaux hebdomadaires
+        dispos = self.disponibilites.filter(
+            is_active=True,
+            date_specific__isnull=True
+        ).order_by('jour', 'heure_debut')
+
+        for dispo in dispos:
+            # Convertir en date réelle et vérifier si pas déjà pris
+            slots = dispo.get_slot_datetimes()
+            for start, end in slots:
+                # S'assurer que start est aware
+                if timezone.is_naive(start):
+                    start = timezone.make_aware(start, timezone.get_current_timezone())
+
+                if start > now:
+                    # Vérifier si créneau libre
+                    if not RendezVous.objects.filter(
+                        medecin=self,
+                        date_heure_rdv=start,
+                        statut__in=['programme', 'confirme']
+                    ).exists():
+                        return start
+        return None
+
+
+class FavoriMedecin(models.Model):
+    """Médecins favoris du patient"""
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='medecins_favoris')
+    medecin = models.ForeignKey(Medecin, on_delete=models.CASCADE, related_name='patients_favoris')
+    date_ajout = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ['patient', 'medecin']
+
+class RechercheSymptome(models.Model):
+    """Mapping symptômes -> spécialités suggérées"""
+    symptome = models.CharField(max_length=100)
+    specialites_suggerees = models.JSONField(default=list)  # ['cardiologue', 'generaliste']
+    
+    class Meta:
+        indexes = [
+            models.Index(fields=['symptome']),
+        ]
+
+
 
 class Disponibilite(models.Model):
     JOUR_CHOICES = [
@@ -380,7 +436,7 @@ class RendezVous(models.Model):
         # notification non-bloquante (déjà implémentée ailleurs)
         try:
             subject = "Rendez-vous confirmé"
-            message = f"Votre rendez-vous du {self.date_heure_rdv.strftime('%d/%m/%Y %H:%M')} a été confirmé."
+            message = f"Bonjour M. {self.patient.user.nom_complet()}, votre rendez-vous du {self.date_heure_rdv.strftime('%d/%m/%Y %H:%M')} avec Dr. {self.medecin.user.nom_complet()} a été confirmé."
             self._create_notification_safe(self.patient.user, subject, message, notif_type='success', category='appointment')
         except Exception:
             pass
@@ -418,7 +474,7 @@ class RendezVous(models.Model):
         # notification non-bloquante
         try:
             subject = "Rendez-vous annulé"
-            message = f"Votre rendez-vous prévu le {self.date_heure_rdv.strftime('%d/%m/%Y %H:%M')} a été annulé."
+            message = f"Bonjour M. {self.patient.user.nom_complet()},\n\nVotre rendez-vous prévu le {self.date_heure_rdv.strftime('%d/%m/%Y %H:%M')} avec Dr. {self.medecin.user.nom_complet()} a été annulé."
             if description:
                 message += f"\nRaison : {description}"
             self._create_notification_safe(self.patient.user, subject, message, notif_type='warning', category='appointment')
@@ -473,13 +529,18 @@ class RendezVous(models.Model):
         try:
             if initiator == 'medecin':
                 subject = "Rendez-vous déplacé et confirmé"
-                message = f"Votre rendez-vous a été déplacé et confirmé au {self.date_heure_rdv.strftime('%d/%m/%Y %H:%M')}."
+                message = f"Votre rendez-vous avec Dr. {self.medecin.user.nom_complet()} a été déplacé et confirmé au {self.date_heure_rdv.strftime('%d/%m/%Y %H:%M')}."
+                self._create_notification_safe(self.patient.user, subject, message, notif_type='info', category='appointment')
             else:
-                subject = "Rendez-vous déplacé — en attente de confirmation"
-                message = f"Votre rendez-vous a été déplacé au {self.date_heure_rdv.strftime('%d/%m/%Y %H:%M')} et attend la confirmation du médecin."
+                subject_patient = "Rendez-vous déplacé — en attente de confirmation"
+                message_patient = f"Votre rendez-vous avec Dr. {self.medecin.user.nom_complet()} a été déplacé au {self.date_heure_rdv.strftime('%d/%m/%Y %H:%M')} et attend la confirmation du médecin."
+                subject_medecin = "Rendez-vous déplacé — en attente de confirmation"
+                message_medecin = f"Le rendez-vous avec {self.patient.user.nom_complet()} a été déplacé au {self.date_heure_rdv.strftime('%d/%m/%Y %H:%M')} et attend votre confirmation."
+
             if raison:
-                message += f"\nRaison : {raison}"
-            self._create_notification_safe(self.patient.user, subject, message, notif_type='info', category='appointment')
+                message_patient += f"\nRaison : {raison}"
+                self._create_notification_safe(self.patient.user, subject_patient, message_patient, notif_type='info', category='appointment')
+                self._create_notification_safe(self.medecin.user, subject_medecin, message_medecin, notif_type='info', category='appointment')
         except Exception:
             pass
 

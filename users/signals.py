@@ -19,12 +19,6 @@ def generate_unique_numero_patient():
             return numero
 
 
-def generate_unique_numero_medecin():
-    """Génère un numéro unique pour un médecin."""
-    while True:
-        numero = f'MED{uuid.uuid4().hex[:8].upper()}'
-        if not Medecin.objects.filter(numero_order=numero).exists():
-            return numero
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
 def manage_profiles_on_role_change(sender, instance, **kwargs):
@@ -45,7 +39,6 @@ def manage_profiles_on_role_change(sender, instance, **kwargs):
             user=instance,
             defaults={
                 'tel': instance.telephone,
-                'numero_order': generate_unique_numero_medecin(),
                 'specialite': 'generaliste'
             }
         )

@@ -284,6 +284,7 @@ class Disponibilite(models.Model):
         return slots
 
 
+
 ALLOWED_TRANSITIONS = {
     'programme': {'confirme', 'annule', 'reporte'},
     'confirme': {'annule', 'reporte', 'en_cours', 'termine'},
@@ -292,6 +293,7 @@ ALLOWED_TRANSITIONS = {
     'termine': set(),
     'annule': set(),
 }
+
 
 class RendezVous(models.Model):
     STATUT_CHOICES = [
@@ -562,7 +564,8 @@ class Notification(models.Model):
         ('reminder', 'Rappel'),
     ]
     
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notifications')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, 
+                             related_name='notifications')
     message = models.TextField()
     type = models.CharField(max_length=50, choices=TYPE_CHOICES, default='info')
     category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default='system')
@@ -589,15 +592,4 @@ class Notification(models.Model):
         """Retourne le temps écoulé depuis l'envoi"""
         return timesince(self.date_envoi)
 
-
-class MessageBot(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    contenu = models.TextField()
-    intention = models.CharField(max_length=200)
-    reponse = models.TextField()
-    date_echange = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        verbose_name = "Message du ChatBot"
-        verbose_name_plural = "Messages du ChatBot"
 

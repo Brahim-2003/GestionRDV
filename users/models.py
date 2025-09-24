@@ -75,8 +75,10 @@ class Utilisateur(AbstractBaseUser, PermissionsMixin):
     telephone = models.CharField(max_length=20, verbose_name="Téléphone")
     role = models.CharField(max_length=20, choices=ROLE, default='patient', verbose_name="Rôle")
     date_inscription = models.DateTimeField(auto_now_add=True, verbose_name="Date d'inscription")
-
     is_actif = models.BooleanField(default=True, verbose_name="Actif")
+
+
+    
     is_staff = models.BooleanField(default=False, verbose_name="Staff")
 
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Date de mise à jour")

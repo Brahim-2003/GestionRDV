@@ -1,4 +1,3 @@
-{# rdv/admin/rdvs/composants/rdvs_table.html #}
 <table class="data-table">
   <thead>
     <tr>
@@ -13,9 +12,9 @@
   <tbody>
     {% for rdv in page_obj %}
     <tr>
-      <td>{{ rdv.patient.user.nom }} {{ rdv.patient.user.prenom }}</td>
+      <td>{{ rdv.patient.user.nom_complet }}</td>
       <td>
-        {{ rdv.medecin.user.nom }} {{ rdv.medecin.user.prenom }}
+        {{ rdv.medecin.user.nom_complet }}
         ({{ rdv.medecin.get_specialite_display }})
       </td>
       <td>{{ rdv.date_heure_rdv|date:"d/m/Y H:i" }}</td>

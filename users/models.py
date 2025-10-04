@@ -9,7 +9,7 @@ import re
 class UtilisateurManager(BaseUserManager):
 
     # Manager personnalisé pour le modèle Utilisateur
-    def create_user(self, email, nom, prenom, mot_de_passe=None, **extra_fields):
+    def create_user(self, email, nom, prenom, date_naissance, mot_de_passe=None, **extra_fields):
 
         # Crée et sauvegarde un utilisateur avec l'email, nom et prénom donnés
         if not email:
@@ -20,15 +20,17 @@ class UtilisateurManager(BaseUserManager):
         
         if not prenom:
             raise ValueError("Le prénom est obligatoire")
+        if not date_naissance:
+            raise ValueError("La date de naissance est obligatoire")
         
         email = self.normalize_email(email)
-        user = self.model(email=email, nom=nom, prenom=prenom, **extra_fields)
+        user = self.model(email=email, nom=nom, prenom=prenom, date_naissance = date_naissance, **extra_fields)
         user.set_password(mot_de_passe)
         user.save(using=self._db)
 
         return user
 
-    def create_superuser(self, email, nom, prenom, mot_de_passe=None, **extra_fields):
+    def create_superuser(self, email, nom, prenom, date_naissance, mot_de_passe=None, **extra_fields):
 
         # Crée et sauvegarde un superutilisateur
         extra_fields.setdefault('is_staff', True)
@@ -41,7 +43,7 @@ class UtilisateurManager(BaseUserManager):
         if extra_fields.get('is_superuser') is not True:
             raise ValueError("Le superutilisateur doit avoir is_superuser=True !")
         
-        return self.create_user(email, nom, prenom, mot_de_passe, **extra_fields)
+        return self.create_user(email, nom, prenom, date_naissance, mot_de_passe, **extra_fields)
 
     # Fonction qui assigne automatiquement les permissions selon le rôle
     def _assign_role_permissions(self, user):
@@ -73,6 +75,7 @@ class Utilisateur(AbstractBaseUser, PermissionsMixin):
     nom = models.CharField(max_length=53, verbose_name="Nom")
     prenom = models.CharField(max_length=53, verbose_name="Prénom")
     telephone = models.CharField(max_length=20, verbose_name="Téléphone")
+    date_naissance = models.DateField(default=None, verbose_name="Date de naissance")
     role = models.CharField(max_length=20, choices=ROLE, default='patient', verbose_name="Rôle")
     date_inscription = models.DateTimeField(auto_now_add=True, verbose_name="Date d'inscription")
     is_actif = models.BooleanField(default=True, verbose_name="Actif")
@@ -86,7 +89,7 @@ class Utilisateur(AbstractBaseUser, PermissionsMixin):
     objects = UtilisateurManager()
 
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['nom', 'prenom']
+    REQUIRED_FIELDS = ['nom', 'prenom', 'date_naissance']
 
     class Meta:
         verbose_name = "Utilisateur"
@@ -104,13 +107,10 @@ class Utilisateur(AbstractBaseUser, PermissionsMixin):
 
 
     def __str__(self):
-        return f"{self.nom} {self.prenom}"
-
-    def __str__(self):
         return f"{self.prenom} {self.nom} ({self.role})"
     
     def nom_complet(self):
-        return f"{self.nom} {self.prenom}"
+        return f"{self.prenom} {self.nom}"
     
     # Vérifie si l'utilisateur a un rôle spécifique
     def has_role(self, role):

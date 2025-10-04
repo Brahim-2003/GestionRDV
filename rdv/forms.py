@@ -80,7 +80,7 @@ class UpdateRDVForm(forms.ModelForm):
         if self.instance and self.instance.pk:
             self.initial['date_heure_rdv'] = self.instance.date_heure_rdv.strftime('%Y-%m-%dT%H:%M')
 
-
+# --- BASE ---
 class DisponibiliteBaseForm(forms.ModelForm):
     """
     Formulaire de base factorisant widgets, labels et validation commune.
@@ -88,139 +88,209 @@ class DisponibiliteBaseForm(forms.ModelForm):
     """
     def __init__(self, *args, medecin=None, **kwargs):
         self.medecin = medecin
+
+        if 'instance' not in kwargs and medecin:
+            kwargs['instance'] = Disponibilite(medecin=medecin)
+
         super().__init__(*args, **kwargs)
 
-        # Select pour 'jour' (évite saisie libre)
-        self.fields['jour'].widget = forms.Select(
-            choices=[('', '— Choisir —')] + Disponibilite.JOUR_CHOICES,
-            attrs={'class': 'form-control'}
-        )
-        self.fields['jour'].required = False
+        if self.instance and medecin:
+            self.instance.medecin = medecin
 
-        # Date input : widget en ISO pour que <input type="date"> soit pré-rempli correctement
-        self.fields['date_specific'].widget = forms.DateInput(
-            format='%Y-%m-%d',
-            attrs={'type': 'date', 'class': 'form-control date-input'}
-        )
-        # accepter plusieurs formats en entrée (ISO + français) pour robustesse
-        self.fields['date_specific'].input_formats = ['%Y-%m-%d', '%d/%m/%Y']
-        self.fields['date_specific'].required = False
+        # --- Widgets communs ---
+        if 'jour' in self.fields:
+            self.fields['jour'].widget = forms.Select(
+                choices=[('', '— Choisir —')] + Disponibilite.JOUR_CHOICES,
+                attrs={'class': 'form-control'}
+            )
+            self.fields['jour'].required = False
+            self.fields['jour'].label = "Jour (hebdomadaire)"
 
-        # Time inputs
-        self.fields['heure_debut'].widget = forms.TimeInput(
-            format='%H:%M',
-            attrs={'type': 'time', 'class': 'form-control time-input'}
-        )
-        self.fields['heure_fin'].widget = forms.TimeInput(
-            format='%H:%M',
-            attrs={'type': 'time', 'class': 'form-control time-input'}
-        )
-        # accepter formats heure (au besoin)
-        self.fields['heure_debut'].input_formats = ['%H:%M', '%H:%M:%S']
-        self.fields['heure_fin'].input_formats  = ['%H:%M', '%H:%M:%S']
+        if 'date_specific' in self.fields:
+            self.fields['date_specific'].widget = forms.DateInput(
+                format='%Y-%m-%d',
+                attrs={'type': 'date', 'class': 'form-control date-input'}
+            )
+            self.fields['date_specific'].input_formats = ['%Y-%m-%d', '%d/%m/%Y']
+            self.fields['date_specific'].required = False
+            self.fields['date_specific'].label = "Date précise"
 
-        # Checkbox
-        self.fields['is_active'].widget = forms.CheckboxInput(attrs={'class': 'form-check-input'})
+        for champ in ['heure_debut', 'heure_fin']:
+            if champ in self.fields:
+                self.fields[champ].widget = forms.TimeInput(
+                    format='%H:%M',
+                    attrs={'type': 'time', 'class': 'form-control time-input'}
+                )
+                self.fields[champ].input_formats = ['%H:%M', '%H:%M:%S']
+                self.fields[champ].label = "Heure " + ("début" if champ=='heure_debut' else "fin")
 
-        # Labels lisibles
-        self.fields['jour'].label = "Jour (hebdomadaire)"
-        self.fields['date_specific'].label = "Date précise (optionnel)"
-        self.fields['heure_debut'].label = "Heure début"
-        self.fields['heure_fin'].label = "Heure fin"
-        self.fields['is_active'].label = "Actif"
-
-        # --- Initials : si instance fournie, forcer les initial au format attendu par les inputs HTML ---
-        inst = getattr(self, 'instance', None)
-        if inst:
-            # date_specific en ISO (YYYY-MM-DD) => input[type=date] affichera la date
-            ds = getattr(inst, 'date_specific', None)
-            if ds:
-                try:
-                    self.initial['date_specific'] = ds.strftime('%Y-%m-%d')
-                except Exception:
-                    # fallback safe
-                    self.initial['date_specific'] = str(ds)
-
-            # heures (format HH:MM)
-            hd = getattr(inst, 'heure_debut', None)
-            if hd:
-                try:
-                    self.initial['heure_debut'] = hd.strftime('%H:%M')
-                except Exception:
-                    self.initial['heure_debut'] = str(hd)
-            hf = getattr(inst, 'heure_fin', None)
-            if hf:
-                try:
-                    self.initial['heure_fin'] = hf.strftime('%H:%M')
-                except Exception:
-                    self.initial['heure_fin'] = str(hf)
+        if 'is_active' in self.fields:
+            self.fields['is_active'].widget = forms.CheckboxInput(attrs={'class': 'form-check-input'})
+            self.fields['is_active'].label = "Actif"
 
     def clean(self):
-        """
-        Validation commune :
-         - XOR jour/date_specific
-         - heure_debut < heure_fin
-         - détection de chevauchement pour self.medecin (si fourni)
-        """
         cleaned = super().clean()
-        jour = cleaned.get('jour')
-        date_specific = cleaned.get('date_specific')
-        hd = cleaned.get('heure_debut')
-        hf = cleaned.get('heure_fin')
+        hd, hf = cleaned.get('heure_debut'), cleaned.get('heure_fin')
 
-        # 1) jour XOR date_specific
-        if bool(jour) == bool(date_specific):
-            raise ValidationError(
-                _("Spécifiez soit un jour de la semaine (jour), soit une date précise (date_specific), pas les deux.")
-            )
-
-        # 2) heures cohérentes
+        # Vérif heures cohérentes
         if hd and hf and hd >= hf:
             self.add_error('heure_fin', _("L'heure de fin doit être supérieure à l'heure de début."))
             raise ValidationError(_("Heures invalides."))
 
-        # 3) conflit de créneaux (si medecin fourni)
-        if self.medecin:
+        # Vérif chevauchement
+        if self.medecin and hd and hf:
             qs = Disponibilite.objects.filter(medecin=self.medecin, is_active=True)
-            if date_specific:
-                qs = qs.filter(date_specific=date_specific)
-            else:
-                qs = qs.filter(jour=jour, date_specific__isnull=True)
+            # Cas hebdo
+            if cleaned.get('jour'):
+                qs = qs.filter(jour=cleaned['jour'], date_specific__isnull=True)
+            # Cas spécifique
+            if cleaned.get('date_specific'):
+                qs = qs.filter(date_specific=cleaned['date_specific'])
 
-            # Exclure l'instance courante (si édition)
             if self.instance and getattr(self.instance, 'pk', None):
                 qs = qs.exclude(pk=self.instance.pk)
 
-            if hd and hf:
-                conflits = qs.filter(heure_debut__lt=hf, heure_fin__gt=hd)
-                if conflits.exists():
-                    raise ValidationError(_("Chevauchement détecté avec un autre créneau."))
+            conflits = qs.filter(heure_debut__lt=hf, heure_fin__gt=hd)
+            if conflits.exists():
+                raise ValidationError(_("Chevauchement détecté avec un autre créneau."))
+
+        # Vérification exclusivité jour/date
+        if cleaned.get('jour') and cleaned.get('date_specific'):
+            raise ValidationError(_("Spécifiez soit un jour de semaine (jour), soit une date précise (date_specific), pas les deux."))
+
+        return cleaned
+
+# --- HEBDO EDIT FORM ---
+class DisponibiliteHebdoEditForm(DisponibiliteBaseForm):
+    class Meta:
+        model = Disponibilite
+        fields = ['jour', 'heure_debut', 'heure_fin']  # on garde juste jour et heures
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # rendre le champ jour statique
+        if 'jour' in self.fields:
+            self.fields['jour'].widget.attrs['readonly'] = True
+            self.fields['jour'].widget.attrs['disabled'] = True  # désactive la modification
+        # cacher date_specific
+        if 'date_specific' in self.fields:
+            self.fields['date_specific'].widget = forms.HiddenInput()
+
+
+# --- SPECIFIQUE ---
+class DisponibiliteSpecifiqueForm(DisponibiliteBaseForm):
+    class Meta:
+        model = Disponibilite
+        fields = ['date_specific', 'heure_debut', 'heure_fin', 'is_active']
+
+    def __init__(self, *args, **kwargs):
+        medecin = kwargs.pop('medecin', None)
+        super().__init__(*args, medecin=medecin, **kwargs)
+
+        if 'date_specific' in self.fields:
+            self.fields['date_specific'].required = True
+        if 'jour' in self.fields:
+            self.fields['jour'].widget = forms.HiddenInput()
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get('jour'):
+            self.add_error('jour', _("Ne pas spécifier de jour pour une disponibilité spécifique."))
+        if not cleaned.get('date_specific'):
+            self.add_error('date_specific', _("Date obligatoire pour une disponibilité spécifique."))
+        return cleaned
+
+
+# --- FORMULAIRE DE CREATION HEBDO ---
+class DisponibiliteHebdoCreateForm(DisponibiliteBaseForm):
+    class Meta:
+        model = Disponibilite
+        fields = ['jour', 'heure_debut', 'heure_fin', 'is_active']  # AJOUTER 'jour'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Le champ jour est requis mais peut être masqué côté template
+        if 'jour' in self.fields:
+            self.fields['jour'].required = True
+
+        # Masquer le champ date_specific
+        if 'date_specific' in self.fields:
+            self.fields['date_specific'].widget = forms.HiddenInput()
+
+    def clean(self):
+        cleaned = super().clean()
+
+        # Vérification du jour (maintenant le champ existe)
+        if not cleaned.get('jour'):
+            if 'jour' in self.fields:  # Vérifier que le champ existe avant d'ajouter l'erreur
+                self.add_error('jour', "Jour obligatoire pour une disponibilité hebdomadaire.")
+            else:
+                # Si le champ n'existe pas, ajouter l'erreur globalement
+                raise ValidationError("Jour obligatoire pour une disponibilité hebdomadaire.")
+
+        # La date spécifique ne doit jamais être remplie
+        if cleaned.get('date_specific'):
+            self.add_error('date_specific', "Ne pas spécifier de date pour une disponibilité hebdomadaire.")
+
+        return cleaned
+
+# --- Formulaire de base pour l'édition hebdo ---
+class DisponibiliteHebdoEditForm(forms.ModelForm):
+    class Meta:
+        model = Disponibilite
+        fields = ['heure_debut', 'heure_fin']
+        widgets = {
+            'heure_debut': forms.TimeInput(format='%H:%M', attrs={'type': 'time'}),
+            'heure_fin': forms.TimeInput(format='%H:%M', attrs={'type': 'time'}),
+        }
+        labels = {
+            'heure_debut': _('Heure de début'),
+            'heure_fin': _('Heure de fin'),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # rendre les champs obligatoires
+        self.fields['heure_debut'].required = True
+        self.fields['heure_fin'].required = True
+
+    def clean(self):
+        cleaned = super().clean()
+        debut = cleaned.get('heure_debut')
+        fin = cleaned.get('heure_fin')
+
+        if debut and fin and debut >= fin:
+            self.add_error('heure_fin', _("L'heure de fin doit être après l'heure de début."))
 
         return cleaned
 
 
-class DisponibiliteCreateForm(DisponibiliteBaseForm):
-    """
-    Formulaire utilisé pour la création d'une Disponibilite.
-    Dans la vue, n'oublie pas de fixer dispo.medecin avant save() si tu utilises commit=False.
-    """
+
+class DisponibiliteSpecifiqueCreateForm(DisponibiliteBaseForm):
     class Meta:
         model = Disponibilite
-        fields = ['jour', 'date_specific', 'heure_debut', 'heure_fin', 'is_active']
+        fields = ['date_specific', 'heure_debut', 'heure_fin', 'is_active']
 
-
-class DisponibiliteEditForm(DisponibiliteBaseForm):
-    """
-    Formulaire utilisé pour l'édition d'une Disponibilite.
-    Instantiate avec instance=dispo, medecin=medecin.
-    """
-    class Meta:
-        model = Disponibilite
-        fields = ['jour', 'date_specific', 'heure_debut', 'heure_fin', 'is_active']
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'jour' in self.fields:
+            self.fields['jour'].widget = forms.HiddenInput()
+        if 'date_specific' in self.fields:
+            self.fields['date_specific'].required = True
 
     def clean(self):
-        # tu peux ajouter des validations spécifiques à l'édition ici
-        return super().clean()
+        cleaned = super().clean()
+        if not cleaned.get('date_specific'):
+            self.add_error('date_specific', _("Date obligatoire pour une disponibilité spécifique."))
+        if cleaned.get('jour'):
+            self.add_error('jour', _("Ne pas spécifier de jour pour une disponibilité spécifique."))
+        return cleaned
+
+
+class DisponibiliteSpecifiqueEditForm(DisponibiliteSpecifiqueForm):
+    """Édition spécifique"""
+
     
 class AnnulerRdvForm(forms.Form):
     raison = forms.CharField(

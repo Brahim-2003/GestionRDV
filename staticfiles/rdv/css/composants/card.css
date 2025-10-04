@@ -1,0 +1,54 @@
+.stats-grid {
+  display: grid;
+  /* 4 colonnes égales sur grand écran, retombe à 2 sur tablettes, 1 sur mobile */
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 2rem;       /* espace entre les cartes */
+  margin: 1.5rem 0;    /* un peu d'air au-dessus et en dessous */
+}
+
+.stat-card {
+  background: white;
+  padding: 1rem;
+  margin: 0 1rem;
+  border-radius: 8px;
+  box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+  display: flex;
+  justify-content: space-between; /* texte à gauche, icône à droite */
+  align-items: center;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+/* Ajuste l'icône pour qu'elle ait toujours la même taille de fond */
+.stat-icon {
+  font-size: 1.25rem;
+  padding: 0.5rem;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Couleurs d'arrière-plan selon la prop "color" */
+.icon-blue     { background: #e7f1ff; color: #007bff; }
+.icon-green    { background: #e6fcef; color: #28a745; }
+.icon-purple   { background: #f3e8ff; color: #6f42c1; }
+.icon-orange   { background: #fff4e5; color: #fd7e14; }
+
+/* Le titre et la valeur déjà définis… */
+.stat-info h3 {
+  font-size: 0.75rem;
+  color: #3e4144;
+  margin: 0;
+}
+.stat-value {
+  font-size: 1.75rem;
+  font-weight: bold;
+  margin: 0.125rem 0;
+}
+
+.stat-card:hover{
+  transform: scale(1.02); /* zoom léger au survol */
+  /* optionnel : renforcer l'ombre pour l'effet de profondeur */
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+  background-color: #b5c4e7;
+}

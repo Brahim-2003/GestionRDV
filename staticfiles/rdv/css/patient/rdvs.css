@@ -1,0 +1,109 @@
+:root {
+  --color-report: #c6aa1b;         /* jaune/orange */
+  --color-report-dark: #8e7814;
+}
+
+.data-table button[class^="action-btn-"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 36px;
+  padding: 6px 10px;
+  margin-right: 0.4rem;
+  text-decoration: none;
+  box-sizing: border-box;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease, color 0.12s ease;
+  font-size: 1.05rem;
+  line-height: 1;
+  gap: 0.5rem;
+  cursor: pointer;
+  border: none;                  /* enlève la bordure native */
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: var(--btn-radius);
+  color: inherit;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.03);
+  align-self: center;
+  vertical-align: middle;
+}
+
+/* Focus accessible (remplacer outline par halo visible) */
+.data-table button[class^="action-btn-"]:focus {
+  outline: none;
+  transform: translateY(-1px);
+  z-index: 1;
+}
+
+/* Focus-visible */
+.data-table button[class^="action-btn-"]:focus-visible {
+  box-shadow:
+    0 1px 0 rgba(0,0,0,0.03),
+    0 0 0 4px rgba(36,152,235,0.12);
+}
+
+/* texte du bouton */
+.button {
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Icônes (boxicons) : s'assurer qu'elles ne dépassent pas */
+.data-table button[class^="action-btn-"] i {
+  pointer-events: none;
+  font-size: 1.05rem;
+  vertical-align: middle;
+  display: inline-block;
+  line-height: 1;
+  color: inherit;
+  opacity: 0.98;
+}
+
+/* Réduction d'espace sur petits écrans */
+@media (max-width: 520px) {
+  .data-table button[class^="action-btn-"] {
+    min-width: 34px;
+    height: 32px;
+    padding: 4px 6px;
+    margin-right: 0.25rem;
+    gap: 0.35rem;
+  }
+  .data-table td {
+    white-space: nowrap;
+  }
+}
+
+/* aligner la dernière colonne à droite pour éviter overflow */
+.data-table td:last-child {
+  text-align: center;
+}
+
+/* Badge statut */
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+}
+
+/* REPORTER */
+.data-table button.action-btn-report,
+.data-table a.action-btn-report {
+  background-color: var(--color-report);
+  color: var(--btn-text-color);
+  box-shadow: 0 2px 0 rgba(0,0,0,0.06);
+}
+.data-table button.action-btn-report:hover,
+.data-table a.action-btn-report:hover,
+.data-table button.action-btn-report:active,
+.data-table a.action-btn-report:active {
+  background-color: var(--color-report-dark);
+  transform: scale(1.01);
+}
+.data-table button.action-btn-report:focus-visible,
+.data-table a.action-btn-report:focus-visible {
+  box-shadow:
+    0 2px 0 rgba(0,0,0,0.06),
+    0 0 0 4px rgba(212,178,0,0.16);
+}

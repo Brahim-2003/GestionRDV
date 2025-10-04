@@ -1,0 +1,62 @@
+@startuml
+actor Utilisateur as U
+participant "Middleware:\nSecurityMiddleware" as MW
+participant "Vue:\nliste_rendez_vous" as V
+participant "Decorator:\n@permission_required" as DEC
+database "Modèle:\nUtilisateur" as USER
+database "Modèle:\nGroup" as GRP
+database "Modèle:\nPermission" as PERM
+
+U -> MW: Requête /rdv/rdvs/
+activate MW
+
+MW -> MW: get_client_ip(request)
+MW -> MW: Vérifie IP bloquée (cache)
+
+alt IP bloquée
+  MW --> U: 403 Forbidden
+else IP OK
+  MW -> V: Transmet requête
+  activate V
+  
+  V -> DEC: @permission_required(\n'users.can_manage_appointments')
+  activate DEC
+  
+  DEC -> USER: request.user.is_authenticated
+  activate USER
+  USER --> DEC: True
+  deactivate USER
+  
+  DEC -> USER: user.has_perm(\n'users.can_manage_appointments')
+  activate USER
+  
+  USER -> GRP: user.groups.all()
+  activate GRP
+  GRP --> USER: [Administrateurs]
+  deactivate GRP
+  
+  USER -> GRP: group.permissions.all()
+  activate GRP
+  GRP -> PERM: filter(codename=\n'can_manage_appointments')
+  activate PERM
+  PERM --> GRP: Permission found
+  deactivate PERM
+  GRP --> USER: Permissions list
+  deactivate GRP
+  
+  USER --> DEC: True
+  deactivate USER
+  
+  DEC --> V: Autorisation accordée
+  deactivate DEC
+  
+  V -> V: Traitement requête
+  V --> MW: Réponse HTTP 200
+  deactivate V
+  
+  MW --> U: Page liste RDV
+end
+
+deactivate MW
+
+@enduml

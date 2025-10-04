@@ -1,0 +1,103 @@
+{% load dict_extras %}
+
+<!-- Calendrier hebdomadaire -->
+<div class="weekly-calendar" id="weekly-calendar">
+  
+  <!-- Indicateur de chargement pour le calendrier -->
+  <div id="weekly-loading" class="loading-indicator hidden">
+    <i class='bx bx-loader-alt bx-spin'></i>
+    <span>Mise à jour du calendrier...</span>
+  </div>
+
+  <!-- Grid du calendrier -->
+  <div class="calendar-grid">
+    {% for day_key, day_name in days.items %}
+      <div class="day-column" data-day="{{ day_key }}">
+        <div class="day-header">
+          <h4 class="day-title">{{ day_name }}</h4>
+          <span class="day-count">
+            {% with slots=weekly_slots|dict_get:day_key %}
+              {{ slots|length }} créneau{{ slots|length|pluralize }}
+            {% endwith %}
+          </span>
+        </div>
+
+        <div class="slots-container" data-day="{{ day_key }}">
+          {% with slots=weekly_slots|dict_get:day_key %}
+            {% if slots %}
+              {% for dispo in slots %}
+                <div class="time-slot {% if dispo.is_active %}active{% else %}inactive{% endif %}" 
+                     data-dispo-id="{{ dispo.id }}" 
+                     data-active="{{ dispo.is_active|yesno:'true,false' }}"
+                     data-day="{{ day_key }}">
+                  
+                  <div class="slot-header">
+                    <span class="time-range">{{ dispo.heure_debut|time:"H:i" }} - {{ dispo.heure_fin|time:"H:i" }}</span>
+                    <div class="slot-status">
+                      <span class="status-indicator {% if dispo.is_active %}status-active{% else %}status-inactive{% endif %}">
+                        <i class="bx {% if dispo.is_active %}bx-check-circle{% else %}bx-x-circle{% endif %}"></i>
+                      </span>
+                    </div>
+                  </div>
+
+                  <div class="slot-actions">
+                    <!-- Toggle button -->
+                    <button class="slot-btn toggle-btn" 
+                            data-dispo-id="{{ dispo.id }}"
+                            data-active="{{ dispo.is_active|yesno:'true,false' }}"
+                            title="{% if dispo.is_active %}Désactiver{% else %}Activer{% endif %} ce créneau"
+                            aria-label="{% if dispo.is_active %}Désactiver{% else %}Activer{% endif %} le créneau de {{ dispo.heure_debut|time:'H:i' }}">
+                      <i class="bx bx-toggle-{% if dispo.is_active %}right{% else %}left{% endif %}"></i>
+                    </button>
+                    
+                    <!-- Edit button -->
+                    <button class="slot-btn edit-btn" 
+                            data-dispo-id="{{ dispo.id }}"
+                            data-edit-url="{% url 'rdv:disponibilite_hebdo_edit' dispo.id %}"
+                            title="Modifier ce créneau"
+                            aria-label="Modifier le créneau de {{ dispo.heure_debut|time:'H:i' }}">
+                      <i class="bx bxs-edit"></i>
+                    </button>
+                    
+                    <!-- Delete button -->
+                    <button class="slot-btn delete-btn" 
+                            data-dispo-id="{{ dispo.id }}"
+                            data-delete-url="{% url 'rdv:disponibilite_hebdo_delete' dispo.id %}"
+                            title="Supprimer ce créneau"
+                            aria-label="Supprimer le créneau de {{ dispo.heure_debut|time:'H:i' }}">
+                      <i class="bx bxs-trash-alt"></i>
+                    </button>
+                  </div>
+
+                  <!-- Loading overlay pour les actions en cours -->
+                  <div class="slot-loading hidden">
+                    <i class='bx bx-loader-alt bx-spin'></i>
+                  </div>
+                </div>
+              {% endfor %}
+            {% else %}
+              <div class="empty-day">
+                <div class="empty-content">
+                  <i class="bx bx-calendar-x"></i>
+                  <span class="empty-text">Aucun créneau</span>
+                </div>
+              </div>
+            {% endif %}
+          {% endwith %}
+        </div>
+
+        <!-- Bouton d'ajout -->
+        <div class="add-slot-container">
+          <button class="add-slot-btn" 
+                  data-day="{{ day_key }}" 
+                  data-form-url="{% url 'rdv:disponibilite_hebdo_add' day_key %}"
+                  title="Ajouter un créneau pour {{ day_name }}"
+                  aria-label="Ajouter un créneau pour {{ day_name }}">
+            <i class='bx bx-plus'></i>
+            <span class="add-text">Ajouter</span>
+          </button>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>

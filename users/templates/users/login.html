@@ -4,6 +4,7 @@
     <head>
         <meta charset="utf-8">
         <title>login</title>
+        <link rel="stylesheet" href="{% static 'users/css/logo.css' %}"> 
         <link rel="stylesheet" href="{% static 'users/css/login.css' %}"> 
           <!-- ICONES -->
         <link rel="stylesheet" href="{% static 'rdv/css/boxicons.min.css' %}">
@@ -14,8 +15,8 @@
         <div class="auth-container">
             <div class="auth-header">
                 <div class="logo">
-                    <div class="logo-icon">M</div>
-                    <div class="logo-text">MedicalCare</div>
+                    <img src="{% static 'rdv/img/accueil/logo_app.png' %}" alt="RdvLib logo" class="logo-image" >
+                    <span class="logo-text">RDVLib</span>
                 </div>
                 <h1 class="auth-title">Bienvenue</h1>
                 <p class="auth-subtitle">Connectez-vous à votre compte</p>

@@ -1,0 +1,28 @@
+
+.logo {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-weight: 700;
+    font-size: 36px; /* Plus grand texte */
+    color: #2c3e50;
+    background-color: #ffffff;
+    padding: 12px 0px;
+    max-width: fit-content;
+}
+
+.logo-image {
+    width: 80px; /* Image plus grande */
+    height: 70px;
+    border-radius: 16px;
+    user-select: none;
+}
+
+.logo-text {
+    font-size: 50px; /* Texte plus grand */
+    font-weight: 900;
+    color: #428adc;
+    user-select: none;
+}

@@ -2,32 +2,44 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Accueil - Gestion des Rendez-vous Médicaux</title>
+
+    <!-- Boxicons CDN -->
+    <link rel="stylesheet" href="{% static 'rdv/css/boxicons.min.css' %}">
+    <link rel="stylesheet" href="{% static 'rdv/css/notifs/notifs.css' %}">
+
+    
     <link rel="stylesheet" href="{% static 'rdv/css/acceuil.css' %}">
-    <script src="{% static 'rdv/js/acceuil.js' %}"></script>
 </head>
 <body>
+    <!-- Skip link (accessibilité) -->
+    <a class="skip-link" href="#accueil" style="position:absolute;left:-9999px;top:auto;">Aller au contenu</a>
+
     <!-- Header -->
-    <header class="header">
+    <header class="header" role="banner">
         <div class="container">
-            <nav class="nav">
+            <nav class="nav" role="navigation" aria-label="Menu principal">
                 <div class="logo">
-                    <div class="logo-icon">🏥</div>
-                    MedicalCare
+                    <img src="{% static 'rdv/img/accueil/logo_app.png' %}" alt="RdvLib logo" class="logo-image" >
+                    <span class="logo-text">RDVLib</span>
                 </div>
-                <ul class="nav-links">
-                    <li><a href="{% url 'rdv:acceuil' %}">Accueil</a></li>
-                    <li><a href="{% url 'rdv:dashboard_redirect' %}">Fonctionnalités</a></li>
-                    <li><a href="#apropos">À propos</a></li>
+
+                <ul id="main-nav" class="nav-links">
+                    <li><a href="#accueil">Accueil</a></li>
+                    <li><a href="#fonctionnalites">Fonctionnalités</a></li>
                     <li><a href="#contact">Contact</a></li>
                 </ul>
+
                 <div class="auth-buttons">
-                    <a href="{% url 'users:login' %}" class="btn btn-connect">Connexion</a>
-                    <a href="{% url 'users:register' %}" class="btn btn-register">S'inscrire</a>
+                    <a href="{% url 'users:login' %}" class="btn btn-connect"><i class="bx bx-log-in" aria-hidden="true"></i> Connexion</a>
+                    <a href="{% url 'users:register' %}" class="btn btn-register"><i class="bx bx-user-plus" aria-hidden="true"></i> S'inscrire</a>
                 </div>
-                <button class="mobile-menu-toggle">☰</button>
+
+                <button class="mobile-menu-toggle" aria-expanded="false" aria-controls="main-nav" aria-label="Ouvrir le menu">
+                    <i class="bx bx-menu" aria-hidden="true"></i>
+                </button>
             </nav>
         </div>
     </header>
@@ -36,13 +48,11 @@
     <section class="hero" id="accueil">
         <div class="container">
             <h1>Gérez vos rendez-vous médicaux en toute simplicité</h1>
-            <p>Une plateforme moderne et intuitive pour la prise de rendez-vous médicaux, avec assistant virtuel intégré et suivi personnalisé.</p>
+            <p>Une plateforme moderne et intuitive pour la prise de rendez-vous médicaux, avec suivi personnalisé.</p>
             <div class="hero-buttons">
-                <a href="#demo" class="btn-primary">
-                    📅 Prendre un rendez-vous
-                </a>
-                <a href="#assistant" class="btn-secondary">
-                    🤖 Assistant virtuel
+                <a href="{% url 'rdv:prendre_rdv' %}" class="btn-primary">
+                    <i class="bx bx-calendar" aria-hidden="true"></i>
+                    Prendre un rendez-vous
                 </a>
             </div>
         </div>
@@ -51,61 +61,46 @@
     <!-- Features Section -->
     <section class="features" id="fonctionnalites">
         <div class="container">
-            <h2 class="section-title">Pourquoi choisir MedicalCare ?</h2>
+            <h2 class="section-title">Pourquoi choisir RdvLib ?</h2>
             <div class="features-grid">
                 <div class="feature-card">
-                    <div class="feature-icon blue">📅</div>
+                    <div class="feature-icon blue" aria-hidden="true">
+                        <i class="bx bx-calendar" style="font-size:1.5rem;"></i>
+                    </div>
                     <h3>Prise de rendez-vous simplifiée</h3>
                     <p>Réservez vos rendez-vous en quelques clics avec notre interface intuitive. Choisissez votre date, heure et médecin préféré facilement.</p>
                 </div>
+
                 <div class="feature-card">
-                    <div class="feature-icon green">🤖</div>
-                    <h3>Assistant virtuel intelligent</h3>
-                    <p>Notre assistant IA vous guide dans vos démarches, répond à vos questions et vous aide à optimiser vos consultations médicales.</p>
-                </div>
-                <div class="feature-card">
-                    <div class="feature-icon purple">👨‍⚕️</div>
+                    <div class="feature-icon purple" aria-hidden="true">
+                        <i class="bx bx-brain" style="font-size:1.5rem;"></i>
+                    </div>
                     <h3>Médecins qualifiés</h3>
                     <p>Accédez à un réseau de médecins certifiés et spécialisés, disponibles selon vos besoins et votre localisation.</p>
                 </div>
+
                 <div class="feature-card">
-                    <div class="feature-icon blue">📱</div>
+                    <div class="feature-icon blue" aria-hidden="true">
+                        <i class="bx bx-mobile" style="font-size:1.5rem;"></i>
+                    </div>
                     <h3>Interface responsive</h3>
-                    <p>Utilisez MedicalCare sur tous vos appareils : ordinateur, tablette ou smartphone avec une expérience optimisée.</p>
+                    <p>Utilisez RdvLib sur tous vos appareils : ordinateur, tablette ou smartphone avec une expérience optimisée.</p>
                 </div>
+
                 <div class="feature-card">
-                    <div class="feature-icon green">📊</div>
+                    <div class="feature-icon green" aria-hidden="true">
+                        <i class="bx bx-bar-chart" style="font-size:1.5rem;"></i>
+                    </div>
                     <h3>Suivi personnalisé</h3>
                     <p>Consultez l'historique de vos rendez-vous, suivez vos consultations et recevez des rappels automatiques.</p>
                 </div>
+
                 <div class="feature-card">
-                    <div class="feature-icon purple">🔒</div>
+                    <div class="feature-icon purple" aria-hidden="true">
+                        <i class="bx bx-lock" style="font-size:1.5rem;"></i>
+                    </div>
                     <h3>Sécurité garantie</h3>
                     <p>Vos données médicales sont protégées par un chiffrement de niveau bancaire et respectent les normes RGPD.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Stats Section -->
-    <section class="stats">
-        <div class="container">
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-number">10k+</div>
-                    <div class="stat-label">Patients satisfaits</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">500+</div>
-                    <div class="stat-label">Médecins partenaires</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">50k+</div>
-                    <div class="stat-label">Rendez-vous pris</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-number">24/7</div>
-                    <div class="stat-label">Support disponible</div>
                 </div>
             </div>
         </div>
@@ -116,19 +111,22 @@
         <div class="container">
             <div class="cta-content">
                 <h2>Prêt à commencer ?</h2>
-                <p>Rejoignez des milliers de patients qui font confiance à MedicalCare pour gérer leurs rendez-vous médicaux en toute sérénité.</p>
+                <p>Rejoignez des milliers de patients qui font confiance à RdvLib pour gérer leurs rendez-vous médicaux en toute sérénité.</p>
                 <a href="{% url 'users:register' %}" class="btn-primary">
-                    🚀 Commencer maintenant
+                    <i class="bx bx-rocket" aria-hidden="true"></i>
+                    Commencer maintenant
                 </a>
             </div>
         </div>
     </section>
 
     <!-- Footer -->
-    <footer class="footer">
+    <footer class="footer" id="contact">
         <div class="container">
-            <p>&copy; 2025 MedicalCare. Tous droits réservés. | Fait avec ❤️ pour votre santé</p>
+            <p>&copy; 2025 RdvLib. Tous droits réservés. | Fait avec <i class="bx bxs-heart" aria-hidden="true"></i> pour votre santé</p>
         </div>
     </footer>
 
+    <script src="{% static 'rdv/js/acceuil.js' %}"></script>
 </body>
+</html>

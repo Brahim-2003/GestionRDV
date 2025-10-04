@@ -1,83 +1,98 @@
+{% load static %}
+
+<!-- Bouton hamburger mobile (fixe, en dehors de la sidebar) -->
+<button class="sidebar-toggle-btn" aria-label="Toggle menu">
+    <span></span>
+    <span></span>
+    <span></span>
+</button>
+
 <!-- Overlay pour mobile -->
-<div class="sidebar-overlay" onclick="toggleSidebar()"></div>
+<div class="sidebar-overlay"></div>
 
-    <!-- Header avec brand -->
-    <div class="sidebar-header">
-        <div class="brand">
-            <div class="brand-icon">CL</div>
-            <div class="brand-info">
-                <h3>Tableau de bord</h3>
-                <span>Panneau Administrateurs</span>
-            </div>
+<!-- Header avec brand -->
+<div class="sidebar-header">
+    <!-- Bouton de fermeture (visible sur mobile uniquement) -->
+    <button class="sidebar-close-btn" aria-label="Fermer le menu">
+        <i class='bx bx-x'></i>
+    </button>
+    
+    <div class="brand">
+        <div class="brand-icon">
+            <img src="{% static 'rdv/img/accueil/logo_app.png' %}" alt="RdvLib logo" class="logo-image">
+        </div>
+        <div class="brand-info">
+            <h3>Tableau de bord</h3>
+            <span>Panneau Administrateurs</span>
         </div>
     </div>
+</div>
 
-    <!-- Barre de recherche -->
-    <div class="sidebar-search">
-        <div class="search-container">
-            <i class="bx bx-search search-icon"></i>
-            <input type="search" class="search-input" placeholder="Rechercher...">
-        </div>
+<!-- Barre de recherche -->
+<div class="sidebar-search">
+    <div class="search-container">
+        <i class="bx bx-search search-icon"></i>
+        <input type="search" class="search-input" placeholder="Rechercher...">
     </div>
+</div>
 
-    <!-- Menu de navigation -->
-    <div class="sidebar-menu">
-        <div class="nav-section">
-            <h6 class="nav-section-title">Navigation</h6>
+<!-- Menu de navigation -->
+<div class="sidebar-menu">
+    <div class="nav-section">
+        <h6 class="nav-section-title">Navigation</h6>
 
-                <!-- Votre structure HTML adaptée -->
-                <nav class="nav-tabs">
-                    <a href="{% url 'rdv:dashboard_redirect' %}" class="nav-tab active">
-                        <i class='bx bx-home'></i>
-                        <span>Tableau de bord</span>
-                    </a>
-                    <a href="{% url 'users:list_users' %}" class="nav-tab">
-                        <i class='bx bx-group'></i>
-                        <span>Utilisateurs</span>
-                    </a>
-                    <a href="{% url 'rdv:list_rdv' %}" class="nav-tab">
-                        <i class='bx bx-calendar'></i>  
-                        <span>Rendez-vous</span>
-                    </a>
-
-                    <a href="{% url 'rdv:notifs' %}" class="nav-tab">
-                        <i class='bx bx-bell'></i>
-                        <span>Notifications</span>
-                    </a>
-                </nav>
-            </div>
-
-            <!-- Section supplémentaire pour démonstration -->
-            <div class="nav-section">
-                <h6 class="nav-section-title">Gestion</h6>
-                
-                <a href="#reports" class="nav-tab">
-                    <i class='bx bx-bar-chart-alt-2'></i>  
-                    <span>Rapports</span>
-                </a>
-                <a href="#settings" class="nav-tab">
-                    <i class='bx bx-cog'></i>  
-                    <span>Paramètres</span>
-                </a>
-            </div>
-        </div>
-
-        <!-- Section utilisateur en bas -->
-        <div class="sidebar-bottom">
-
-          <a href="{% url 'users:logout' %}" class="logout" id="logout-link">
-                    <i class='bx bxs-log-out bx-sm'></i>
-                    <span>Déconnexion</span>
+        <!-- Votre structure HTML adaptée -->
+        <nav class="nav-tabs">
+            <a href="{% url 'rdv:dashboard_redirect' %}" class="nav-tab active">
+                <i class='bx bx-home'></i>
+                <span>Tableau de bord</span>
+            </a>
+            <a href="{% url 'users:list_users' %}" class="nav-tab">
+                <i class='bx bx-group'></i>
+                <span>Utilisateurs</span>
+            </a>
+            <a href="{% url 'rdv:list_rdv' %}" class="nav-tab">
+                <i class='bx bx-calendar'></i>  
+                <span>Rendez-vous</span>
             </a>
 
-            <div class="user-profile">
-                <div class="user-avatar">{{ user.nom|slice:":1" }} {{ user.prenom|slice:":1" }}</div>
-                <div class="user-info">
-                    <h4>{{ user.nom }} {{ user.prenom }}</h4>
-                    <span>{{ user.role }}</span>
-                </div>
-                <div class="status-dot online"></div>
-            </div>
+            <a href="{% url 'rdv:notifs' %}" class="nav-tab">
+                <i class='bx bx-bell'></i>
+                <span>Notifications</span>
+            </a>
+        </nav>
+    </div>
 
-            
+    <!-- Section supplémentaire pour démonstration -->
+    <div class="nav-section">
+        <h6 class="nav-section-title">Gestion</h6>
+        
+        <a href="{% url 'rdv:history_list' %}" class="nav-tab">
+            <i class='bx bx-history'></i> 
+            <span>Historiques</span>
+        </a>
+
+        <a href="{% url 'rdv:dashboard_rapports' %}" class="nav-tab">
+            <i class='bx bx-bar-chart-alt-2'></i>  
+            <span>Rapports</span>
+        </a>
+    </div>
+</div>
+
+<!-- Section utilisateur en bas -->
+<div class="sidebar-bottom">
+
+    <a href="{% url 'users:logout' %}" class="logout" id="logout-link">
+        <i class='bx bxs-log-out bx-sm'></i>
+        <span>Déconnexion</span>
+    </a>
+
+    <div class="user-profile">
+        <div class="user-avatar">{{ user.nom|slice:":1" }} {{ user.prenom|slice:":1" }}</div>
+        <div class="user-info">
+            <h4>{{ user.nom }} {{ user.prenom }}</h4>
+            <span>{{ user.role }}</span>
         </div>
+        <div class="status-dot online"></div>
+    </div>
+</div>

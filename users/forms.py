@@ -41,6 +41,13 @@ class RegisterForm(forms.ModelForm):
         })
     )
 
+    date_naissance = forms.DateField(
+        widget=forms.DateInput(attrs={
+            'class': 'form-control',
+            'type': 'date'
+        })
+    )
+
     email = forms.EmailField(
         widget=forms.EmailInput(attrs={
             'class': 'form-control',
@@ -72,7 +79,7 @@ class RegisterForm(forms.ModelForm):
 
     class Meta:
         model = Utilisateur
-        fields = ('nom', 'prenom', 'email', 'telephone', 'password1', 'password2')
+        fields = ('nom', 'prenom', 'date_naissance', 'email', 'telephone', 'password1', 'password2')
 
 
     def clean(self):
@@ -92,6 +99,7 @@ class RegisterForm(forms.ModelForm):
             email=cleaned_data['email'],
             nom=cleaned_data['nom'],
             prenom=cleaned_data['prenom'],
+            date_naissance=cleaned_data['date_naissance'],
             mot_de_passe=cleaned_data['password1'],
             telephone=cleaned_data['telephone'],
             role='patient'  # Toujours patient pour les inscriptions classiques
@@ -108,6 +116,9 @@ class UtilisateurCreationForm(UserCreationForm):
     prenom = forms.CharField(
         max_length=66,
         widget=forms.TextInput(attrs={'class': 'form-control'})
+    )
+    date_naissance = forms.DateField(
+        widget=forms.DateInput(attrs={'class': 'form-control','type': 'date'})
     )
     email = forms.EmailField(
         widget=forms.EmailInput(attrs={'class': 'form-control'})
@@ -135,51 +146,19 @@ class UtilisateurCreationForm(UserCreationForm):
     
     class Meta:
         model = Utilisateur
-        fields = ('nom', 'prenom', 'email', 'telephone', 'role', 'password1', 'password2')
-
-# Formulaire de modification d'utilisateur
-class UtilisateurUpdateForm(UserChangeForm):
-    password = None  # Supprime le champ mot de passe
-    
-    nom = forms.CharField(
-        max_length=66,
-        widget=forms.TextInput(attrs={'class': 'form-control'})
-    )
-    prenom = forms.CharField(
-        max_length=66,
-        widget=forms.TextInput(attrs={'class': 'form-control'})
-    )
-    email = forms.EmailField(
-        widget=forms.EmailInput(attrs={'class': 'form-control'})
-    )
-    telephone = forms.CharField(
-        max_length=20,
-        widget=forms.TextInput(attrs={'class': 'form-control'})
-    )
-    role = forms.ChoiceField(
-        choices=Utilisateur.ROLE,
-        widget=forms.Select(attrs={'class': 'form-control'})
-    )
-    est_actif = forms.BooleanField(
-        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
-    )
-    widget = forms.CheckboxInput(attrs={'class': 'form-check-input'})
-
-    
-    class Meta:
-        model = Utilisateur
-        fields = ('nom', 'prenom', 'email', 'telephone', 'role', 'est_actif')
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Si l'utilisateur modifie son propre profil et n'est pas admin,
-        # on retire certains champs
-        if hasattr(self, 'request') and self.request.user == self.instance and self.request.user.role != 'admin':
-            del self.fields['role']
-            del self.fields['est_actif']
-
+        fields = ('nom', 'prenom', 'date_naissance', 'email', 'telephone', 'role', 'password1', 'password2')
 
 User = get_user_model()
+
+# Formulaire de modification d'utilisateur
+class UtilisateurUpdateForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ["nom", "prenom", "email", "telephone", "role", "is_actif"]
+
+
+
+
 
 class UserEditForm(forms.ModelForm):
     class Meta:
@@ -190,13 +169,13 @@ class UserEditForm(forms.ModelForm):
 class PatientEditForm(forms.ModelForm):
     class Meta:
         model = Patient
-        fields = ["date_naissance", "sexe", "tel", "adresse"]
+        fields = ["date_naissance", "sexe", "tel", "adresse", "photo"]
 
 
 class MedecinEditForm(forms.ModelForm):
     class Meta:
         model = Medecin
-        fields = ["numero_order", "specialite", "cabinet", "adresse_cabinet", "tel", "sexe", "diplomes"]
+        fields = ["numero_order", "specialite", "cabinet", "adresse_cabinet", "tel", "sexe", "diplomes", "photo", "tarif_consultation", "langues_parlees", "accepte_nouveaux_patients"]
 
 
 

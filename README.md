@@ -1,13 +1,13 @@
 # Gestion des Rendez-vous Médicaux
 
-> 🚧 Projet en cours de développement – Non destiné à la production pour l’instant.
+> Projet en cours de développement – Non destiné à la production pour l’instant.
 
 Ce projet est une application web de gestion des rendez-vous médicaux développée avec **Django**. 
 Il permet aux patients de prendre rendez-vous en ligne, aux médecins de gérer leurs disponibilités, et aux administrateurs de superviser l’ensemble du système.
 
 ---
 
-## 🧩 Fonctionnalités prévues
+## Fonctionnalités prévues
 
 - Authentification et gestion des rôles (patient, médecin, admin)
 - Prise de rendez-vous par les patients
@@ -18,7 +18,7 @@ Il permet aux patients de prendre rendez-vous en ligne, aux médecins de gérer 
 
 ---
 
-## 🛠️ Technologies utilisées
+## Technologies utilisées
 
 - [Django](https://www.djangoproject.com/)
 - Python 3.x
@@ -27,7 +27,7 @@ Il permet aux patients de prendre rendez-vous en ligne, aux médecins de gérer 
 
 ---
 
-## 📂 Structure du projet
+## Structure du projet
 
 ```bash
 GestionRDV/

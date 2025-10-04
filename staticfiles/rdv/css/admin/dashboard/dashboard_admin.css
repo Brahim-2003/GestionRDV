@@ -3,13 +3,13 @@
   max-width: 1200px;
   height: 100%;
   margin: 0;
-  padding: 1rem 1rem;
+  padding: 0.75rem 0.75rem;
 }
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 1.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
   margin-bottom: 0rem;
 }
 
@@ -17,18 +17,79 @@
   display: flex;               /* aligne les enfants côte à côte */
     justify-content: space-between; /* espace entre les cartes */
     align-items: stretch;        /* même hauteur */
-    gap: 1.5rem;                 /* espace entre les cartes */
+    gap: 1rem;                 /* espace entre les cartes */
     width: 100%;                 /* prend toute la largeur */
-    padding: 1rem;               /* marge intérieure */
+    padding: 0.75rem;               /* marge intérieure */
     box-sizing: border-box;
 }
 
-.content-grid .card {
+.content-grid .card, .rdv-recents {
     flex: 1 1 50%;               /* chaque carte prend ~50% */
     background: white;
-    border-radius: 8px;
+    border-radius: 6px;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    padding: 1rem;
+    padding: 0.75rem;
     box-sizing: border-box;
 }
+
+
+
+.rdv-recents h3 i, .rdv-recents h3 span {
+    color: #007bff;
+}
+
+.btn-view-more {
+  display: inline-block;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: #007bff;
+  text-decoration: none;
+}
+
+.btn-view-more:hover {
+  color: #14385f;
+}
+
+
+/* ================================
+   Rendez-vous récents
+   ================================ */
+.rdv-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.rdv-table th, .rdv-table td {
+  text-align: left;
+  padding: 0.8rem;
+  border-bottom: 1px solid #eee;
+  font-size: 0.9rem;
+}
+
+.rdv-table th {
+  background: #f5f7fa;
+  font-weight: 600;
+}
+
+.rdv-table .empty {
+  text-align: center;
+  color: #888;
+}
+
+
+/* Statuts des rendez-vous */
+.statut {
+  padding: 0.2rem 0.6rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  text-transform: capitalize;
+}
+
+.statut.confirme { background: #d4edda; color: #155724; }
+.statut.programme { background: #fff3cd; color: #856404; }
+.statut.annule   { background: #f8d7da; color: #721c24; }
+.statut.reporte  { background: #cce5ff; color: #004085; }
+.statut.termine  { background: #e2e3e5; color: #383d41; }
 

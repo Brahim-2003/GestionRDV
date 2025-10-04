@@ -553,9 +553,6 @@ button {
 
 
 
-
-
-
 /* Responsive */
 @media (max-width: 600px) {
   .search-filter-bar {
@@ -643,3 +640,406 @@ button {
 }
 
 
+/* ===== AJOUTS POUR LA RESPONSIVITÉ - À ajouter à la fin de base.css ===== */
+
+/* Empêcher le scroll du body quand sidebar ouverte sur mobile */
+body.sidebar-open {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+}
+
+/* ===== OVERLAY MOBILE - Mise à jour ===== */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, visibility 0.3s ease;
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+
+.sidebar-overlay.active {
+  display: block;
+  opacity: 1;
+  visibility: visible;
+}
+
+/* ===== RESPONSIVE LAYOUT PRINCIPAL ===== */
+
+/* Tablettes */
+@media (max-width: 1024px) {
+  :root {
+    --sidebar-width: 240px;
+  }
+  
+  .section-header {
+    margin: 8px 16px;
+  }
+  
+  .section-header h2 {
+    font-size: 1.15rem;
+  }
+}
+
+/* Mobile et Tablettes */
+@media (max-width: 768px) {
+  .app-container {
+    flex-direction: row;
+  }
+  
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    width: 280px;
+    z-index: 1001;
+  }
+  
+  .sidebar.open {
+    transform: translateX(0);
+  }
+  
+  #ajax-content {
+    margin-left: 0;
+    width: 100%;
+    padding: 1rem;
+  }
+  
+  .sidebar-overlay {
+    display: block;
+  }
+  
+  .main-content {
+    padding: 1rem;
+  }
+  
+  /* Ajustements des sections */
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+    margin: 8px 12px;
+  }
+  
+  .section-header h2 {
+    font-size: 1.1rem;
+  }
+  
+  .section-header p {
+    font-size: 0.8125rem;
+  }
+  
+  /* Barre de recherche et filtres en colonne */
+  .search-filter-bar {
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px;
+  }
+  
+  .search-filter-bar > * {
+    width: 100%;
+  }
+  
+  /* Tableaux responsive */
+  .tab-content {
+    padding: 12px 8px;
+    margin: 12px 8px;
+  }
+  
+  .data-table {
+    font-size: 0.8125rem;
+  }
+  
+  .data-table th,
+  .data-table td {
+    padding: 8px 6px;
+  }
+  
+  .data-table thead th {
+    font-size: 0.8rem;
+  }
+  
+  /* Modales sur mobile */
+  .modal {
+    max-width: calc(100vw - 32px);
+    margin: 16px;
+  }
+  
+  .modal-header {
+    padding: 16px;
+  }
+  
+  .modal-body {
+    padding: 16px;
+  }
+  
+  .modal-title {
+    font-size: 18px;
+  }
+}
+
+/* Petits mobiles */
+@media (max-width: 480px) {
+  .sidebar {
+    width: 100%;
+    max-width: 320px;
+  }
+  
+  #ajax-content {
+    padding: 0.75rem;
+  }
+  
+  .main-content {
+    padding: 0.75rem;
+  }
+  
+  .section-header {
+    margin: 6px 8px;
+  }
+  
+  .section-header h2 {
+    font-size: 1rem;
+  }
+  
+  .section-header p {
+    font-size: 0.75rem;
+  }
+  
+  /* Boutons plus petits */
+  .btn-primary {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.8125rem;
+  }
+  
+  /* Formulaires */
+  .modern-form input,
+  .modern-form select,
+  .modern-form .form-control {
+    font-size: 0.875rem;
+    padding: 0.45rem 0.65rem;
+  }
+  
+  .modern-form label {
+    font-size: 0.8rem;
+  }
+  
+  .form-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .form-actions .btn-primary,
+  .form-actions .btn-secondary {
+    width: 100%;
+    justify-content: center;
+    padding: 0.75rem 1rem;
+  }
+  
+  /* Tableaux très compacts */
+  .data-table th,
+  .data-table td {
+    padding: 6px 4px;
+    font-size: 0.75rem;
+  }
+  
+  .data-table thead th {
+    font-size: 0.75rem;
+  }
+  
+  /* Actions en colonne si nécessaire */
+  .action-btn-edit,
+  .action-btn-delete {
+    font-size: 1rem;
+    margin-right: 0.25rem;
+  }
+  
+  /* Badges plus petits */
+  .badge {
+    padding: 0.2rem 0.4rem;
+    font-size: 0.75rem;
+  }
+  
+  /* Modales plein écran sur très petits écrans */
+  .modal {
+    max-width: 100%;
+    max-height: 100vh;
+    margin: 0;
+    border-radius: 0;
+  }
+  
+  .modal-header,
+  .modal-body {
+    padding: 12px;
+  }
+  
+  .modal-title {
+    font-size: 16px;
+  }
+}
+
+/* Très petits écrans */
+@media (max-width: 360px) {
+  .sidebar {
+    max-width: 100%;
+  }
+  
+  .section-header h2 {
+    font-size: 0.9375rem;
+  }
+  
+  .btn-primary {
+    font-size: 0.75rem;
+    padding: 0.375rem 0.625rem;
+  }
+  
+  .data-table {
+    font-size: 0.7rem;
+  }
+  
+  .data-table th,
+  .data-table td {
+    padding: 4px 3px;
+  }
+}
+
+/* Mode paysage sur mobile */
+@media (max-width: 768px) and (orientation: landscape) {
+  .sidebar {
+    width: 260px;
+  }
+  
+  .modal {
+    max-height: 90vh;
+  }
+  
+  .modal-body {
+    max-height: calc(90vh - 120px);
+  }
+}
+
+/* Support pour grands écrans */
+@media (min-width: 1200px) {
+  :root {
+    --sidebar-width: 260px;
+  }
+  
+  .main-content {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+  
+  .tab-content {
+    max-width: 1200px;
+  }
+}
+
+@media (min-width: 1440px) {
+  :root {
+    --sidebar-width: 280px;
+  }
+  
+  .section-header h2 {
+    font-size: 1.35rem;
+  }
+}
+
+/* Optimisations pour les appareils tactiles */
+@media (hover: none) and (pointer: coarse) {
+  /* Augmenter les zones de touch */
+  .nav-tab,
+  .logout,
+  .btn-primary,
+  .action-btn-edit,
+  .action-btn-delete {
+    min-height: 44px; /* Taille minimale recommandée pour touch */
+  }
+  
+  .sidebar-toggle-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  
+  /* Meilleur feedback tactile */
+  .nav-tab:active,
+  .btn-primary:active {
+    transform: scale(0.98);
+  }
+}
+
+/* Amélioration de l'accessibilité */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  .sidebar,
+  .sidebar-overlay {
+    transition: none !important;
+  }
+}
+
+/* Mode sombre (si vous voulez l'ajouter plus tard) */
+@media (prefers-color-scheme: dark) {
+  /* Préparation pour le dark mode - à personnaliser selon vos besoins
+  :root {
+    --bg-light: #1a1a1a;
+    --bg-dark: #ffffff;
+    --text-primary: #f3f4f6;
+    --text-secondary: #d1d5db;
+  }
+  */
+}
+
+/* Impression - masquer les éléments non nécessaires */
+@media print {
+  .sidebar,
+  .sidebar-overlay,
+  .sidebar-toggle-btn,
+  .action-btn-edit,
+  .action-btn-delete,
+  .btn-primary {
+    display: none !important;
+  }
+  
+  #ajax-content {
+    margin-left: 0;
+    width: 100%;
+  }
+  
+  .data-table {
+    page-break-inside: avoid;
+  }
+}
+
+/* Styles pour Safari iOS */
+@supports (-webkit-touch-callout: none) {
+  .sidebar {
+    /* Fix pour le bounce scroll sur iOS */
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  body.sidebar-open {
+    /* Fix pour iOS avec position fixed */
+    position: fixed;
+    overflow: hidden;
+  }
+}
+
+/* Fix pour les anciens navigateurs */
+@supports not (backdrop-filter: blur(2px)) {
+  .sidebar-overlay {
+    background: rgba(0, 0, 0, 0.6);
+  }
+}

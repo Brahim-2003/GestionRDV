@@ -1,0 +1,287 @@
+{% load static %}
+{% load history_extras %}
+
+
+{# Conteneur racine exposant toutes les routes #}
+<div id="history-root" class="admin-history"
+     data-url-list="{% url 'rdv:history_list' %}"
+     data-url-detail="{% url 'rdv:history_detail' 0 %}">
+
+  <!-- Header avec titre -->
+  <div class="section-header">
+      <div>
+          <h2>Historique des Rendez-vous</h2>
+          <p>Consultez toutes les actions effectuées sur les rendez-vous</p>
+      </div>
+  </div>
+
+  <!-- Messages Django -->
+  {% if messages %}
+      {% for message in messages %}
+          <div class="alert alert-{{ message.tags }}">
+              {{ message }}
+          </div>
+      {% endfor %}
+  {% endif %}
+
+  <!-- Panneau de filtres et recherche -->
+  <div class="filters-panel">
+      <form method="get" class="filters-form" id="history-filters">
+          
+          <!-- Barre de recherche -->
+          <div class="search-box">
+              <i class='bx bx-search'></i>
+              <input type="text" 
+                     name="search" 
+                     placeholder="Rechercher dans l'historique..." 
+                     value="{{ current_search }}"
+                     class="search-input">
+          </div>
+
+          <!-- Filtres par dates -->
+          <div class="date-filters">
+              <div class="date-input-group">
+                  <label for="date_from">Du</label>
+                  <input type="date" 
+                         name="date_from" 
+                         id="date_from"
+                         value="{{ current_date_from }}"
+                         class="date-input">
+              </div>
+              <div class="date-input-group">
+                  <label for="date_to">Au</label>
+                  <input type="date" 
+                         name="date_to" 
+                         id="date_to"
+                         value="{{ current_date_to }}"
+                         class="date-input">
+              </div>
+          </div>
+
+          <!-- Filtre par utilisateur -->
+          <div class="user-filter">
+              <i class='bx bx-user'></i>
+              <input type="text" 
+                     name="user" 
+                     placeholder="Filtrer par utilisateur..." 
+                     value="{{ current_user_filter }}"
+                     class="user-input">
+          </div>
+
+          <!-- Filtre par ID de RDV -->
+          <div class="rdv-filter">
+              <i class='bx bx-id-card'></i>
+              <input type="text" 
+                     name="rdv_id" 
+                     placeholder="ID du RDV..." 
+                     value="{{ current_rdv_id }}"
+                     class="rdv-input">
+          </div>
+
+          <!-- Boutons d'action -->
+          <div class="filter-actions">
+              <button type="submit" class="btn btn-primary">
+                  <i class='bx bx-filter'></i>
+                  Filtrer
+              </button>
+              <button type="button" class="btn btn-secondary" id="reset-filters">
+                  <i class='bx bx-reset'></i>
+                  Réinitialiser
+              </button>
+          </div>
+      </form>
+  </div>
+
+  <!-- Filtres par type d'action (onglets) -->
+  <div class="action-tabs">
+      <button class="action-tab {% if current_filter == 'all' %}active{% endif %}" 
+              data-action="all">
+          <i class='bx bx-list-ul'></i>
+          Toutes
+          <span class="badge">{{ total_count }}</span>
+      </button>
+      {% for action_code, action_label in action_choices %}
+      <button class="action-tab {% if current_filter == action_code %}active{% endif %}" 
+              data-action="{{ action_code }}">
+          {% if action_code == 'create' %}
+              <i class='bx bx-plus-circle'></i>
+          {% elif action_code == 'confirm' %}
+              <i class='bx bx-check-circle'></i>
+          {% elif action_code == 'cancel' %}
+              <i class='bx bx-x-circle'></i>
+          {% elif action_code == 'report' %}
+              <i class='bx bx-calendar-event'></i>
+          {% elif action_code == 'update' %}
+              <i class='bx bx-edit'></i>
+          {% elif action_code == 'delete' %}
+              <i class='bx bx-trash'></i>
+          {% endif %}
+          {{ action_label }}
+          <span class="badge">{{ action_stats|default_if_none:0 }}</span>
+      </button>
+      {% endfor %}
+  </div>
+
+  <!-- Liste de l'historique -->
+  <div class="history-list">
+      {% for item in history_items %}
+      <div class="history-item action-{{ item.action }}" data-history-id="{{ item.id }}">
+          
+          <!-- Indicateur visuel du type d'action -->
+          <div class="action-indicator {{ item.action }}">
+              {% if item.action == 'create' %}
+                  <i class='bx bx-plus-circle'></i>
+              {% elif item.action == 'confirm' %}
+                  <i class='bx bx-check-circle'></i>
+              {% elif item.action == 'cancel' %}
+                  <i class='bx bx-x-circle'></i>
+              {% elif item.action == 'report' %}
+                  <i class='bx bx-calendar-event'></i>
+              {% elif item.action == 'update' %}
+                  <i class='bx bx-edit'></i>
+              {% elif item.action == 'delete' %}
+                  <i class='bx bx-trash'></i>
+              {% endif %}
+          </div>
+
+          <!-- Contenu principal de l'historique -->
+          <div class="history-content">
+              
+              <!-- En-tête avec action et timestamp -->
+              <div class="history-header-item">
+                  <div class="action-title">
+                      <span class="action-badge {{ item.action }}">
+                          {{ item.get_action_display }}
+                      </span>
+                      <span class="rdv-id">RDV #{{ item.rdv.id }}</span>
+                  </div>
+                  <div class="timestamp">
+                      <i class='bx bx-time'></i>
+                      {{ item.timestamp|date:"d/m/Y à H:i" }}
+                  </div>
+              </div>
+
+              <!-- Informations sur le RDV -->
+              <div class="rdv-info">
+                  <div class="info-row">
+                      <i class='bx bx-user'></i>
+                      <strong>Patient:</strong>
+                      {{ item.rdv.patient.user.nom_complet }} 
+                  </div>
+                  <div class="info-row">
+                      <i class='bx bx-user-circle'></i>
+                      <strong>Médecin:</strong>
+                      {{ item.rdv.medecin.user.nom_complet }}
+                  </div>
+                  <div class="info-row">
+                      <i class='bx bx-calendar'></i>
+                      <strong>Date du RDV:</strong>
+                      {{ item.rdv.date_heure_rdv|date:"d/m/Y à H:i" }}
+                  </div>
+              </div>
+
+              <!-- Utilisateur qui a effectué l'action -->
+              <div class="performed-by">
+                  <i class='bx bx-user-check'></i>
+                  <strong>Par:</strong>
+                  {% if item.performed_by %}
+                      {{ item.performed_by.nom_complet|default:item.performed_by.nom }}
+                  {% else %}
+                      <span class="system-action">Système</span>
+                  {% endif %}
+              </div>
+
+              <!-- Description de l'action -->
+              {% if item.description %}
+              <div class="history-description">
+                  <i class='bx bx-info-circle'></i>
+                  <p>{{ item.description }}</p>
+              </div>
+              {% endif %}
+
+              <!-- Affichage des changements (ancienne vs nouvelle valeur) -->
+              {% if item.old_value or item.new_value %}
+              <div class="value-changes">
+                  {% if item.old_value %}
+                  <div class="old-value">
+                      <i class='bx bx-minus-circle'></i>
+                      <strong>Ancienne :</strong>
+                      <span>{{ item.old_value }}</span>
+                  </div>
+                  {% endif %}
+                  {% if item.new_value %}
+                  <div class="new-value">
+                      <i class='bx bx-plus-circle'></i>
+                      <strong>Nouvelle :</strong>
+                      <span>{{ item.new_value }}</span>
+                  </div>
+                  {% endif %}
+              </div>
+              {% endif %}
+
+              <!-- Bouton pour voir le détail complet du RDV -->
+              <div class="history-actions">
+                  <a href="{% url 'rdv:history_detail' item.rdv.id %}" 
+                     class="btn-link view-detail"
+                     data-rdv-id="{{ item.rdv.id }}">
+                      <i class='bx bx-show'></i>
+                      Voir l'historique complet
+                  </a>
+              </div>
+
+          </div><!-- /.history-content -->
+      </div><!-- /.history-item -->
+      {% empty %}
+      
+      <!-- État vide quand aucun résultat -->
+      <div class="empty-state">
+          <i class='bx bx-folder-open'></i>
+          <h3>Aucun historique trouvé</h3>
+          <p>Aucune action ne correspond à vos critères de recherche.</p>
+          <button type="button" class="btn btn-primary" id="reset-empty">
+              <i class='bx bx-reset'></i>
+              Réinitialiser les filtres
+          </button>
+      </div>
+      {% endfor %}
+  </div><!-- /.history-list -->
+
+  <!-- Pagination -->
+  {% if history_items.has_other_pages %}
+  <div class="pagination-container">
+      <div class="pagination-info">
+          Page {{ history_items.number }} sur {{ history_items.paginator.num_pages }}
+          ({{ history_items.start_index }} - {{ history_items.end_index }} sur {{ total_count }})
+      </div>
+      <div class="pagination-controls">
+          {% if history_items.has_previous %}
+              <a href="?page=1{% if current_filter != 'all' %}&action={{ current_filter }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_user_filter %}&user={{ current_user_filter }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}{% if current_rdv_id %}&rdv_id={{ current_rdv_id }}{% endif %}" 
+                 class="pagination-btn">
+                  <i class='bx bx-chevrons-left'></i>
+              </a>
+              <a href="?page={{ history_items.previous_page_number }}{% if current_filter != 'all' %}&action={{ current_filter }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_user_filter %}&user={{ current_user_filter }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}{% if current_rdv_id %}&rdv_id={{ current_rdv_id }}{% endif %}" 
+                 class="pagination-btn">
+                  <i class='bx bx-chevron-left'></i>
+              </a>
+          {% endif %}
+
+          <span class="current-page">{{ history_items.number }}</span>
+
+          {% if history_items.has_next %}
+              <a href="?page={{ history_items.next_page_number }}{% if current_filter != 'all' %}&action={{ current_filter }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_user_filter %}&user={{ current_user_filter }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}{% if current_rdv_id %}&rdv_id={{ current_rdv_id }}{% endif %}" 
+                 class="pagination-btn">
+                  <i class='bx bx-chevron-right'></i>
+              </a>
+              <a href="?page={{ history_items.paginator.num_pages }}{% if current_filter != 'all' %}&action={{ current_filter }}{% endif %}{% if current_search %}&search={{ current_search }}{% endif %}{% if current_user_filter %}&user={{ current_user_filter }}{% endif %}{% if current_date_from %}&date_from={{ current_date_from }}{% endif %}{% if current_date_to %}&date_to={{ current_date_to }}{% endif %}{% if current_rdv_id %}&rdv_id={{ current_rdv_id }}{% endif %}" 
+                 class="pagination-btn">
+                  <i class='bx bx-chevrons-right'></i>
+              </a>
+          {% endif %}
+      </div>
+  </div>
+  {% endif %}
+
+</div><!-- /#history-root -->
+
+
+<script defer src="{% static 'rdv/js/admin/history/history.js' %}"></script>

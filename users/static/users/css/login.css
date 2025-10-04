@@ -26,34 +26,13 @@ body {
 
 .auth-header {
     margin-bottom: 30px;
-}
-
-.logo {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 24px;
+    flex-direction: column;
+    align-items: center; /* Centre horizontalement le contenu */
+    gap: 12px;
 }
 
-.logo-icon {
-    background: #2563eb;
-    color: white;
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    font-weight: 700;
-    margin-right: 12px;
-}
 
-.logo-text {
-    font-size: 28px;
-    font-weight: 600;
-    color: #2563eb;
-}
 
 .auth-title {
     font-size: 32px;

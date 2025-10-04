@@ -19,7 +19,7 @@ class UtilisateurAdmin(BaseUserAdmin):
     # Configuration des fieldsets pour l'édition
     fieldsets = [
         (None, {'fields': ['email', 'password']}),
-        ('Informations personnelles', {'fields': ['nom', 'prenom', 'telephone']}),
+        ('Informations personnelles', {'fields': ['nom', 'prenom', 'telephone', 'date_naissance']}),
         ('Permissions', {'fields': ['role', 'is_actif', 'is_staff', 'is_superuser', 'groups', 'user_permissions']}),
         ('Dates importantes', {'fields': ['last_login', 'date_inscription']}),
     ]

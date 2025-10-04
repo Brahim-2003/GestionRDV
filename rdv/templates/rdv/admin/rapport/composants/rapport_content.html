@@ -1,0 +1,271 @@
+{% load static %}
+        <!-- Contenu principal -->
+        <main class="main-content">
+            <div class="content-header">
+                <h1 class="content-title">
+                    <i class='bx bx-bar-chart-alt-2'></i>
+                    Rapports & Statistiques
+                </h1>
+                <p class="content-subtitle">Analyse complète des données médicales et performances du système</p>
+            </div>
+            
+            <!-- Contrôles de période -->
+            <div class="period-controls">
+                <button class="period-btn" data-period="7">
+                    <i class='bx bx-calendar'></i> 7 jours
+                </button>
+                <button class="period-btn active" data-period="30">
+                    <i class='bx bx-calendar-week'></i> 30 jours
+                </button>
+                <button class="period-btn" data-period="90">
+                    <i class='bx bx-calendar-event'></i> 3 mois
+                </button>
+                <button class="period-btn" data-period="365">
+                    <i class='bx bx-calendar-alt'></i> 1 an
+                </button>
+            </div>
+            
+            <!-- Statistiques générales -->
+            <div class="stats-overview">
+                <div class="stat-card-rapport">
+                    <div class="stat-icon">
+                        <i class='bx bx-user'></i>
+                    </div>
+                    <div class="stat-number" id="total-patients">{{ total_patients }}</div>
+                    <div class="stat-label">Total Patients</div>
+                </div>
+                
+                <div class="stat-card-rapport">
+                    <div class="stat-icon">
+                        <i class='bx bx-plus-medical'></i>
+                    </div>
+                    <div class="stat-number" id="total-medecins">{{ total_medecins }}</div>
+                    <div class="stat-label">Total Médecins</div>
+                </div>
+                
+                <div class="stat-card-rapport">
+                    <div class="stat-icon">
+                        <i class='bx bx-calendar-check'></i>
+                    </div>
+                    <div class="stat-number" id="total-rdv">{{ total_rdv }}</div>
+                    <div class="stat-label">Total Rendez-vous</div>
+                </div>
+                
+                <div class="stat-card-rapport">
+                    <div class="stat-icon">
+                        <i class='bx bx-time-five'></i>
+                    </div>
+                    <div class="stat-number" id="rdv-aujourd-hui">{{ rdv_aujourd_hui }}</div>
+                    <div class="stat-label">RDV Aujourd'hui</div>
+                </div>
+            </div>
+            
+            <!-- Graphiques principaux -->
+            <div class="charts-grid">
+                <!-- RDV par statut -->
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h3 class="chart-title">
+                            <i class='bx bx-pie-chart-alt-2'></i>
+                            Rendez-vous par Statut
+                        </h3>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="rdvStatutChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Evolution des RDV -->
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h3 class="chart-title">
+                            <i class='bx bx-line-chart'></i>
+                            Évolution des Rendez-vous
+                        </h3>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="rdvEvolutionChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Spécialités demandées -->
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h3 class="chart-title">
+                            <i class='bx bx-bar-chart-alt'></i>
+                            Spécialités les Plus Demandées
+                        </h3>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="specialitesChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Patients par âge -->
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h3 class="chart-title">
+                            <i class='bx bx-group'></i>
+                            Répartition Patients par Âge
+                        </h3>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="agesChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Top médecins -->
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h3 class="chart-title">
+                            <i class='bx bx-trophy'></i>
+                            Top Médecins Performants
+                        </h3>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="medecinsChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Nouveaux patients -->
+                <div class="chart-container">
+                    <div class="chart-header">
+                        <h3 class="chart-title">
+                            <i class='bx bx-user-plus'></i>
+                            Nouveaux Patients par Mois
+                        </h3>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="nouveauxPatientsChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Tableaux détaillés -->
+            <div class="tables-section">
+                <!-- Top médecins -->
+                <div class="table-container">
+                    <h3 class="table-title">
+                        <i class='bx bx-medal'></i>
+                        Top Médecins par Performance
+                    </h3>
+                    <table class="stats-table">
+                        <thead>
+                            <tr>
+                                <th>Médecin</th>
+                                <th>Spécialité</th>
+                                <th>Nombre RDV</th>
+                                <th>Taux Confirmation</th>
+                            </tr>
+                        </thead>
+                        <tbody id="top-medecins-table">
+                            <tr>
+                                <td colspan="4" style="text-align: center; padding: 2rem;">
+                                    <div class="loading">
+                                        <div class="spinner"></div>
+                                        <div class="loading-text">Chargement des données...</div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Patients actifs -->
+                <div class="table-container">
+                    <h3 class="table-title">
+                        <i class='bx bx-star'></i>
+                        Patients les Plus Actifs
+                    </h3>
+                    <table class="stats-table">
+                        <thead>
+                            <tr>
+                                <th>Patient</th>
+                                <th>Nombre de RDV</th>
+                            </tr>
+                        </thead>
+                        <tbody id="patients-actifs-table">
+                            <tr>
+                                <td colspan="2" style="text-align: center; padding: 2rem;">
+                                    <div class="loading">
+                                        <div class="spinner"></div>
+                                        <div class="loading-text">Chargement des données...</div>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Section export -->
+            <div class="export-section">
+                <button class="export-btn" onclick="dashboard.exportStats()">
+                    <i class='bx bx-download'></i>
+                    Exporter les Statistiques (CSV)
+                </button>
+            </div>
+        </main>
+    </div>
+    
+    <script>
+        window.RDV_API = {
+            overview: "{% url 'rdv:api_overview' %}",
+            rdv: "{% url 'rdv:api_rdv' %}",
+            patients: "{% url 'rdv:api_patients' %}",
+            medecins: "{% url 'rdv:api_medecins' %}",
+            export: "{% url 'rdv:export_stats' %}"
+        };
+    </script>
+
+    <!-- Chart.js -->
+     <script defer src="{% static 'rdv/js/chart.min.js' %}"></script>
+
+    <!-- JS principal -->
+    <script defer src="{% static 'rdv/js/admin/rapport/rapport.js' %}"></script>
+
+    <script>
+(function() {
+  // idempotence : évite dispatch multiples
+  if (window._rdv_report_fragment_dispatched) return;
+  window._rdv_report_fragment_dispatched = true;
+
+  function doDispatch(kind) {
+    try {
+      window.dispatchEvent(new Event('rdv:report:loaded'));
+      console.info('🟢 fragment rapports rendu -> rdv:report:loaded (' + kind + ')');
+    } catch (e) {
+      console.error('Erreur dispatch rdv:report:loaded', e);
+    }
+  }
+
+  // Si rapport.js est déjà chargé et expose l'init, dispatch tout de suite.
+  if (typeof window.initReportDashboard === 'function' || typeof window.StatsDashboard !== 'undefined' || typeof window.reportDashboard !== 'undefined') {
+    // micro-tick pour laisser les defer s'exécuter si ils sont en file
+    setTimeout(() => doDispatch('ready-immediate'), 0);
+    return;
+  }
+
+  // Sinon, attendre DOMContentLoaded (les scripts defer ont normalement été exécutés juste avant)
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function onDom() {
+      document.removeEventListener('DOMContentLoaded', onDom);
+      doDispatch('DOMContentLoaded');
+    });
+  } else {
+    // déjà parsed — schedule a microtask to give defer scripts a chance
+    setTimeout(() => doDispatch('post-parse-fallback'), 50);
+  }
+
+  // Ultime filet de sécurité : si rien n'a marché au bout d'un petit délai, re-dispatch (rare)
+  setTimeout(function() {
+    if (!window.reportDashboard && !(typeof window.initReportDashboard === 'function')) {
+      // une dernière tentative
+      doDispatch('final-timeout');
+    }
+  }, 1000);
+})();
+</script>
+
+
+ 

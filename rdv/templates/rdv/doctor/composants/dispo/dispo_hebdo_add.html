@@ -1,0 +1,59 @@
+{% load static %}
+<link rel="stylesheet" href="{% static 'rdv/css/boxicons.min.css' %}">
+
+<form id="create-dispo-hebdo-day-form"
+      class="modern-form"
+      method="post"
+      data-ajax="1"
+      action="{% url 'rdv:disponibilite_hebdo_add' day_key %}">
+  {% csrf_token %}
+
+  <h3 class="form-title">
+    <i class='bx bx-calendar-week'></i>
+    Nouveau créneau - {{ day_name }}
+  </h3>
+
+  <!-- Information sur le jour sélectionné -->
+  <div class="day-info" style="background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 6px; padding: 12px; margin-bottom: 16px; color: #0369a1;">
+    <i class='bx bx-info-circle'></i>
+    <strong>Jour sélectionné :</strong> {{ day_name }}
+  </div>
+
+  {% if form.non_field_errors %}
+    <div class="nonfield-errors">{{ form.non_field_errors }}</div>
+  {% endif %}
+
+  <!-- Champ jour masqué -->
+  <div style="display: none;">
+    {{ form.jour }}
+  </div>
+
+  <div class="time-fields-row" style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+    <div class="field-group">
+      <label for="{{ form.heure_debut.id_for_label }}">{{ form.heure_debut.label }}</label>
+      {{ form.heure_debut }}
+      {% if form.heure_debut.errors %}<div class="errorlist">{{ form.heure_debut.errors }}</div>{% endif %}
+    </div>
+
+    <div class="field-group">
+      <label for="{{ form.heure_fin.id_for_label }}">{{ form.heure_fin.label }}</label>
+      {{ form.heure_fin }}
+      {% if form.heure_fin.errors %}<div class="errorlist">{{ form.heure_fin.errors }}</div>{% endif %}
+    </div>
+  </div>
+
+  <div class="form-check" style="margin: 16px 0;">
+    {{ form.is_active }}
+    <label for="{{ form.is_active.id_for_label }}" style="margin-left: 8px;">{{ form.is_active.label }}</label>
+    {% if form.is_active.errors %}<div class="errorlist">{{ form.is_active.errors }}</div>{% endif %}
+  </div>
+
+  <div class="form-actions">
+    <button type="submit" class="btn-primary">
+      <i class='bx bxs-save'></i> Ajouter le créneau
+    </button>
+    <button type="button" class="btn-secondary modal-cancel">
+      <i class='bx bxs-x-circle'></i> Annuler
+    </button>
+  </div>
+</form>

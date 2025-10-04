@@ -12,6 +12,23 @@ urlpatterns=[
     path('modifier_rdv/<int:rdv_id>/', views.edit_rdv, name='modifier_rendez_vous'),
     path('supprimer_rdv/<int:rdv_id>/', views.delete_rdv, name='supprimer_rendez_vous'),
 
+    path('dashboard_rapports/', views.dashboard_stats, name='dashboard_rapports'),
+    
+    # APIs pour les données des graphiques
+    path('api/overview/', views.stats_api_overview, name='api_overview'),
+    path('api/rdv/', views.stats_api_rdv, name='api_rdv'),
+    path('api/patients/', views.stats_api_patients, name='api_patients'),
+    path('api/medecins/', views.stats_api_medecins, name='api_medecins'),
+    
+    # Export
+    path('export/', views.export_stats, name='export_stats'),
+
+    # URL pour la liste complète de l'historique avec filtres
+    path('history/', views.rdv_history_list, name='history_list'),
+    
+    # URL pour voir l'historique détaillé d'un RDV spécifique
+    path('history/rdv/<int:rdv_id>/', views.rdv_detail_history, name='history_detail'),
+
     path('dashboard_medecin/', views.dashboard_medecin_view, name='dashboard_medecin'),
     path('liste_rdv_medecin/', views.liste_rdv_medecin, name='liste_rdv_medecin'),
     path('confirmer/<int:rdv_id>/', views.confirmer_rdv, name='confirmer_rdv'),       
@@ -20,9 +37,15 @@ urlpatterns=[
     path('notifier/<int:rdv_id>/', views.notifier_rdv, name='notifier_patient'),   
 
     path('disponibilites/', views.disponibilites_list, name='disponibilites_list'),
-    path('disponibilites/add/', views.disponibilite_add, name='disponibilite_add'),
-    path('disponibilites/<int:pk>/edit/', views.disponibilite_edit, name='disponibilite_edit'),
-    path('disponibilites/<int:pk>/delete/', views.disponibilite_delete, name='disponibilite_delete'),
+    path('disponibilites/add/', views.disponibilite_specifique_add, name='disponibilite_add'),
+    path('disponibilites/<int:pk>/edit/', views.disponibilite_specifique_edit, name='disponibilite_edit'),
+    path('disponibilites/<int:pk>/delete/', views.disponibilite_specifique_delete, name='disponibilite_delete'),
+    path('disponibilite/<int:dispo_id>/toggle/', views.toggle_dispo_status, name='toggle_dispo_status'),
+    path('disponibilites/weekly/', views.weekly_calendar_view, name='weekly_calendar'),
+    path('disponibilite/hebdo/add/<str:day_key>/', views.disponibilite_hebdo_add, name='disponibilite_hebdo_add'),
+    path('disponibilite/<int:pk>/edit-hebdo/', views.disponibilite_hebdo_edit, name='disponibilite_hebdo_edit'),
+    path('disponibilite/<int:dispo_id>/delete-hebdo/', views.disponibilite_hebdo_delete, name='disponibilite_hebdo_delete'),
+
 
     path('dashboard_patient/', views.dashboard_patient_view, name='dashboard_patient'),
     path('liste_rdv_patient/', views.liste_rdv_patient, name='liste_rdv_patient'),

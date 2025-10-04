@@ -45,7 +45,7 @@ class RdvHistory(models.Model):
 class Patient(models.Model):
     user =  models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='profil_patient')
     numero_patient = models.CharField(max_length=20, unique=True, blank=True)
-    date_naissance = models.DateField()
+    date_naissance = models.DateField(verbose_name="Date de naissance")
     adresse = models.TextField(blank=True)
     sexe = models.CharField(max_length=10, choices=[('F', 'Féminin'), ('M', 'Masculin')], default='F')
     tel = models.CharField(
@@ -91,6 +91,7 @@ class Medecin(models.Model):
 
     user =  models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='profil_medecin')
     numero_order = models.CharField(max_length=20, blank=True)
+    date_naissance = models.DateField(verbose_name="Date de naissance")
     specialite = models.CharField(max_length=100, choices=SPECIALITES)
     cabinet = models.CharField(max_length=200, blank=True)
     adresse_cabinet = models.TextField(blank=True)
@@ -435,7 +436,6 @@ class RendezVous(models.Model):
                 extra={}
             )
 
-        # notification non-bloquante (déjà implémentée ailleurs)
         try:
             subject = "Rendez-vous confirmé"
             message = f"Bonjour M. {self.patient.user.nom_complet()}, votre rendez-vous du {self.date_heure_rdv.strftime('%d/%m/%Y %H:%M')} avec Dr. {self.medecin.user.nom_complet()} a été confirmé."

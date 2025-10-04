@@ -5,13 +5,15 @@
   <meta charset="UTF-8">
   <title>{% block title %}Dashboard{% endblock %}</title>
 
-  <!-- FEUILLES DE STYLE GLOBALES -->
-  <link rel="stylesheet" href="{% static 'rdv/css/base.css' %}">
-  <link rel="stylesheet" href="{% static 'rdv/css/admin/dashboard/dashboard_admin.css' %}">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ 
   
   <link rel="stylesheet" href="{% static 'rdv/css/admin/users/profil_user.css' %}">
   <link rel="stylesheet" href="{% static 'rdv/css/admin/rdvs/rdvs.css' %}">
   <link rel="stylesheet" href="{% static 'rdv/css/notifs/notifs.css' %}">
+  <link rel="stylesheet" href="{% static 'rdv/css/admin/rapports/rapports.css' %}">
+  <link rel="stylesheet" href="{% static 'rdv/css/admin/history/history.css' %}">
+
   <!-- ICONES -->
   <link rel="stylesheet" href="{% static 'rdv/css/boxicons.min.css' %}">
   <link rel="stylesheet" href="{% static 'rdv/css/animations.css' %}">
@@ -22,6 +24,10 @@
   <link rel="stylesheet" href="{% static 'rdv/css/composants/card.css' %}">
   <link rel="stylesheet" href="{% static 'rdv/css/composants/card_jour.css' %}">
   <link rel="stylesheet" href="{% static 'rdv/css/composants/card_recent.css' %}">
+
+  <!-- FEUILLES DE STYLE GLOBALES -->
+  <link rel="stylesheet" href="{% static 'rdv/css/admin/dashboard/dashboard_admin.css' %}">
+  <link rel="stylesheet" href="{% static 'rdv/css/base.css' %}">
 
   {% block extra_css %}{% endblock %}
 </head>

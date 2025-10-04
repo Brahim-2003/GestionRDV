@@ -1,10 +1,14 @@
+{% load static %}
+
 <!-- Overlay pour mobile -->
 <div class="sidebar-overlay" onclick="toggleSidebar()"></div>
 
     <!-- Header avec brand -->
     <div class="sidebar-header">
         <div class="brand">
-            <div class="brand-icon">CL</div>
+            <div class="brand-icon">
+                <img src="{% static 'rdv/img/accueil/logo_app.png' %}" alt="RdvLib logo" class="logo-image" >
+            </div>
             <div class="brand-info">
                 <h3>Tableau de bord</h3>
                 <span>Panneau Médécin</span>

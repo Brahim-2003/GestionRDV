@@ -6,9 +6,11 @@ from django.contrib.contenttypes.models import ContentType
 from django.apps import apps
 from django.utils.translation import gettext_lazy
 import uuid
+from django.db import transaction
 
 from rdv.models import Patient, Medecin
 from users.models import Utilisateur
+from users.tasks import notify_admins_on_user_create
 
 
 def generate_unique_numero_patient():
@@ -21,13 +23,14 @@ def generate_unique_numero_patient():
 
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
-def manage_profiles_on_role_change(sender, instance, **kwargs):
+def manage_profiles_on_role_change(sender, instance, created, **kwargs):
     role = getattr(instance, 'role', None)
 
     if role == 'patient':
         Patient.objects.get_or_create(
             user=instance,
             defaults={
+                'date_naissance': instance.date_naissance,
                 'tel': instance.telephone,
                 'numero_patient': generate_unique_numero_patient()
             }
@@ -38,6 +41,7 @@ def manage_profiles_on_role_change(sender, instance, **kwargs):
         Medecin.objects.get_or_create(
             user=instance,
             defaults={
+                'date_naissance': instance.date_naissance,
                 'tel': instance.telephone,
                 'specialite': 'generaliste'
             }
@@ -60,6 +64,11 @@ def manage_profiles_on_role_change(sender, instance, **kwargs):
         group, _ = Group.objects.get_or_create(name=role_group)
         instance.groups.add(group)
 
+    if created and instance.role == 'patient':
+        
+        transaction.on_commit(
+        lambda: notify_admins_on_user_create.delay(instance.id)
+        )
 
 @receiver(post_migrate)
 def create_default_groups_and_permissions(sender, **kwargs):
@@ -139,3 +148,6 @@ def create_default_groups_and_permissions(sender, **kwargs):
         'can_view_all_users','can_manage_patients','can_manage_medecins',
         'can_view_statistics','can_export_data','can_manage_appointments'
     ])
+
+
+

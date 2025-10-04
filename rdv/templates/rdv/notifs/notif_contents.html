@@ -26,15 +26,6 @@
       </div>
   </div>
 
-  <!-- Messages Django -->
-  {% if messages %}
-      {% for message in messages %}
-          <div class="alert alert-{{ message.tags }}">
-              {{ message }}
-          </div>
-      {% endfor %}
-  {% endif %}
-
   <!-- Actions principales -->
   {% if notifications %}
   <div class="notifications-actions">
@@ -73,7 +64,7 @@
                   {% elif notification.type == 'success' %}
                       <i class='bx bxs-check-circle' ></i>
                   {% elif notification.type == 'warning' %}
-                      <i class='bx bxs-exclamation-triangle' ></i>
+                      <i class='bx bxs-error'></i>
                   {% elif notification.type == 'error' %}
                       <i class='bx bxs-x-circle' ></i>
                   {% endif %}

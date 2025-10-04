@@ -4,6 +4,7 @@ from django.contrib.auth.decorators import login_required, permission_required
 from django.contrib.auth.forms import PasswordChangeForm
 from django.core.paginator import Paginator 
 from django.db.models import Q, Max
+from django.db import transaction
 from django.http import JsonResponse, HttpResponseForbidden
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
@@ -16,6 +17,7 @@ from django.views.decorators.http import require_POST, require_http_methods
 from .models import Utilisateur
 from rdv.models import Patient, Medecin
 from .forms import ConnexionForm, RegisterForm, UtilisateurCreationForm, UtilisateurUpdateForm, UserEditForm, PatientEditForm, MedecinEditForm, CustomPasswordChangeForm
+from users.tasks import notify_admins_on_user_create
 
 
 # Create your views here.
@@ -82,7 +84,7 @@ def connecter(request):
         except Medecin.DoesNotExist:
             pass
         try:
-            _ = user.profil_patient
+            _ = request.user.profil_patient
             return redirect('rdv:dashboard_patient')
         except Patient.DoesNotExist:
             pass
@@ -419,12 +421,13 @@ def modifier_utilisateur(request, user_id):
     if request.method == 'POST':
         form = UtilisateurUpdateForm(request.POST, instance=user)
         if form.is_valid():
-            user = form.save()
-            return redirect('users:list_users')  # Redirige vers la liste des utilisateurs
+            form.save()
+            return JsonResponse({"success": True, "message": "Informations utilisateur mises à jour."})
     else:
         form = UtilisateurUpdateForm(instance=user)
     
-    return render(request, 'rdv/admin/users/modifier.html', {'form': form})
+    return render(request, 'rdv/admin/users/composants/edit_user_form.html', {'form': form})
+
 
 
 @login_required(login_url='users:login')

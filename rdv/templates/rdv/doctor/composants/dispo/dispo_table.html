@@ -1,59 +1,171 @@
-<table class="data-table">
+<!-- Table des disponibilités ponctuelles -->
+<div id="dispo-table-container" 
+     data-url="{% url 'rdv:disponibilites_list' %}"
+     data-ajax-url="{% url 'rdv:disponibilites_list' %}"
+     data-table-type="ponctuel">
+  
+  <!-- Indicateur de chargement -->
+  <div id="table-loading" class="loading-indicator hidden">
+    <i class='bx bx-loader-alt bx-spin'></i>
+    <span>Chargement...</span>
+  </div>
+
+  <!-- Messages d'erreur -->
+  <div id="table-error" class="error-message hidden">
+    <i class='bx bx-error-circle'></i>
+    <span id="error-text">Erreur lors du chargement des données</span>
+    <button type="button" id="retry-button" class="btn-sm btn-secondary">
+      <i class='bx bx-refresh'></i> Réessayer
+    </button>
+  </div>
+
+  <!-- Table -->
+  <div id="table-wrapper">
+    <table class="data-table">
       <thead>
         <tr>
-          <th>Jour</th>
+          <th>Date</th>
           <th>Heure début</th>
           <th>Heure fin</th>
-          <th>Active</th>
-          <th>Actions</th>
+          <th>Status</th>
+          <th class="col-actions">Actions</th>
         </tr>
       </thead>
       <tbody id="dispo-tbody">
         {% for dispo in page_obj.object_list %}
-          <tr data-slot-id="{{ dispo.id }}">
-            <td>
-            {% if dispo.date_specific %}
-              {{ dispo.date_specific|date:"d/m/Y" }}
-              (<span class="badge badge-info">Ponctuel</span>)
-            {% else %}
-              {{ dispo.get_jour_display }}
-              (<span class="badge badge-primary">Hebdo</span>)
-            {% endif %}
-          </td>
-            <td>{{ dispo.heure_debut|time:"H:i" }}</td>
-            <td>{{ dispo.heure_fin|time:"H:i" }}</td>
-            <td>
-              {% if dispo.is_active %}
-                <span class="badge badge-success"><i class='bx bxs-check-circle' style='color:#2d7318' ></i></span>
+          <tr data-dispo-id="{{ dispo.id }}" data-slot-id="{{ dispo.id }}">
+            <td class="col-date">
+              {% if dispo.date_specific %}
+                <span class="date-display">{{ dispo.date_specific|date:"d/m/Y" }}</span>
+                <span class="badge badge-info">Ponctuel</span>
               {% else %}
-                <span class="badge badge-danger"><i class='bx bx-x' style='color:#af1014'></i></span>
+                <span class="badge badge-primary">Hebdomadaire</span>
               {% endif %}
             </td>
-              <td class="col-actions" style="white-space:nowrap">
-                <button
-                  type="button"
-                  class="action-btn-edit"
-                  data-edit-url="{% url 'rdv:disponibilite_edit' dispo.id %}"
-                  data-slot-id="{{ dispo.id }}"
-                  aria-label="Modifier"
-                >
+            <td class="col-time">
+              <span class="time-display">{{ dispo.heure_debut|time:"H:i" }}</span>
+            </td>
+            <td class="col-time">
+              <span class="time-display">{{ dispo.heure_fin|time:"H:i" }}</span>
+            </td>
+            <td class="col-status">
+              <span class="status-badge {% if dispo.is_active %}status-active{% else %}status-inactive{% endif %}">
+                <i class='bx {% if dispo.is_active %}bxs-check-circle{% else %}bx-x-circle{% endif %}'></i>
+                {% if dispo.is_active %}Active{% else %}Inactive{% endif %}
+              </span>
+            </td>
+            <td class="col-actions">
+              <div class="action-buttons">
+                <!-- Toggle button -->
+                <button type="button"
+                        class="action-btn toggle-btn"
+                        data-dispo-id="{{ dispo.id }}"
+                        data-active="{{ dispo.is_active|yesno:'true,false' }}"
+                        title="{% if dispo.is_active %}Désactiver{% else %}Activer{% endif %}"
+                        aria-label="{% if dispo.is_active %}Désactiver{% else %}Activer{% endif %} le créneau">
+                  <i class="bx bx-toggle-{% if dispo.is_active %}right{% else %}left{% endif %}"></i>
+                </button>
+                
+                <!-- Edit button -->
+                <button type="button"
+                        class="action-btn action-btn-edit"
+                        data-edit-url="{% url 'rdv:disponibilite_edit' dispo.id %}"
+                        data-slot-id="{{ dispo.id }}"
+                        data-dispo-id="{{ dispo.id }}"
+                        title="Modifier le créneau"
+                        aria-label="Modifier le créneau">
                   <i class="bx bxs-edit"></i>
                 </button>
-                <button
-                  type="button"
-                  class="action-btn-delete btn-icon"
-                  data-delete-url="{% url 'rdv:disponibilite_delete' dispo.id %}"
-                  data-slot-id="{{ dispo.id }}"
-                  aria-label="Supprimer le créneau {{ dispo.id }}">
-                  <i class='bx bxs-trash-alt' aria-hidden="true"></i>
+                
+                <!-- Delete button -->
+                <button type="button"
+                        class="action-btn action-btn-delete"
+                        data-delete-url="{% url 'rdv:disponibilite_delete' dispo.id %}"
+                        data-slot-id="{{ dispo.id }}"
+                        data-dispo-id="{{ dispo.id }}"
+                        title="Supprimer le créneau"
+                        aria-label="Supprimer le créneau">
+                  <i class='bx bxs-trash-alt'></i>
                 </button>
-
+              </div>
             </td>
           </tr>
         {% empty %}
-          <tr>
-            <td colspan="4" class="text-center">Aucune disponibilité trouvée.</td>
+          <tr class="empty-row">
+            <td colspan="6" class="text-center">
+              <div class="empty-state">
+                <i class="bx bx-calendar-x"></i>
+                <p>Aucune disponibilité ponctuelle trouvée.</p>
+                <p class="empty-hint">Utilisez les filtres ci-dessus ou ajoutez un nouveau créneau.</p>
+              </div>
+            </td>
           </tr>
         {% endfor %}
       </tbody>
     </table>
+  </div>
+
+  <!-- Pagination -->
+  {% if page_obj.has_other_pages %}
+    <div class="pagination-wrapper">
+      <nav class="pagination" aria-label="Navigation pagination">
+        <ul class="pagination-list">
+          {% if page_obj.has_previous %}
+            <li class="page-item">
+              <button type="button" 
+                      class="page-link"
+                      data-page="1"
+                      title="Première page"
+                      aria-label="Aller à la première page">
+                <i class='bx bx-chevrons-left'></i>
+                Première
+              </button>
+            </li>
+            <li class="page-item">
+              <button type="button" 
+                      class="page-link"
+                      data-page="{{ page_obj.previous_page_number }}"
+                      title="Page précédente"
+                      aria-label="Aller à la page précédente">
+                <i class='bx bx-chevron-left'></i>
+                Précédent
+              </button>
+            </li>
+          {% endif %}
+          
+          <li class="page-info">
+            <span class="page-current">
+              Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}
+            </span>
+            <span class="page-total">
+              ({{ page_obj.paginator.count }} résultat{{ page_obj.paginator.count|pluralize }})
+            </span>
+          </li>
+          
+          {% if page_obj.has_next %}
+            <li class="page-item">
+              <button type="button" 
+                      class="page-link"
+                      data-page="{{ page_obj.next_page_number }}"
+                      title="Page suivante"
+                      aria-label="Aller à la page suivante">
+                Suivant
+                <i class='bx bx-chevron-right'></i>
+              </button>
+            </li>
+            <li class="page-item">
+              <button type="button" 
+                      class="page-link"
+                      data-page="{{ page_obj.paginator.num_pages }}"
+                      title="Dernière page"
+                      aria-label="Aller à la dernière page">
+                Dernière
+                <i class='bx bx-chevrons-right'></i>
+              </button>
+            </li>
+          {% endif %}
+        </ul>
+      </nav>
+    </div>
+  {% endif %}
+</div>

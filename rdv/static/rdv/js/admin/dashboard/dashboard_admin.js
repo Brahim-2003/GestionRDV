@@ -2,7 +2,7 @@
 
 // Mets à jour les statistiques via l'API
 function updateDashboard() {
-    fetch('{% url "api_stats" %}')
+    fetch('{% url "rdv : api_dashboard_stats" %}')
         .then(resp => resp.json())
         .then(data => {
             document.querySelectorAll('.stat-card').forEach(card => {

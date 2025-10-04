@@ -1,4 +1,4 @@
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, date as date_cls
 
 # Django imports (groupés et triés)
 from django.contrib import messages
@@ -15,13 +15,20 @@ from django.views.decorators.http import require_POST, require_http_methods, req
 from django.contrib.auth.decorators import login_required, permission_required
 import json
 import logging
+import csv
 from django.utils.dateparse import parse_datetime
+from django.db.models.functions import TruncMonth, TruncWeek, TruncDay
+
+
+logger = logging.getLogger(__name__)
+
+
 
 
 
 # App imports
 from users.models import Utilisateur
-from .forms import UpdateRDVForm, DisponibiliteEditForm, DisponibiliteCreateForm, AnnulerRdvForm, ReporterRdvForm, NotifierRdvForm, RendezVousForm
+from .forms import UpdateRDVForm, DisponibiliteHebdoCreateForm, DisponibiliteHebdoEditForm, DisponibiliteSpecifiqueCreateForm, DisponibiliteSpecifiqueEditForm, AnnulerRdvForm, ReporterRdvForm, NotifierRdvForm, RendezVousForm
 from .models import RendezVous, Notification, Patient, Medecin, Disponibilite, RdvHistory, FavoriMedecin, RechercheSymptome
 from . import notifications as notif_helpers
 from rdv.utils import user_can_manage_rdv, send_manual_notification
@@ -193,53 +200,41 @@ def dashboard_admin_view(request):
 @login_required(login_url='users:login')
 @permission_required('users.can_view_statistics', raise_exception=True)
 def api_dashboard_stats(request):
-    user = request.user
+    
     now = timezone.now()
     debut_semaine = now - timezone.timedelta(days=now.weekday())
     debut_mois = now.replace(day=1)
     debut_jour = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    jours_semaine = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
 
-    data = {}
-
-    if user.is_admin_role():
-        data = {
+    data = {
             'total_utilisateurs': Utilisateur.objects.count(),
+            'total_utilisateurs_inscris_semaine': Utilisateur.objects.filter(date_inscription__gte=debut_semaine).count(),
+            'total_utilisateurs_inscris_mois': Utilisateur.objects.filter(date_inscription__gte = debut_mois).count(),
+            'total_utilisateurs_inscris_aujour': Utilisateur.objects.filter(date_inscription__gte = debut_jour).count(),
+            'total_admins': Utilisateur.objects.filter(role='admin').count(),
             'total_patients': Utilisateur.objects.filter(role='patient').count(),
             'total_medecins': Utilisateur.objects.filter(role='medecin').count(),
+            
+
             'total_rendez_vous': RendezVous.objects.count(),
             'total_confirmes': RendezVous.objects.filter(statut='confirme').count(),
-            'total_programmes': RendezVous.objects.filter(statut='programme').count(),
             'total_annules': RendezVous.objects.filter(statut='annule').count(),
+            'total_en_cours': RendezVous.objects.filter(statut='en_cours').count(),
+            'total_programmes': RendezVous.objects.filter(statut='programme').count(),
             'total_termines': RendezVous.objects.filter(statut='termine').count(),
-            'rdv_cette_semaine': RendezVous.objects.filter(date_heure_rdv__gte=debut_semaine).count(),
-            'rdv_ce_mois': RendezVous.objects.filter(date_heure_rdv__gte=debut_mois).count(),
-            'rdv_par_jour': [
-                RendezVous.objects.filter(date_heure_rdv__date=debut_jour + timezone.timedelta(days=i)).count()
+
+            'rendez_vous_semaine': RendezVous.objects.filter(date_creation__gte=debut_semaine).count(),
+            'rendez_vous_mois': RendezVous.objects.filter(date_creation__gte=debut_mois).count(),
+            'rendez_vous_aujour': RendezVous.objects.filter(date_creation__gte=debut_jour).count(),
+            'jours_semaine': jours_semaine,
+            'rendez_vous_jour': [
+                RendezVous.objects.filter(date_creation__date=debut_jour + timezone.timedelta(days=i)).count()
                 for i in range(7)
-            ]
+            ],
+            'notifications': Notification.objects.filter(user=request.user)[:5],
+            'rdvs_recents': RendezVous.objects.all().order_by('-date_creation')[:5]
         }
-
-    elif user.is_medecin():
-        try:
-            medecin = user.profil_medecin
-            data = {
-                'total_rdv': RendezVous.objects.filter(medecin=medecin).count(),
-                'en_attente': RendezVous.objects.filter(medecin=medecin, statut='programme').count(),
-                'du_jour': RendezVous.objects.filter(medecin=medecin, date_heure_rdv__date=now.date()).count()
-            }
-        except Medecin.DoesNotExist:
-            pass
-
-    elif user.is_patient():
-        try:
-            patient = user.profil_patient
-            data = {
-                'rdv_passes': RendezVous.objects.filter(patient=patient, date_heure_rdv__lt=now).count(),
-                'rdv_a_venir': RendezVous.objects.filter(patient=patient, date_heure_rdv__gte=now).count()
-            }
-        except Patient.DoesNotExist:
-            pass
-
     return JsonResponse(data)
 
 
@@ -345,61 +340,557 @@ def delete_rdv(request, rdv_id):
     return redirect('/rdv/rdvs')
 
 
-# Les vues pour le rapport
-
-
-@login_required(login_url='users:login')
-@permission_required('users.can_view_statistics', raise_exception=True)
-def statistiques_generales(request):
-    """Statistiques générales du système"""
+# Les vues pour l'historique des RDV
+@login_required
+def rdv_history_list(request):
+    """
+    Vue principale pour afficher l'historique des rendez-vous.
+    Gère les filtres par action, date, utilisateur et recherche.
+    Supporte les requêtes AJAX pour le chargement dynamique.
+    """
     
-    # Compter les utilisateurs par type
-    total_patients = Patient.objects.count()
-    total_medecins = Medecin.objects.count()
-    total_rdv = RendezVous.objects.count()
+    # Récupération de tous les historiques (avec optimisation des requêtes)
+    # select_related charge les relations en une seule requête SQL
+    history_list = RdvHistory.objects.select_related(
+        'rdv', 
+        'performed_by',
+        'rdv__patient',
+        'rdv__medecin'
+    ).all()
     
-    # RDV par statut
-    rdv_par_statut = dict(RendezVous.objects.values('statut').annotate(count=Count('id')))
+    # === FILTRES ===
     
-    # RDV du mois en cours
-    debut_mois = timezone.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    rdv_mois_courant = RendezVous.objects.filter(date_heure_rdv__gte=debut_mois).count()
+    # Filtre par type d'action (create, confirm, cancel, etc.)
+    action_filter = request.GET.get('action', 'all')
+    if action_filter and action_filter != 'all':
+        history_list = history_list.filter(action=action_filter)
     
-    # RDV d'aujourd'hui
-    aujourd_hui = timezone.now().date()
-    rdv_aujourd_hui = RendezVous.objects.filter(date_heure_rdv__date=aujourd_hui).count()
+    # Filtre par utilisateur (qui a effectué l'action)
+    user_filter = request.GET.get('user', '')
+    if user_filter:
+        history_list = history_list.filter(
+            Q(performed_by__nom__icontains=user_filter) | Q(performed_by__prenom__icontains=user_filter)
+        )
+    # Filtre par période de temps
+    date_from = request.GET.get('date_from', '')
+    date_to = request.GET.get('date_to', '')
     
-    # Notifications non lues
-    notifs_non_lues = Notification.objects.filter(is_read=False).count()
+    if date_from:
+        # Filtre les enregistrements à partir de cette date
+        history_list = history_list.filter(timestamp__gte=date_from)
     
-    # Messages bot du jour
-    messages_bot_jour = MessageBot.objects.filter(date_echange__date=aujourd_hui).count()
+    if date_to:
+        # Filtre les enregistrements jusqu'à cette date (inclus toute la journée)
+        from django.utils import timezone
+        import datetime
+        date_to_obj = datetime.datetime.strptime(date_to, '%Y-%m-%d')
+        date_to_end = timezone.make_aware(
+            datetime.datetime.combine(date_to_obj, datetime.time.max)
+        )
+        history_list = history_list.filter(timestamp__lte=date_to_end)
     
-    # Croissance des utilisateurs (7 derniers jours)
-    il_y_a_7_jours = timezone.now() - timedelta(days=7)
-    nouveaux_patients = Patient.objects.filter(user__date_joined__gte=il_y_a_7_jours).count()
-    nouveaux_medecins = Medecin.objects.filter(user__date_joined__gte=il_y_a_7_jours).count()
+    # Recherche globale dans la description
+    search_query = request.GET.get('search', '')
+    if search_query:
+        history_list = history_list.filter(
+            Q(description__icontains=search_query) |
+            Q(old_value__icontains=search_query) |
+            Q(new_value__icontains=search_query) |
+            Q(rdv__patient__user__nom__icontains=search_query) |
+            Q(rdv__patient__user__prenom__icontains=search_query)
+        )
     
-    stats = {
-        'totaux': {
-            'patients': total_patients,
-            'medecins': total_medecins,
-            'rdv_total': total_rdv,
-            'rdv_mois': rdv_mois_courant,
-            'rdv_aujourd_hui': rdv_aujourd_hui,
-            'notifs_non_lues': notifs_non_lues,
-            'messages_bot_jour': messages_bot_jour
-        },
-        'croissance': {
-            'nouveaux_patients': nouveaux_patients,
-            'nouveaux_medecins': nouveaux_medecins
-        },
-        'rdv_par_statut': rdv_par_statut
+    # Filtre par ID de RDV spécifique (utile pour voir l'historique d'un seul RDV)
+    rdv_id = request.GET.get('rdv_id', '')
+    if rdv_id:
+        history_list = history_list.filter(rdv_id=rdv_id)
+    
+    # === PAGINATION ===
+    # On affiche 20 éléments par page pour ne pas surcharger l'interface
+    paginator = Paginator(history_list, 20)
+    page_number = request.GET.get('page', 1)
+    history_page = paginator.get_page(page_number)
+    
+    # === STATISTIQUES ===
+    # Calcul du nombre d'actions par type pour afficher dans l'interface
+    action_stats = {}
+    all_history = RdvHistory.objects.all()  # Sans filtres pour les stats globales
+    for action_code, action_label in RdvHistory.ACTION_CHOICES:
+        action_stats[action_code] = all_history.filter(action=action_code).count()
+    
+    # Total des enregistrements après filtrage
+    total_count = history_list.count()
+    
+    # === CONTEXTE ===
+    context = {
+        'history_items': history_page,  # Les éléments de la page courante
+        'action_stats': action_stats,    # Statistiques par type d'action
+        'total_count': total_count,      # Nombre total après filtres
+        'current_filter': action_filter, # Filtre actif pour le surlignage dans l'UI
+        'current_user_filter': user_filter,
+        'current_search': search_query,
+        'current_date_from': date_from,
+        'current_date_to': date_to,
+        'current_rdv_id': rdv_id,
+        'action_choices': RdvHistory.ACTION_CHOICES,  # Pour générer les filtres
+        'page_obj': history_page,  # Pour la pagination
     }
     
-    return JsonResponse(stats, encoder=DjangoJSONEncoder)
+    # === RÉPONSE ===
+    # Si c'est une requête AJAX, on renvoie seulement le fragment HTML
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return render(request, 'rdv/admin/history/composants/history_contents.html', context)
+    
+    # Sinon, on renvoie la page complète avec le template de base
+    return render(request, 'rdv/admin/history/rdv_history.html', context)
 
 
+@login_required
+def rdv_detail_history(request, rdv_id):
+    """
+    Vue pour afficher l'historique complet d'un rendez-vous spécifique.
+    Utile pour voir toutes les modifications d'un RDV particulier.
+    """
+    try:
+        rdv = RendezVous.objects.get(id=rdv_id)
+    except RendezVous.DoesNotExist:
+        from django.http import HttpResponseNotFound
+        return HttpResponseNotFound("Rendez-vous non trouvé")
+    
+    # Récupère tout l'historique de ce RDV
+    history_list = RdvHistory.objects.filter(rdv=rdv).select_related(
+        'performed_by'
+    ).order_by('-timestamp')
+    
+    context = {
+        'rdv': rdv,
+        'history_items': history_list,
+        'total_count': history_list.count(),
+    }
+    
+    # Support AJAX pour charger dynamiquement
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return render(request, 'rdv/admin/history/composants/history_detail_contents.html', context)
+    
+    return render(request, 'rdv/admin/history/rdv_history_detail.html', context)
+
+
+# Les vues pour le rapport
+
+@login_required
+def dashboard_stats(request):
+    """Vue principale du dashboard (template page rapports)."""
+    try:
+        total_patients = Patient.objects.count()
+        total_medecins = Medecin.objects.count()
+        total_rdv = RendezVous.objects.count()
+        # utilise la date locale/aware
+        rdv_aujourd_hui = RendezVous.objects.filter(
+            date_heure_rdv__date=timezone.localdate()
+        ).count()
+
+        context = {
+            'total_patients': total_patients,
+            'total_medecins': total_medecins,
+            'total_rdv': total_rdv,
+            'rdv_aujourd_hui': rdv_aujourd_hui,
+        }
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return render(request, 'rdv/admin/rapport/composants/rapport_content.html', context)
+
+        # Vérifie que le template existe à ce chemin ; adapte si nécessaire
+        return render(request, 'rdv/admin/rapport/rapport.html', context)
+    except Exception as e:
+        logger.exception("Erreur dashboard_stats : %s", e)
+        # page d'erreur simplifiée (évite 500 brut)
+        return render(request, 'rdv/admin/rapport/rapport.html', {'error': 'Impossible de charger le dashboard.'})
+
+
+# ----------------------
+# API: Overview (général)
+# ----------------------
+@login_required
+def stats_api_overview(request):
+    """
+    Renvoie un JSON regroupant :
+    - overview (counts)
+    - rdv_statuts (counts par statut)
+    - nouveaux_patients (6 derniers mois, format [{'month': 'YYYY-MM', 'count': n}, ...])
+    - rdv_par_mois (6 derniers mois)
+    - top_medecins (liste avec total_rdv / rdv_confirmes / rdv_annules)
+    - specialites_stats (top spécialités par nombre de RDV)
+    """
+    try:
+        # Overview
+        total_patients = Patient.objects.count()
+        total_medecins = Medecin.objects.count()
+        total_rdv = RendezVous.objects.count()
+        rdv_aujourd_hui = RendezVous.objects.filter(date_heure_rdv__date=timezone.localdate()).count()
+
+        # RDV par statut
+        rdv_statuts_qs = RendezVous.objects.values('statut').annotate(count=Count('id')).order_by('statut')
+        rdv_statuts = list(rdv_statuts_qs)
+
+        # 6 derniers mois
+        six_months_ago = timezone.now() - timedelta(days=180)
+
+        # Nouveaux patients par mois (on utilise Utilisateur.role == 'patient')
+        nouveaux_patients_qs = (
+            Utilisateur.objects
+            .filter(role='patient', date_inscription__gte=six_months_ago)
+            .annotate(month=TruncMonth('date_inscription'))
+            .values('month')
+            .annotate(count=Count('id'))
+            .order_by('month')
+        )
+        nouveaux_patients = [
+            {'month': item['month'].strftime('%Y-%m'), 'count': item['count']} for item in nouveaux_patients_qs
+        ]
+
+        # RDV par mois (6 derniers mois)
+        rdv_par_mois_qs = (
+            RendezVous.objects
+            .filter(date_creation__gte=six_months_ago)
+            .annotate(month=TruncMonth('date_creation'))
+            .values('month')
+            .annotate(count=Count('id'))
+            .order_by('month')
+        )
+        rdv_par_mois = [
+            {'month': item['month'].strftime('%Y-%m'), 'count': item['count']} for item in rdv_par_mois_qs
+        ]
+
+        # Top médecins (total rdv, confirmés, annulés) — format compatible JS attendu
+        top_medecins_qs = (
+            Medecin.objects
+            .annotate(
+                total_rdv=Count('rendez_vous'),
+                rdv_confirmes=Count('rendez_vous', filter=Q(rendez_vous__statut='confirme')),
+                rdv_annules=Count('rendez_vous', filter=Q(rendez_vous__statut='annule'))
+            )
+            .values(
+                'user__nom',
+                'user__prenom',
+                'specialite',
+                'total_rdv',
+                'rdv_confirmes',
+                'rdv_annules'
+            )
+            .order_by('-total_rdv')[:10]
+        )
+        top_medecins = list(top_medecins_qs)
+
+        # Spécialités les plus demandées (depuis les RDV)
+        specialites_qs = (
+            RendezVous.objects
+            .values('medecin__specialite')
+            .annotate(count=Count('id'))
+            .order_by('-count')[:10]
+        )
+        specialites_stats = [{'specialite': s['medecin__specialite'], 'count': s['count']} for s in specialites_qs]
+
+        return JsonResponse({
+            'overview': {
+                'total_patients': total_patients,
+                'total_medecins': total_medecins,
+                'total_rdv': total_rdv,
+                'rdv_aujourd_hui': rdv_aujourd_hui
+            },
+            'rdv_statuts': rdv_statuts,
+            'nouveaux_patients': nouveaux_patients,
+            'rdv_par_mois': rdv_par_mois,
+            'top_medecins': top_medecins,
+            'specialites_stats': specialites_stats
+        })
+    except Exception as e:
+        logger.exception("Erreur stats_api_overview : %s", e)
+        return JsonResponse({'error': 'Erreur serveur lors de la construction de l\'overview.'}, status=500)
+
+
+# ----------------------
+# API: RDV (timeline / annulation / par statut)
+# ----------------------
+@login_required
+def stats_api_rdv(request):
+    """
+    Paramètre GET:
+      - periode: '7', '30', '90', '365' (jours) — default '30'
+    Retour:
+      - rdv_timeline: [{'period': 'YYYY-MM-DD', 'count': n}, ...]
+      - rdv_statuts_periode: [{'statut': 'confirme', 'count': n}, ...]
+      - annulation_stats: [{ 'medecin__user__nom': ..., 'medecin__user__prenom': ..., 'total_rdv':n, 'annules':m, 'taux_annulation':x }, ...]
+      - periode: valeur retournée (string)
+    """
+    try:
+        periode = request.GET.get('periode', '30')
+        now = timezone.now()
+
+        if periode == '7':
+            date_debut = now - timedelta(days=7)
+            truncate_func = TruncDay
+        elif periode == '30':
+            date_debut = now - timedelta(days=30)
+            truncate_func = TruncDay
+        elif periode == '90':
+            date_debut = now - timedelta(days=90)
+            truncate_func = TruncWeek
+        else:  # '365' ou autre
+            date_debut = now - timedelta(days=365)
+            truncate_func = TruncMonth
+
+        # Timeline
+        rdv_timeline_qs = (
+            RendezVous.objects
+            .filter(date_creation__gte=date_debut)
+            .annotate(period=truncate_func('date_creation'))
+            .values('period')
+            .annotate(count=Count('id'))
+            .order_by('period')
+        )
+
+        rdv_timeline = []
+        for item in rdv_timeline_qs:
+            period_val = item['period']
+            # period_val peut être datetime.date ou datetime
+            if hasattr(period_val, 'strftime'):
+                # Pour TruncMonth on veut YYYY-MM (ou YYYY-MM-01)
+                if truncate_func is TruncMonth:
+                    rdv_timeline.append({'period': period_val.strftime('%Y-%m'), 'count': item['count']})
+                else:
+                    rdv_timeline.append({'period': period_val.strftime('%Y-%m-%d'), 'count': item['count']})
+            else:
+                rdv_timeline.append({'period': str(period_val), 'count': item['count']})
+
+        # RDV par statut dans la période
+        rdv_statuts_periode_qs = (
+            RendezVous.objects
+            .filter(date_creation__gte=date_debut)
+            .values('statut')
+            .annotate(count=Count('id'))
+        )
+        rdv_statuts_periode = list(rdv_statuts_periode_qs)
+
+        # Annulation par médecin (top 10 par total rdv)
+        annulation_qs = (
+            RendezVous.objects
+            .filter(date_creation__gte=date_debut)
+            .values('medecin__user__nom', 'medecin__user__prenom')
+            .annotate(
+                total_rdv=Count('id'),
+                annules=Count('id', filter=Q(statut='annule'))
+            )
+            .order_by('-total_rdv')[:10]
+        )
+        annulation_stats = []
+        for item in annulation_qs:
+            total = item.get('total_rdv', 0) or 0
+            annules = item.get('annules', 0) or 0
+            taux = round((annules / total) * 100, 2) if total > 0 else 0
+            annulation_stats.append({
+                'medecin__user__nom': item.get('medecin__user__nom'),
+                'medecin__user__prenom': item.get('medecin__user__prenom'),
+                'total_rdv': total,
+                'annules': annules,
+                'taux_annulation': taux
+            })
+
+        return JsonResponse({
+            'rdv_timeline': rdv_timeline,
+            'rdv_statuts_periode': rdv_statuts_periode,
+            'annulation_stats': annulation_stats,
+            'periode': periode
+        })
+    except Exception as e:
+        logger.exception("Erreur stats_api_rdv : %s", e)
+        return JsonResponse({'error': 'Erreur serveur lors de la récupération des stats RDV.'}, status=500)
+
+
+# ----------------------
+# API: Patients
+# ----------------------
+@login_required
+def stats_api_patients(request):
+    """
+    Renvoie:
+      - patients_sexe: [{'sexe': 'M', 'count': n}, ...]
+      - ages_data: [{'age_group': '0-18', 'count': n}, ...]
+      - patients_actifs: [{'user__nom': ..., 'user__prenom': ..., 'nombre_rdv': n}, ...]
+      - inscriptions_evolution: [{'month': 'YYYY-MM', 'count': n}, ...]
+    """
+    try:
+        # Répartition par sexe
+        patients_sexe_qs = Patient.objects.values('sexe').annotate(count=Count('id'))
+        patients_sexe = list(patients_sexe_qs)
+
+        # Répartition par âge (calcul simple)
+        today = timezone.localdate()
+        ages_stats = {
+            '0-18': 0,
+            '19-30': 0,
+            '31-50': 0,
+            '51-70': 0,
+            '70+': 0
+        }
+
+        patients = Patient.objects.select_related('user').all()
+        for p in patients:
+            try:
+                dob = p.date_naissance
+                # age calcul robuste
+                age = today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+            except Exception:
+                age = 0
+            if age <= 18:
+                ages_stats['0-18'] += 1
+            elif age <= 30:
+                ages_stats['19-30'] += 1
+            elif age <= 50:
+                ages_stats['31-50'] += 1
+            elif age <= 70:
+                ages_stats['51-70'] += 1
+            else:
+                ages_stats['70+'] += 1
+
+        ages_data = [{'age_group': k, 'count': v} for k, v in ages_stats.items()]
+
+        # Patients les plus actifs (par nombre de RDV)
+        patients_actifs_qs = (
+            Patient.objects
+            .annotate(nombre_rdv=Count('rendez_vous'))
+            .filter(nombre_rdv__gt=0)
+            .values('user__nom', 'user__prenom', 'nombre_rdv')
+            .order_by('-nombre_rdv')[:10]
+        )
+        patients_actifs = list(patients_actifs_qs)
+
+        # Evolution inscriptions (6 derniers mois) -> Utilisateur.role == 'patient'
+        six_months_ago = timezone.now() - timedelta(days=180)
+        inscriptions_qs = (
+            Utilisateur.objects
+            .filter(role='patient', date_inscription__gte=six_months_ago)
+            .annotate(month=TruncMonth('date_inscription'))
+            .values('month')
+            .annotate(count=Count('id'))
+            .order_by('month')
+        )
+        inscriptions_evolution = [
+            {'month': item['month'].strftime('%Y-%m'), 'count': item['count']} for item in inscriptions_qs
+        ]
+
+        return JsonResponse({
+            'patients_sexe': patients_sexe,
+            'ages_data': ages_data,
+            'patients_actifs': patients_actifs,
+            'inscriptions_evolution': inscriptions_evolution
+        })
+    except Exception as e:
+        logger.exception("Erreur stats_api_patients : %s", e)
+        return JsonResponse({'error': 'Erreur serveur lors de la récupération des stats patients.'}, status=500)
+
+
+# ----------------------
+# API: Médecins
+# ----------------------
+@login_required
+def stats_api_medecins(request):
+    """
+    Renvoie:
+      - specialites_repartition
+      - medecins_performance (total_rdv, rdv_confirmes, rdv_annules + taux)
+      - medecins_sexe
+      - disponibilites_stats (nombre disponibilités actives)
+    """
+    try:
+        # Répartition par spécialité (médecins)
+        specialites_repartition_qs = Medecin.objects.values('specialite').annotate(count=Count('id')).order_by('-count')
+        specialites_repartition = list(specialites_repartition_qs)
+
+        # Performance des médecins
+        medecins_perf_qs = (
+            Medecin.objects
+            .annotate(
+                total_rdv=Count('rendez_vous'),
+                rdv_confirmes=Count('rendez_vous', filter=Q(rendez_vous__statut='confirme')),
+                rdv_annules=Count('rendez_vous', filter=Q(rendez_vous__statut='annule'))
+            )
+            .values(
+                'user__nom',
+                'user__prenom',
+                'specialite',
+                'total_rdv',
+                'rdv_confirmes',
+                'rdv_annules'
+            )
+            .order_by('-total_rdv')[:15]
+        )
+        medecins_performance = []
+        for m in medecins_perf_qs:
+            total = m.get('total_rdv', 0) or 0
+            confirms = m.get('rdv_confirmes', 0) or 0
+            annules = m.get('rdv_annules', 0) or 0
+            taux_confirmation = round((confirms / total) * 100, 2) if total > 0 else 0
+            taux_annulation = round((annules / total) * 100, 2) if total > 0 else 0
+            medecins_performance.append({
+                **m,
+                'taux_confirmation': taux_confirmation,
+                'taux_annulation': taux_annulation
+            })
+
+        # Médecins par sexe
+        medecins_sexe_qs = Medecin.objects.values('sexe').annotate(count=Count('id'))
+        medecins_sexe = list(medecins_sexe_qs)
+
+        # Disponibilités moyennes / nombre de disponibilités actives
+        disponibilites_qs = (
+            Medecin.objects
+            .annotate(nombre_disponibilites=Count('disponibilites', filter=Q(disponibilites__is_active=True)))
+            .values('user__nom', 'user__prenom', 'specialite', 'nombre_disponibilites')
+            .order_by('-nombre_disponibilites')[:10]
+        )
+        disponibilites_stats = list(disponibilites_qs)
+
+        return JsonResponse({
+            'specialites_repartition': specialites_repartition,
+            'medecins_performance': medecins_performance,
+            'medecins_sexe': medecins_sexe,
+            'disponibilites_stats': disponibilites_stats
+        })
+    except Exception as e:
+        logger.exception("Erreur stats_api_medecins : %s", e)
+        return JsonResponse({'error': 'Erreur serveur lors de la récupération des stats médecins.'}, status=500)
+
+
+# ----------------------
+# Export CSV simple (général)
+# ----------------------
+@login_required
+def export_stats(request):
+    """Génère un CSV téléchargeable des principales métriques."""
+    try:
+        response = HttpResponse(content_type='text/csv; charset=utf-8')
+        response['Content-Disposition'] = 'attachment; filename="statistiques.csv"'
+
+        writer = csv.writer(response)
+        writer.writerow(['Type', 'Métrique', 'Valeur', 'Date'])
+
+        # Général
+        today = timezone.localdate()
+        writer.writerow(['Général', 'Total Patients', Patient.objects.count(), today])
+        writer.writerow(['Général', 'Total Médecins', Medecin.objects.count(), today])
+        writer.writerow(['Général', 'Total RDV', RendezVous.objects.count(), today])
+
+        # RDV par statut
+        for s in RendezVous.objects.values('statut').annotate(count=Count('id')):
+            writer.writerow(['RDV par statut', s['statut'], s['count'], today])
+
+        # Spécialités (depuis rendez-vous)
+        for spec in RendezVous.objects.values('medecin__specialite').annotate(count=Count('id')).order_by('-count'):
+            writer.writerow(['Spécialités', spec['medecin__specialite'], spec['count'], today])
+
+        return response
+    except Exception as e:
+        logger.exception("Erreur export_stats : %s", e)
+        return HttpResponse("Erreur lors de l'export", status=500)
 
 
 """ 
@@ -436,7 +927,7 @@ def dashboard_medecin_view(request):
         'rendez_vous_aujour': RendezVous.objects.filter(date_creation__gte=debut_jour, medecin=med).count(),
 
          # Notifications récentes
-        'notifications': Notification.objects.filter(user=request.user).order_by('-date_envoi')[:5],
+        'notifications': Notification.objects.filter(user=request.user).order_by('-date_envoi')[:3],
     
         # RDV récents
         'rdvs_recents': RendezVous.objects.filter(medecin=med).order_by('-date_heure_rdv')[:5],
@@ -523,8 +1014,6 @@ try:
 except Exception:
     create_and_send_notification = None
 
-
-logger = logging.getLogger(__name__)
 
 @login_required
 @require_POST
@@ -645,6 +1134,7 @@ def reporter_rdv(request, rdv_id):
     except RendezVous.DoesNotExist:
         return JsonResponse({'success': False, 'error': 'Rendez-vous introuvable'}, status=404)
 
+    # --- Autorisations ---
     if initiator == 'medecin':
         if not hasattr(request.user, 'profil_medecin') or rdv.medecin != request.user.profil_medecin:
             return HttpResponseForbidden("Accès refusé")
@@ -654,7 +1144,7 @@ def reporter_rdv(request, rdv_id):
 
     # --- GET ---
     if request.method == 'GET':
-        form = ReporterRdvForm()  # <--- garder ce form uniquement pour l'affichage
+        form = ReporterRdvForm()
         return render(
             request,
             'rdv/doctor/composants/rdvs/rdv_report_form.html',
@@ -662,7 +1152,6 @@ def reporter_rdv(request, rdv_id):
         )
 
     # --- POST ---
-    data = {}
     if request.content_type and request.content_type.startswith('application/json'):
         try:
             data = json.loads(request.body.decode('utf-8') or "{}")
@@ -678,6 +1167,7 @@ def reporter_rdv(request, rdv_id):
     if not date_val or not time_val:
         return JsonResponse({'success': False, 'error': 'Date et heure requises'}, status=400)
 
+    # Conversion date + heure en datetime
     try:
         naive_dt = datetime.fromisoformat(f"{date_val}T{time_val}")
     except Exception:
@@ -692,11 +1182,47 @@ def reporter_rdv(request, rdv_id):
     if new_dt <= timezone.now():
         return JsonResponse({'success': False, 'error': 'La nouvelle date doit être dans le futur'}, status=400)
 
-    # Vérification de conflit
+    # Durée du RDV
     duration = getattr(rdv, 'duree_minutes', 30) or 30
     new_start = new_dt
     new_end = new_dt + timedelta(minutes=duration)
 
+    # --- Vérification disponibilité du médecin ---
+    weekday_map = {
+        0: "mon", 1: "tue", 2: "wed", 3: "thu",
+        4: "fri", 5: "sat", 6: "sun"
+    }
+    jour_code = weekday_map[new_start.weekday()]
+
+    # Vérifier d'abord s’il existe une **exception spécifique inactive** (blocage ponctuel)
+    exception_negative = Disponibilite.objects.filter(
+        medecin=rdv.medecin,
+        date_specific=new_start.date(),
+        is_active=False
+    ).exists()
+
+    if exception_negative:
+        return JsonResponse({'success': False, 'error': "Le médecin n'est pas disponible ce jour-là (exception)."}, status=400)
+
+    # Chercher les dispos valides (spécifiques ou récurrentes)
+    disponibilites = Disponibilite.objects.filter(
+        medecin=rdv.medecin,
+        is_active=True
+    ).filter(
+        Q(date_specific=new_start.date()) |
+        Q(date_specific__isnull=True, jour=jour_code)
+    )
+
+    dispo_match = False
+    for dispo in disponibilites:
+        if dispo.heure_debut <= new_start.time() and dispo.heure_fin >= new_end.time():
+            dispo_match = True
+            break
+
+    if not dispo_match:
+        return JsonResponse({'success': False, 'error': 'Le médecin n\'est pas disponible à ce créneau.'}, status=400)
+
+    # --- Vérification chevauchements RDV ---
     window_start = new_start - timedelta(days=1)
     window_end = new_end + timedelta(days=1)
     candidates = RendezVous.objects.filter(
@@ -712,6 +1238,7 @@ def reporter_rdv(request, rdv_id):
         if other_start < new_end and other_end > new_start:
             return JsonResponse({'success': False, 'error': 'Conflit avec un autre rendez-vous.'}, status=400)
 
+    # --- Application du report ---
     try:
         with transaction.atomic():
             rdv = RendezVous.objects.select_for_update().get(id=rdv_id)
@@ -723,7 +1250,7 @@ def reporter_rdv(request, rdv_id):
             rdv.report(new_dt, raison=raison, initiator=initiator, by_user=request.user)
 
             RdvHistory.objects.create(
-                rdv=rdv,  
+                rdv=rdv,
                 action="reporte",
                 performed_by=request.user,
                 description=f"Rendez-vous déplacé au {new_dt} (raison: {raison})"
@@ -735,7 +1262,6 @@ def reporter_rdv(request, rdv_id):
         logger.exception("Erreur reporter_rdv %s: %s", rdv_id, e)
         return JsonResponse({'success': False, 'error': 'Erreur serveur'}, status=500)
 
-
     return JsonResponse({
         'success': True,
         'statut': rdv.statut,
@@ -744,6 +1270,7 @@ def reporter_rdv(request, rdv_id):
         'nouvelle_date_iso': rdv.date_heure_rdv.isoformat(),
         'report_initiator': rdv.report_initiator
     })
+
 
 
 
@@ -795,72 +1322,269 @@ def notifier_rdv(request, rdv_id):
     return JsonResponse({'success': True})
 
 
-@login_required(login_url='users:login')
+# vues pour la gestion des disponibilités du médecin
+JOURS_SEMAINE = {
+    'monday': 'Lundi',
+    'tuesday': 'Mardi', 
+    'wednesday': 'Mercredi',
+    'thursday': 'Jeudi',
+    'friday': 'Vendredi',
+    'saturday': 'Samedi',
+    'sunday': 'Dimanche'
+}
+
+# Mapping pour les choix du modèle Django (supposé)
+JOURS_MAPPING = {
+    'monday': 'mon',
+    'tuesday': 'tue',
+    'wednesday': 'wed',
+    'thursday': 'thu',
+    'friday': 'fri',
+    'saturday': 'sat',
+    'sunday': 'sun',
+}
+@login_required
 def disponibilites_list(request):
-    # 1. Sécurité
-    try:
-        medecin = request.user.profil_medecin
-    except Medecin.DoesNotExist:
-        return HttpResponseForbidden()
+    """Vue principale avec gestion des onglets"""
+    type_filter = request.GET.get('type', '')
+    jour_filter = request.GET.get('jour', '')
+    date_filter = request.GET.get('date', '')
+    page_num = request.GET.get('page', 1)
 
-    # 2. Base queryset
-    qs = Disponibilite.objects.filter(medecin=medecin)
+    medecin = get_object_or_404(Medecin, user=request.user)
 
-    # 3. Récupère filtres depuis GET
-    type_filter = request.GET.get('type', '').strip()        # '', 'ponctuel', 'hebdomadaire'
-    jour_filter = request.GET.get('jour', '').strip()        # ex: 'mon','tue',...
-    date_filter = request.GET.get('date', '').strip()        # format attendu: 'YYYY-MM-DD'
-
-    # 4. Applique les filtres côté serveur
-    # Si type demandé
-    if type_filter == 'ponctuel':
-        qs = qs.filter(date_specific__isnull=False)
-        if date_filter:
-            qs = qs.filter(date_specific=date_filter)
-    elif type_filter == 'hebdomadaire':
-        qs = qs.filter(date_specific__isnull=True)
-        if jour_filter:
-            qs = qs.filter(jour=jour_filter)
-    else:
-        # pas de type forcé : appliquer jour/date si fournis
-        if date_filter:
-            qs = qs.filter(date_specific=date_filter)
-        if jour_filter:
-            qs = qs.filter(jour=jour_filter, date_specific__isnull=True)
-
-    # 5. Tri
-    qs = qs.order_by('date_specific', 'jour', 'heure_debut')
-
-    # 6. Pagination
-    page_obj = Paginator(qs, 25).get_page(request.GET.get('page'))
-
-    # 7. JSON polling (respecte les mêmes filtres car 'qs' est filtré)
-    if request.GET.get('json') == '1':
-        last_count = int(request.GET.get('last_count', '0') or 0)
-        current = qs.count()
-        if last_count == current:
-            return JsonResponse({'changed': False})
-        data = [{
-            'id': d.id,
-            'jour': d.jour or (d.date_specific.isoformat() if d.date_specific else ''),
-            'heure_debut': d.heure_debut.strftime('%H:%M'),
-            'heure_fin': d.heure_fin.strftime('%H:%M'),
-        } for d in qs]
-        return JsonResponse({'changed': True, 'last_count': current, 'disponibilites': data})
-
-    # 8. Fragment table-only ?
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest' and request.GET.get('table-only'):
-        return render(request, 'rdv/doctor/composants/dispo/dispo_table.html', {
-            'page_obj': page_obj,
-        })
-
-    # 9. Page complète : passe aussi les valeurs de filtres pour utiliser dans le template (pagination links)
-    return render(request, 'rdv/doctor/disponibilites.html', {
+    # Créneaux hebdomadaires groupés par jour
+    weekly_slots = {}
+    if not type_filter or type_filter == 'hebdomadaire':
+        hebdo_dispos = medecin.disponibilites.filter(
+            date_specific__isnull=True
+        ).order_by('jour', 'heure_debut')
+        
+        # Grouper par jour (conversion mapping si nécessaire)
+        for dispo in hebdo_dispos:
+            # Si votre modèle utilise 'mon', 'tue', etc., convertir vers 'monday', etc.
+            jour_key = None
+            for eng_day, fr_day in JOURS_MAPPING.items():
+                if dispo.jour == fr_day:  # 'mon' -> 'monday'
+                    jour_key = eng_day
+                    break
+            
+            if jour_key:
+                if jour_key not in weekly_slots:
+                    weekly_slots[jour_key] = []
+                weekly_slots[jour_key].append(dispo)
+    
+    # Créneaux ponctuels avec filtrage
+    ponctuel_query = medecin.disponibilites.filter(date_specific__isnull=False)
+    
+    if jour_filter:
+        # Filtrer les ponctuels par jour de semaine si nécessaire
+        pass  # Implémentation selon vos besoins
+    
+    if date_filter:
+        ponctuel_query = ponctuel_query.filter(date_specific=date_filter)
+    
+    ponctuel_dispos = ponctuel_query.order_by('date_specific', 'heure_debut')
+    
+    # Pagination pour ponctuels
+    paginator = Paginator(ponctuel_dispos, 10)
+    page_obj = paginator.get_page(page_num)
+    
+    # AJAX pour table-only
+    if request.GET.get('table-only') == '1':
+        if type_filter == 'hebdomadaire':
+            return render(request, 'rdv/doctor/composants/dispo/weekly_calendar.html', {
+                'weekly_slots': weekly_slots,
+                'days': JOURS_SEMAINE
+            })
+        else:
+            return render(request, 'rdv/doctor/composants/dispo/dispo_table.html', {
+                'page_obj': page_obj
+            })
+    
+    context = {
+        'weekly_slots': weekly_slots,
+        'ponctuel_dispos': ponctuel_dispos,
         'page_obj': page_obj,
+        'days': JOURS_SEMAINE,
         'type_filter': type_filter,
         'jour_filter': jour_filter,
         'date_filter': date_filter,
+    }
+    return render(request, 'rdv/doctor/disponibilites.html', context)
+
+
+
+@login_required
+@require_http_methods(["POST"])
+def toggle_dispo_status(request, dispo_id):
+    """Toggle l'état actif/inactif d'une disponibilité"""
+    try:
+        # CORRECTION : Récupérer via le médecin, pas directement via user
+        medecin = get_object_or_404(Medecin, user=request.user)
+        dispo = get_object_or_404(medecin.disponibilites, id=dispo_id)
+        
+        # Lire les données JSON
+        data = json.loads(request.body)
+        new_status = data.get('is_active')
+        
+        if new_status is not None:
+            dispo.is_active = new_status
+        else:
+            # Fallback : toggle automatique
+            dispo.is_active = not dispo.is_active
+            
+        dispo.save()
+        
+        return JsonResponse({
+            'success': True,
+            'is_active': dispo.is_active,
+            'message': f"Créneau {'activé' if dispo.is_active else 'désactivé'}"
+        })
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'error': 'Données JSON invalides'
+        }, status=400)
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'error': str(e)
+        }, status=400)
+
+@login_required
+def weekly_calendar_view(request):
+    """Vue pour le fragment calendrier hebdomadaire"""
+    medecin = get_object_or_404(Medecin, user=request.user)
+    
+    weekly_slots = {}
+    hebdo_dispos = medecin.disponibilites.filter(
+        date_specific__isnull=True
+    ).order_by('jour', 'heure_debut')
+    
+    for dispo in hebdo_dispos:
+        jour_key = None
+        for eng_day, fr_day in JOURS_MAPPING.items():
+            if dispo.jour == fr_day:
+                jour_key = eng_day
+                break
+        
+        if jour_key:
+            if jour_key not in weekly_slots:
+                weekly_slots[jour_key] = []
+            weekly_slots[jour_key].append(dispo)
+    
+    return render(request, 'rdv/doctor/composants/dispo/weekly_calendar.html', {
+        'weekly_slots': weekly_slots,
+        'days': JOURS_SEMAINE
     })
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def disponibilite_hebdo_add(request, day_key):
+    medecin = get_object_or_404(Medecin, user=request.user)
+    
+    
+    if day_key not in JOURS_MAPPING:
+        if _is_ajax(request):
+            return JsonResponse({'status': 'error', 'errors': {'__all__': ['Jour invalide']}}, status=400)
+        return redirect('rdv:disponibilites_list')
+
+    jour_model = JOURS_MAPPING[day_key]
+
+    if request.method == 'GET':
+        # Créer le formulaire avec le jour pré-sélectionné
+        form = DisponibiliteHebdoCreateForm(medecin=medecin)
+        form.initial['jour'] = jour_model
+        
+        return render(request, 'rdv/doctor/composants/dispo/dispo_hebdo_add.html', {
+            'form': form,
+            'day_key': day_key,
+            'day_name': JOURS_SEMAINE.get(day_key, day_key.title()),
+        })
+    
+    # POST - Créer une copie des données POST et forcer le jour
+    post_data = request.POST.copy()
+    post_data['jour'] = jour_model
+    
+    form = DisponibiliteHebdoCreateForm(post_data, medecin=medecin)
+    
+    if form.is_valid():
+        try:
+            with transaction.atomic():
+                dispo = form.save(commit=False)
+                dispo.medecin = medecin
+                dispo.jour = jour_model  # Double assurance
+                dispo.date_specific = None
+                dispo.full_clean()
+                dispo.save()
+                
+            if _is_ajax(request):
+                return JsonResponse({'status': 'ok', 'id': dispo.id})
+            return redirect('rdv:disponibilites_list')
+            
+        except Exception as e:
+            if _is_ajax(request):
+                return JsonResponse({'status': 'error', 'errors': {'__all__': [str(e)]}}, status=400)
+            form.add_error(None, str(e))
+    
+    # En cas d'erreur
+    if _is_ajax(request):
+        return JsonResponse({'status': 'error', 'errors': errors_to_dict(form.errors)}, status=400)
+    
+    return render(request, 'rdv/doctor/composants/dispo/dispo_hebdo_add.html', {
+        'form': form,
+        'day_key': day_key,
+        'day_name': JOURS_SEMAINE.get(day_key, day_key.title()),
+    })
+
+
+
+@login_required(login_url='users:login')
+@require_http_methods(["GET", "POST"])
+def disponibilite_hebdo_edit(request, pk):
+    medecin = get_object_or_404(Medecin, user=request.user)
+    dispo = get_object_or_404(Disponibilite, pk=pk, medecin=medecin)
+
+    if request.method == "GET":
+        form = DisponibiliteHebdoEditForm(instance=dispo)
+        return render(request, 'rdv/doctor/composants/dispo/dispo_hebdo_edit_form.html', {
+            'form': form,
+            'disponibilite': dispo
+        })
+
+    # POST
+    form = DisponibiliteHebdoEditForm(request.POST, instance=dispo)
+    if form.is_valid():
+        form.save()
+        if _is_ajax(request):
+            return JsonResponse({'status': 'ok', 'id': dispo.id})
+        return redirect('rdv:disponibilites_list')
+
+    # erreurs
+    if _is_ajax(request):
+        return JsonResponse({'status': 'error', 'errors': errors_to_dict(form.errors)}, status=400)
+    return render(request, 'rdv/doctor/composants/dispo/dispo_hebdo_edit_form.html', {
+        'form': form,
+        'disponibilite': dispo
+    })
+
+
+@login_required
+@require_http_methods(["POST"])  
+def disponibilite_hebdo_delete(request, dispo_id):
+    """Supprimer un créneau hebdomadaire"""
+    medecin = get_object_or_404(Medecin, user=request.user)
+    try:
+        dispo = get_object_or_404(
+            medecin.disponibilites.filter(date_specific__isnull=True), 
+            id=dispo_id
+        )
+        dispo.delete()
+        return JsonResponse({'success': True, 'message': 'Créneau supprimé'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=400)
 
 
 def _is_ajax(request):
@@ -887,7 +1611,7 @@ def errors_to_dict(errors):
 
 @login_required(login_url='users:login')
 @require_http_methods(["GET", "POST"])
-def disponibilite_add(request):
+def disponibilite_specifique_add(request):
     """
     GET (AJAX)  -> fragment HTML du formulaire (modal)
     POST (AJAX) -> renvoie JSON (status ok / erreurs)
@@ -899,16 +1623,16 @@ def disponibilite_add(request):
     base_instance = Disponibilite(medecin=medecin)
 
     if request.method == 'GET':
-        form = DisponibiliteCreateForm(instance=base_instance, medecin=medecin)
-        return render(request, 'rdv/doctor/composants/dispo/dispo_add_form.html', {'form': form})
+        form = DisponibiliteSpecifiqueCreateForm(instance=base_instance, medecin=medecin)
+        return render(request, 'rdv/doctor/composants/dispo/dispo_specifique_add.html', {'form': form})
 
     # POST
-    form = DisponibiliteCreateForm(request.POST, instance=base_instance, medecin=medecin)
+    form = DisponibiliteSpecifiqueCreateForm(request.POST, instance=base_instance, medecin=medecin)
     if not form.is_valid():
         if _is_ajax(request):
             return JsonResponse({'status': 'error', 'errors': errors_to_dict(form.errors)}, status=400)
         # fallback: render fragment with errors (rare if you don't use page)
-        return render(request, 'rdv/doctor/composants/dispo/dispo_add_form.html', {'form': form})
+        return render(request, 'rdv/doctor/composants/dispo/dispo_specifique_add.html', {'form': form})
 
     dispo = form.save(commit=False)
     dispo.medecin = medecin
@@ -927,20 +1651,20 @@ def disponibilite_add(request):
             else:
                 for m in msgs:
                     form.add_error(f, m)
-        return render(request, 'rdv/doctor/composants/dispo/dispo_add_form.html', {'form': form})
+        return render(request, 'rdv/doctor/composants/dispo/dispo_specifique_add.html', {'form': form})
     except IntegrityError:
-        msg = "Un créneau identique existe déjà pour ce médecin (même jour/date et mêmes heures)."
+        msg = "Un créneau identique existe déjà pour ce médecin (même date et mêmes heures)."
         if _is_ajax(request):
             return JsonResponse({'status': 'error', 'errors': {'__all__': [msg]}}, status=409)
         form.add_error(None, msg)
-        return render(request, 'rdv/doctor/composants/dispo/dispo_add_form.html', {'form': form})
+        return render(request, 'rdv/doctor/composants/dispo/dispo_specifique_add.html', {'form': form})
     except Exception as e:
         # logger.exception(e)  # si tu as un logger
         msg = "Erreur serveur lors de l'enregistrement."
         if _is_ajax(request):
             return JsonResponse({'status': 'error', 'errors': {'__all__': [msg]}}, status=500)
         form.add_error(None, msg)
-        return render(request, 'rdv/doctor/composants/dispo/dispo_add_form.html', {'form': form})
+        return render(request, 'rdv/doctor/composants/dispo/dispo_specifique_add.html', {'form': form})
 
     # succès
     if _is_ajax(request):
@@ -950,20 +1674,20 @@ def disponibilite_add(request):
 
 @login_required(login_url='users:login')
 @require_http_methods(["GET", "POST"])
-def disponibilite_edit(request, pk):
+def disponibilite_specifique_edit(request, pk):
     medecin = get_object_or_404(Medecin, user=request.user)
     dispo = get_object_or_404(Disponibilite, pk=pk, medecin=medecin)
 
     if request.method == 'GET':
-        form = DisponibiliteEditForm(instance=dispo, medecin=medecin)
-        return render(request, 'rdv/doctor/composants/dispo/dispo_edit_form.html', {'form': form, 'disponibilite': dispo})
+        form = DisponibiliteSpecifiqueEditForm(instance=dispo, medecin=medecin)
+        return render(request, 'rdv/doctor/composants/dispo/dispo_specifique_edit.html', {'form': form, 'disponibilite': dispo})
 
     # POST
-    form = DisponibiliteEditForm(request.POST, instance=dispo, medecin=medecin)
+    form = DisponibiliteSpecifiqueEditForm(request.POST, instance=dispo, medecin=medecin)
     if not form.is_valid():
         if _is_ajax(request):
             return JsonResponse({'status': 'error', 'errors': errors_to_dict(form.errors)}, status=400)
-        return render(request, 'rdv/doctor/composants/dispo/dispo_edit_form.html', {'form': form, 'disponibilite': dispo})
+        return render(request, 'rdv/doctor/composants/dispo/dispo_specifique_edit.html', {'form': form, 'disponibilite': dispo})
 
     try:
         with transaction.atomic():
@@ -981,20 +1705,20 @@ def disponibilite_edit(request, pk):
             else:
                 for m in msgs:
                     form.add_error(f, m)
-        return render(request, 'rdv/doctor/composants/dispo/dispo_edit_form.html', {'form': form, 'disponibilite': dispo})
+        return render(request, 'rdv/doctor/composants/dispo/dispo_specifique_edit.html', {'form': form, 'disponibilite': dispo})
     except IntegrityError:
-        msg = "Un créneau identique existe déjà pour ce médecin (même jour/date et mêmes heures)."
+        msg = "Un créneau identique existe déjà pour ce médecin (même date et mêmes heures)."
         if _is_ajax(request):
             return JsonResponse({'status': 'error', 'errors': {'__all__': [msg]}}, status=409)
         form.add_error(None, msg)
-        return render(request, 'rdv/doctor/composants/dispo/dispo_edit_form.html', {'form': form, 'disponibilite': dispo})
+        return render(request, 'rdv/doctor/composants/dispo/dispo_specifique_edit.html', {'form': form, 'disponibilite': dispo})
     except Exception as e:
         # logger.exception(e)
         msg = "Erreur serveur lors de la mise à jour."
         if _is_ajax(request):
             return JsonResponse({'status': 'error', 'errors': {'__all__': [msg]}}, status=500)
         form.add_error(None, msg)
-        return render(request, 'rdv/doctor/composants/dispo/dispo_edit_form.html', {'form': form, 'disponibilite': dispo})
+        return render(request, 'rdv/doctor/composants/dispo/dispo_specifique_edit.html', {'form': form, 'disponibilite': dispo})
 
     # succès
     if _is_ajax(request):
@@ -1003,7 +1727,7 @@ def disponibilite_edit(request, pk):
 
 @login_required(login_url='users:login')
 @require_POST
-def disponibilite_delete(request, pk):
+def disponibilite_specifique_delete(request, pk):
     medecin = get_object_or_404(Medecin, user=request.user)
     disponibilite = get_object_or_404(Disponibilite, pk=pk, medecin=medecin)
     disponibilite.delete()
@@ -1036,6 +1760,7 @@ def dashboard_patient_view(request):
 
     context = {
         # Statistiques générales
+        'patient': patient,
         'total_rdv': RendezVous.objects.filter(patient=patient).count(),
         'rdv_a_venir': RendezVous.objects.filter(patient=patient, date_heure_rdv__gte=now).count(),
         'rdv_passes': RendezVous.objects.filter(patient=patient, date_heure_rdv__lt=now).count(),
@@ -1052,7 +1777,7 @@ def dashboard_patient_view(request):
         'rdv_aujour': RendezVous.objects.filter(patient=patient, date_creation__date=now.date()).count(),
 
         # Notifications récentes
-        'notifications': Notification.objects.filter(user=request.user).order_by('-date_envoi')[:5],
+        'notifications': Notification.objects.filter(user=request.user).order_by('-date_envoi')[:3],
 
         # RDV récents
         'rdvs_recents': RendezVous.objects.filter(patient=patient).order_by('-date_heure_rdv')[:5],
@@ -1216,74 +1941,113 @@ def api_search_medecins(request):
     
     return JsonResponse({'medecins': data})
 
+
 @login_required
 def api_creneaux_medecin(request, medecin_id):
-    """API créneaux disponibles d'un médecin"""
+    """API créneaux disponibles d'un médecin (robuste)"""
     medecin = get_object_or_404(Medecin, id=medecin_id)
-    date_debut = request.GET.get('date_debut')
-    date_fin = request.GET.get('date_fin')
-    
-    if not date_debut:
-        date_debut = timezone.now()
-    else:
-        date_debut = datetime.fromisoformat(date_debut)
-    
-    if not date_fin:
-        date_fin = date_debut + timedelta(days=30)
-    else:
-        date_fin = datetime.fromisoformat(date_fin)
-    
-    # Récupérer disponibilités
+    tz = timezone.get_current_timezone()
+
+    # Dates de début et fin
+    date_debut_str = request.GET.get('date_debut')
+    date_fin_str = request.GET.get('date_fin')
+
+    try:
+        date_debut = datetime.fromisoformat(date_debut_str) if date_debut_str else timezone.now()
+        date_fin = datetime.fromisoformat(date_fin_str) if date_fin_str else date_debut + timedelta(days=30)
+    except Exception:
+        return JsonResponse({'success': False, 'error': 'Format date invalide'}, status=400)
+
+    # Convertir en aware datetime
+    if timezone.is_naive(date_debut):
+        date_debut = timezone.make_aware(date_debut, tz)
+    if timezone.is_naive(date_fin):
+        date_fin = timezone.make_aware(date_fin, tz)
+
     creneaux = []
     current = date_debut.date()
-    
-    while current <= date_fin.date():
-        # Disponibilités hebdomadaires
-        jour_semaine = ['mon','tue','wed','thu','fri','sat','sun'][current.weekday()]
-        dispos_jour = Disponibilite.objects.filter(
-            medecin=medecin,
-            jour=jour_semaine,
-            is_active=True,
-            date_specific__isnull=True
-        )
-        
-        # Disponibilités spécifiques
+    end_date = date_fin.date()
+
+    while current <= end_date:
+        # --- Vérifier exceptions spécifiques ---
         dispos_spec = Disponibilite.objects.filter(
             medecin=medecin,
             date_specific=current,
             is_active=True
         )
-        
-        for dispo in list(dispos_jour) + list(dispos_spec):
-            # Générer créneaux de 30 min
-            heure = dispo.heure_debut
-            while heure < dispo.heure_fin:
-                dt = timezone.make_aware(
-                    datetime.combine(current, heure)
-                )
-                
-                # Vérifier si créneau libre
-                if not RendezVous.objects.filter(
-                    medecin=medecin,
-                    date_heure_rdv=dt,
-                    statut__in=['programme', 'confirme', 'en_cours']
-                ).exists():
-                    creneaux.append({
-                        'datetime': dt.isoformat(),
-                        'date': current.isoformat(),
-                        'heure': heure.strftime('%H:%M'),
-                        'disponible': True
-                    })
-                
-                # Incrémenter de 30 min
-                heure = (datetime.combine(current, heure) + timedelta(minutes=30)).time()
-        
+
+        # Vérifier si une exception négative existe (date_specific inactive)
+        has_negative_exception = Disponibilite.objects.filter(
+            medecin=medecin,
+            date_specific=current,
+            is_active=False
+        ).exists()
+
+        creneaux_jour = []
+
+        if dispos_spec.exists():
+            # Utiliser uniquement les disponibilités spécifiques actives
+            for dispo in dispos_spec:
+                heure = dispo.heure_debut
+                while heure < dispo.heure_fin:
+                    new_start = timezone.make_aware(datetime.combine(current, heure), tz)
+                    new_end = new_start + timedelta(minutes=30)
+                    
+                    # Vérifier si créneau libre
+                    conflict = RendezVous.objects.filter(
+                        medecin=medecin,
+                        date_heure_rdv__lt=new_end,
+                        date_heure_rdv__gte=new_start,
+                        statut__in=['programme', 'confirme', 'en_cours']
+                    ).exists()
+                    if not conflict:
+                        creneaux_jour.append({
+                            'datetime': new_start.isoformat(),
+                            'date': current.isoformat(),
+                            'heure': heure.strftime('%H:%M'),
+                            'disponible': True
+                        })
+                    heure = (datetime.combine(current, heure) + timedelta(minutes=30)).time()
+
+        elif not has_negative_exception:
+            # Aucune disponibilité spécifique → utiliser les disponibilités récurrentes
+            jour_semaine = ['mon','tue','wed','thu','fri','sat','sun'][current.weekday()]
+            dispos_jour = Disponibilite.objects.filter(
+                medecin=medecin,
+                jour=jour_semaine,
+                is_active=True,
+                date_specific__isnull=True
+            )
+            for dispo in dispos_jour:
+                heure = dispo.heure_debut
+                while heure < dispo.heure_fin:
+                    new_start = timezone.make_aware(datetime.combine(current, heure), tz)
+                    new_end = new_start + timedelta(minutes=30)
+
+                    conflict = RendezVous.objects.filter(
+                        medecin=medecin,
+                        date_heure_rdv__lt=new_end,
+                        date_heure_rdv__gte=new_start,
+                        statut__in=['programme', 'confirme', 'en_cours']
+                    ).exists()
+                    if not conflict:
+                        creneaux_jour.append({
+                            'datetime': new_start.isoformat(),
+                            'date': current.isoformat(),
+                            'heure': heure.strftime('%H:%M'),
+                            'disponible': True
+                        })
+                    heure = (datetime.combine(current, heure) + timedelta(minutes=30)).time()
+
+        # Ajouter les créneaux du jour
+        creneaux.extend(creneaux_jour)
         current += timedelta(days=1)
-    
+
     return JsonResponse({
         'medecin_id': medecin.id,
         'creneaux': creneaux
     })
+
 
 @login_required
 @require_POST
@@ -1314,15 +2078,6 @@ def api_reserver_rdv(request):
         motif=data.get('motif', ''),
         statut='programme',
         duree_minutes=30
-    )
-    
-    # Notification
-    from rdv.utils import create_and_send_notification
-    create_and_send_notification(
-        patient.user,
-        "Rendez-vous programmé",
-        f"Votre RDV avec Dr. {medecin.user.nom_complet()} le {dt.strftime('%d/%m/%Y à %H:%M')} est confirmé.",
-        rdv=rdv
     )
     
     return JsonResponse({

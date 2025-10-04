@@ -14,7 +14,7 @@
             <tr>
                 <td>{{ rdv.date_heure_rdv|date:"d/m/Y" }}</td>
                 <td>{{ rdv.date_heure_rdv|time:"H:i" }}</td>
-                <td>{{ rdv.medecin.user.nom }} {{ rdv.medecin.user.prenom }}</td>
+                <td>{{ rdv.medecin.user.nom_complet }}</td>
                 <td>
                     {% if rdv.motif %}
                     {{ rdv.motif }}
@@ -39,21 +39,7 @@
                         </button>
                     {% endif %}
 
-                    {# Bouton Annuler (médecin peut annuler sauf si déjà annulé/termine) #}
-                    {% if rdv.can_be_cancelled_by_medecin %}
-                        <button
-                        type="button"
-                        class="action-btn-cancel js-cancel-rdv"
-                        data-rdv-id="{{ rdv.id }}"
-                        data-statut="{{ rdv.statut }}"
-                        data-patient-name="{{ rdv.patient.user.nom }} {{ rdv.patient.user.prenom }}"
-                        data-date-label="{{ rdv.date_heure_rdv|date:'d/m/Y H:i' }}"
-                        title="Annuler le rendez-vous"
-                        aria-label="Annuler le rendez-vous">
-                        <i class='bx bx-undo' aria-hidden="true"></i>
-                        <span class="button">Annuler</span>
-                        </button>
-                    {% endif %}
+                    
                 </td>
             </tr>
             {% empty %}

@@ -12,15 +12,21 @@
         {% for user in page_obj.object_list %}
             <tr data-user-id="{{ user.id }}">
                 <td>
-                    <a href="{% url 'users:profil' user.id %}" class="btn-profil">{{ user.nom }} {{ user.prenom }}</a>
+                    <a href="{% url 'users:profil' user.id %}" class="btn-profil">{{ user.nom_complet }}</a>
                 </td>
                 <td>{{ user.email }}</td>
                 <td><span class="user-role">{{ user.role }}</span></td>
                 <td><span class="user-status">{% if user.is_actif %}<i class='bx bxs-check-circle' style='color:#2d7318' ></i>{% else %}<i class='bx bx-x' style='color:#af1014'></i>{% endif %}</span></td>
                 <td>
-                    <a href="{% url 'users:modifier_utilisateur' user.id %}" class="action-btn-edit">
-                        <i class='bx bxs-edit' style='color:#20a52d'  ></i>
-                    </a>
+                    <button 
+                        style="color: #47bb24;"
+                        class="edit-btn" 
+                        data-form-url="{% url 'users:edit_user' %}"
+                        data-target="#edit-user-modal"
+                        data-container="#edit-user-modal-form-container"
+                        >
+                        <i class='bx bx-edit'></i>
+                    </button>
                     <a 
                         href="#" 
                         class="action-btn-delete" 

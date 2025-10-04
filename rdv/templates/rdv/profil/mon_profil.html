@@ -77,7 +77,7 @@
         <div class="info-grid">
             <div class="info-item">
                 <span class="info-label">Nom complet</span>
-                <span class="info-value">{{ utilisateur.nom }} {{ utilisateur.prenom }}</span>
+                <span class="info-value">{{ utilisateur.prenom }} {{ utilisateur.nom }}</span>
             </div>
             <div class="info-item">
                 <span class="info-label">Email</span>
@@ -109,7 +109,8 @@
                     
                     <button class="edit-btn small"
                             data-target="#edit-password-modal"
-                            data-form-url="{% url 'users:edit_password' %}">
+                            data-form-url="{% url 'users:edit_password' %}"
+                            data-container="#edit-password-modal-form-container">
                     <i class='bx bx-edit'></i>
                     </button>
                 </span>
@@ -182,7 +183,7 @@
         <span class="section-icon">
             <i class='bx bxs-contact'></i>
         </span>
-        Informations professionnelles
+        Informations patient
         <button 
             class="edit-btn" 
             data-form-url="{% url 'users:edit_patient' %}"
@@ -190,7 +191,7 @@
             data-container="#edit-patient-modal-form-container">
             <i class='bx bx-edit'></i>
         </button>
-    </h2>
+        </h2>
         <div class="medical-info">
             <div class="info-grid">
                 <div class="info-item">

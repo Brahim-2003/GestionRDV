@@ -1,0 +1,71 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: gestionrdv_redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  db:
+    image: postgres:15-alpine
+    container_name: gestionrdv_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Zaka.BZB2003
+      POSTGRES_DB: gestion_rdv_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - '5432:5432'
+
+
+
+  web:
+    build: .
+    container_name: gestionrdv_web
+    command: gunicorn GestionRDV.wsgi:application --bind 0.0.0.0:8000 --workers 4
+    volumes:
+      - .:/app:rw
+    env_file: .env
+    ports:
+      - '8000:8000'
+    depends_on:
+      - redis
+      - db
+    restart: unless-stopped
+
+  worker:
+    build: .
+    container_name: gestionrdv_celery_worker
+    command: celery -A GestionRDV worker -l info --concurrency=2
+    volumes:
+      - .:/app:rw
+    env_file: .env
+    depends_on:
+      - redis
+      - db
+      - web
+    restart: unless-stopped
+
+  beat:
+    build: .
+    container_name: gestionrdv_celery_beat
+    command: celery -A GestionRDV beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    volumes:
+      - .:/app:rw
+    env_file: .env
+    depends_on:
+      - redis
+      - db
+      - web
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+

@@ -1,7 +1,7 @@
 
 # rdv/admin.py
 from django.contrib import admin
-from .models import Patient, Medecin, RendezVous, Disponibilite, Notification, MessageBot, RdvHistory
+from .models import Patient, Medecin, RendezVous, Disponibilite, Notification, RdvHistory
 
 @admin.register(Patient)
 class PatientAdmin(admin.ModelAdmin):
@@ -24,7 +24,7 @@ class MedecinAdmin(admin.ModelAdmin):
     
     fieldsets = (
         ('Informations générales', {
-            'fields': ['user', 'numero_order', 'sexe', 'specialite', 'tel']
+            'fields': ['user', 'numero_order', 'date_naissance', 'sexe', 'specialite', 'tel']
             }),
         ('Cabinet', {
             'fields': ['cabinet', 'adresse_cabinet']
@@ -65,11 +65,11 @@ class RendezVousAdmin(admin.ModelAdmin):
             'fields': ['patient', 'medecin', 'date_heure_rdv', 'duree_minutes']
         }),
         ('Détails', {
-            'fields': ['motif', 'statut', 'date_creation']
+            'fields': ['motif', 'statut', 'date_creation', 'report_initiator', 'raison_report', 'raison_annulation', 'date_modification']
         }),
     )
     
-    readonly_fields = ('date_creation', 'date_modification')
+    readonly_fields = ('date_creation', 'date_modification', 'raison_report', 'raison_annulation', 'report_initiator')
 
 @admin.register(Notification)
 class NotificationAdmin(admin.ModelAdmin):
@@ -93,17 +93,6 @@ class NotificationAdmin(admin.ModelAdmin):
         }),
     )
 
-
-@admin.register(MessageBot)
-class MessageBotAdmin(admin.ModelAdmin):
-    list_display = ('user', 'contenu', 'intention', 'reponse', 'date_echange')
-    search_fields = ['user__nom', 'user__prenom', 'contenu', 'intention']
-    list_filter = ['date_echange']
-    fieldsets = (
-        ('Conversation', {
-            'fields': ['user', 'contenu', 'intention', 'reponse']
-        }),
-    )
 
 @admin.register(RdvHistory)
 class RdvHistoryAdmin(admin.ModelAdmin):

@@ -1,0 +1,176 @@
+/* ================================
+   Layout principal du dashboard
+   ================================ */
+.dashboard-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr; /* 2 colonnes */
+  grid-template-areas:
+    "stats notifs"
+    "rdvs  rdvs"; /* rdvs prend toute la largeur */
+  gap: 2rem;
+  margin-top: 20px;
+}
+
+
+.notifs-recents {
+    border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    padding-left: 10px;
+    grid-area: notifs;
+}
+
+.rdv-recents {
+    border-radius: 4px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+    padding-left: 10px;
+    grid-area: rdvs;
+    margin-left: 10px;
+}
+
+
+
+
+h3 i, h3 span {
+    color: #007bff;
+}
+
+.btn-view-more {
+  display: inline-block;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  color: #007bff;
+  text-decoration: none;
+}
+
+.btn-view-more:hover {
+  color: #14385f;
+}
+
+
+
+
+/* ================================
+   Notifications récentes
+   ================================ */
+
+   .notif-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.notif-item {
+  border-bottom: 1px solid #eee;
+  padding: 0.8rem 0;
+}
+
+.notif-item.unread {
+  background: #f8faff;
+}
+
+.notif-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.notif-message {
+  margin: 0.3rem 0 0;
+  font-size: 0.85rem;
+  color: #555;
+}
+
+.notif-empty {
+  text-align: center;
+  padding: 1rem;
+  color: #888;
+}
+
+
+
+/* ================================
+   Rendez-vous récents
+   ================================ */
+.rdv-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.rdv-table th, .rdv-table td {
+  text-align: left;
+  padding: 0.8rem;
+  border-bottom: 1px solid #eee;
+  font-size: 0.9rem;
+}
+
+.rdv-table th {
+  background: #f5f7fa;
+  font-weight: 600;
+}
+
+.rdv-table .empty {
+  text-align: center;
+  color: #888;
+}
+
+
+/* Statuts des rendez-vous */
+.statut {
+  padding: 0.2rem 0.6rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  text-transform: capitalize;
+}
+
+.statut.confirme { background: #d4edda; color: #155724; }
+.statut.programme { background: #fff3cd; color: #856404; }
+.statut.annule   { background: #f8d7da; color: #721c24; }
+.statut.reporte  { background: #cce5ff; color: #004085; }
+.statut.termine  { background: #e2e3e5; color: #383d41; }
+
+/* ================================
+   Responsive design
+   ================================ */
+
+/* Tablettes (≤ 992px) */
+@media (max-width: 992px) {
+  .dashboard-content {
+    grid-template-columns: 1fr; /* une seule colonne */
+    grid-template-areas:
+      "stats"
+      "notifs"
+      "rdvs";
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr); /* 2 cartes par ligne */
+  }
+}
+
+/* Mobiles (≤ 600px) */
+@media (max-width: 600px) {
+  .stats-grid {
+    grid-template-columns: 1fr; /* 1 carte par ligne */
+  }
+
+  .card {
+    padding: 1rem;
+  }
+
+  .card h3 {
+    font-size: 1rem;
+  }
+
+  .notif-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .rdv-table th, .rdv-table td {
+    padding: 0.6rem;
+    font-size: 0.85rem;
+  }
+}

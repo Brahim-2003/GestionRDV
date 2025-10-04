@@ -14,7 +14,7 @@
             <tr>
                 <td>{{ rdv.date_heure_rdv|date:"d/m/Y" }}</td>
                 <td>{{ rdv.date_heure_rdv|time:"H:i" }}</td>
-                <td>{{ rdv.patient.user.nom }} {{ rdv.patient.user.prenom }}</td>
+                <td>{{ rdv.patient.user.nom_complet }}</td>
                 <td>
                     {% if rdv.motif %}
                     {{ rdv.motif }}

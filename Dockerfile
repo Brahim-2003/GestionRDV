@@ -28,11 +28,9 @@ COPY . .
 # Créer les dossiers nécessaires
 RUN mkdir -p logs staticfiles media
 
-# Collecte des fichiers statiques (sera exécuté au démarrage)
-RUN python manage.py collectstatic --noinput
-
 # Exposer le port
 EXPOSE 8000
 
 # Commande par défaut (sera surchargée par docker-compose)
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["gunicorn", "GestionRDV.wsgi:application", "--bind", "0.0.0.0:8000"]

@@ -57,13 +57,14 @@ def notify_medecin_new_rdv(self, rdv_id):
     Notifie le médecin d'un nouveau RDV.
     """
     try:
+        from django.utils import timezone  # ← AJOUTER
         rdv = RendezVous.objects.select_related('patient__user', 'medecin__user').get(id=rdv_id)
         
         create_and_send_notification(
             rdv.medecin.user,
             "Nouveau rendez-vous programmé",
             f"Un nouveau rendez-vous a été programmé avec {rdv.patient.user.nom_complet()} "
-            f"le {rdv.date_heure_rdv.strftime('%d/%m/%Y à %H:%M')}.\n"
+            f"le {timezone.localtime(rdv.date_heure_rdv).strftime('%d/%m/%Y à %H:%M')}.\n"  # ← CHANGER ICI
             f"Motif : {rdv.motif or 'Non précisé'}",
             notif_type='info',
             category='appointment',
@@ -78,6 +79,7 @@ def notify_medecin_new_rdv(self, rdv_id):
     except Exception as e:
         logger.exception(f"Erreur notification nouveau RDV #{rdv_id}: {e}")
         raise self.retry(exc=e, countdown=60)
+    
 
 
 @shared_task(bind=True, max_retries=3)
@@ -86,6 +88,7 @@ def handle_status_change(self, rdv_id, old_status, new_status):
     Gère les notifications selon le changement de statut.
     """
     try:
+        from django.utils import timezone  # ← AJOUTER
         rdv = RendezVous.objects.select_related('patient__user', 'medecin__user').get(id=rdv_id)
         
         # Mapping des transitions importantes
@@ -93,14 +96,14 @@ def handle_status_change(self, rdv_id, old_status, new_status):
             ('programme', 'confirme'): {
                 'user': rdv.patient.user,
                 'subject': "Rendez-vous confirmé",
-                'message': f"Votre rendez-vous du {rdv.date_heure_rdv.strftime('%d/%m/%Y à %H:%M')} "
+                'message': f"Votre rendez-vous du {timezone.localtime(rdv.date_heure_rdv).strftime('%d/%m/%Y à %H:%M')} "  # ← CHANGER
                           f"avec Dr. {rdv.medecin.user.nom_complet()} a été confirmé.",
                 'type': 'success'
             },
             ('confirme', 'annule'): {
                 'user': rdv.patient.user,
                 'subject': "Rendez-vous annulé",
-                'message': f"Votre rendez-vous du {rdv.date_heure_rdv.strftime('%d/%m/%Y à %H:%M')} "
+                'message': f"Votre rendez-vous du {timezone.localtime(rdv.date_heure_rdv).strftime('%d/%m/%Y à %H:%M')} "  # ← CHANGER
                           f"a été annulé.\n"
                           f"Raison : {rdv.raison_annulation or 'Non précisée'}",
                 'type': 'warning'

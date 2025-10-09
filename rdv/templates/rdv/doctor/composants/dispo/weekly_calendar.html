@@ -16,10 +16,17 @@
         <div class="day-header">
           <h4 class="day-title">{{ day_name }}</h4>
           <span class="day-count">
-            {% with slots=weekly_slots|dict_get:day_key %}
-              {{ slots|length }} créneau{{ slots|length|pluralize }}
+            {% with count=weekly_slots|dict_get:day_key|length %}
+              {% if count == 0 %}
+                Aucun créneau
+              {% elif count == 1 %}
+                1 créneau
+              {% else %}
+                {{ count }} créneaux
+              {% endif %}
             {% endwith %}
           </span>
+
         </div>
 
         <div class="slots-container" data-day="{{ day_key }}">

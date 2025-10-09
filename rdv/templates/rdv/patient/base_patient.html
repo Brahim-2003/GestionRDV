@@ -35,6 +35,13 @@
 
 <body>
   <div class="app-container">
+
+    <button id="sidebar-toggle-btn" class="sidebar-toggle-btn" aria-label="Ouvrir le menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+
+    <div id="sidebar-overlay" class="sidebar-overlay" aria-hidden="true"></div>
+
     <div class="sidebar">
       <!-- Contenu de la sidebar -->
       {% block menu_block %}

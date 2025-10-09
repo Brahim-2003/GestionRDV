@@ -109,57 +109,109 @@ class RegisterForm(forms.ModelForm):
 
 # Formulaire de création d'utilisateur par l'admin
 class UtilisateurCreationForm(UserCreationForm):
-    nom = forms.CharField(
-        max_length=66,
-        widget=forms.TextInput(attrs={'class': 'form-control'})
-    )
-    prenom = forms.CharField(
-        max_length=66,
-        widget=forms.TextInput(attrs={'class': 'form-control'})
-    )
-    date_naissance = forms.DateField(
-        widget=forms.DateInput(attrs={'class': 'form-control','type': 'date'})
-    )
-    email = forms.EmailField(
-        widget=forms.EmailInput(attrs={'class': 'form-control'})
-    )
-    telephone = forms.CharField(
-        max_length=20,
-        widget=forms.TextInput(attrs={'class': 'form-control'})
-    )
-    role = forms.ChoiceField(
-        choices=Utilisateur.ROLE,
-        widget=forms.Select(attrs={'class': 'form-control'})
-    )
-    password1 = forms.CharField(
-        widget=forms.PasswordInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'Mot de passe'
-        })
-    )
-    password2 = forms.CharField(
-        widget=forms.PasswordInput(attrs={
-            'class': 'form-control',
-            'placeholder': 'Confirmez le mot de passe'
-        })
-    )
-    
+    # (ton formulaire existant — pas répété ici)
     class Meta:
         model = Utilisateur
-        fields = ('nom', 'prenom', 'date_naissance', 'email', 'telephone', 'role', 'password1', 'password2')
+        fields = ('nom', 'prenom', 'date_naissance', 'email', 'telephone', 'role', 'is_actif', 'password1', 'password2')
+
+        widgets = {
+            'nom': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nom'
+            }),
+            'prenom': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Prénom'
+            }),
+            'date_naissance': forms.DateInput(attrs={
+                'class': 'form-control',
+                'type': 'date'
+            }),
+            'email': forms.EmailInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'email@exemple.com'
+            }),
+            'telephone': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': '+235 XX XX XX XX'
+            }),
+            'role': forms.Select(attrs={
+                'class': 'form-control'
+            }),
+            'is_actif': forms.CheckboxInput(attrs={
+                'class': 'form-check-input'
+            })
+        }
+
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        if email and Utilisateur.objects.filter(email__iexact=email).exists():
+            raise ValidationError("Un compte existe déjà avec cette adresse email.")
+        return email
+
+
+class UtilisateurEditForm(forms.ModelForm):
+    """
+    Formulaire pour éditer un utilisateur existant.
+    Ne gère PAS le mot de passe (utiliser un formulaire séparé pour ça).
+    """
+    class Meta:
+        model = Utilisateur
+        fields = ('nom', 'prenom', 'email', 'telephone', 'role', 'is_actif')
+        widgets = {
+            'nom': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nom'
+            }),
+            'prenom': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Prénom'
+            }),
+            'email': forms.EmailInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'email@exemple.com'
+            }),
+            'telephone': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': '+235 XX XX XX XX'
+            }),
+            'role': forms.Select(attrs={
+                'class': 'form-control'
+            }),
+            'is_actif': forms.CheckboxInput(attrs={
+                'class': 'form-check-input'
+            })
+        }
+        labels = {
+            'nom': 'Nom',
+            'prenom': 'Prénom',
+            'email': 'Email',
+            'telephone': 'Téléphone',
+            'role': 'Rôle',
+            'is_actif': 'Compte actif'
+        }
+    
+    def clean_email(self):
+        """
+        Vérifie que l'email n'est pas déjà utilisé par un autre utilisateur.
+        """
+        email = self.cleaned_data.get('email')
+        if email:
+            # Exclure l'utilisateur actuel de la vérification
+            existing = Utilisateur.objects.filter(email__iexact=email).exclude(id=self.instance.id)
+            if existing.exists():
+                raise ValidationError("Un autre compte existe déjà avec cette adresse email.")
+        return email
+    
+    def clean_telephone(self):
+        """
+        Validation optionnelle du téléphone (adapte selon tes besoins).
+        """
+        telephone = self.cleaned_data.get('telephone')
+        # Ajoute ta logique de validation si nécessaire
+        return telephone
 
 User = get_user_model()
-
-# Formulaire de modification d'utilisateur
-class UtilisateurUpdateForm(forms.ModelForm):
-    class Meta:
-        model = User
-        fields = ["nom", "prenom", "email", "telephone", "role", "is_actif"]
-
-
-
-
-
 class UserEditForm(forms.ModelForm):
     class Meta:
         model = User

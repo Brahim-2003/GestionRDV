@@ -8,9 +8,9 @@
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 1rem;
-  margin-bottom: 0rem;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 2rem;
+  margin-bottom: 1rem;
 }
 
 .content-grid {
@@ -43,7 +43,7 @@
   margin-top: 1rem;
   font-size: 0.9rem;
   color: #007bff;
-  text-decoration: none;
+  text-decoration: underline;
 }
 
 .btn-view-more:hover {

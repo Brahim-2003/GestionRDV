@@ -22800,3 +22800,49 @@ WARNING 2025-10-04 15:15:15,668 log Not Found: /favicon.ico
 WARNING 2025-10-04 15:15:48,196 log Not Found: /static/rdv/js/admin/users/user_forms.js.js
 WARNING 2025-10-04 15:21:16,382 log Not Found: /favicon.ico
 WARNING 2025-10-04 15:21:17,531 log Not Found: /favicon.ico
+WARNING 2025-10-04 15:29:43,108 log Bad Request: /rdv/disponibilite/1/edit-hebdo/
+WARNING 2025-10-04 15:29:53,184 log Bad Request: /rdv/disponibilite/1/edit-hebdo/
+WARNING 2025-10-04 15:43:23,812 log Not Found: /favicon.ico
+WARNING 2025-10-04 15:48:02,735 log Bad Request: /rdv/disponibilites/add/
+WARNING 2025-10-04 15:48:10,314 log Bad Request: /rdv/disponibilites/add/
+WARNING 2025-10-04 15:52:52,942 log Not Found: /favicon.ico
+WARNING 2025-10-04 15:52:54,540 log Not Found: /favicon.ico
+WARNING 2025-10-04 16:35:56,065 middleware Échec connexion: ache@gmail.com depuis 172.18.0.1
+WARNING 2025-10-04 16:35:56,106 tasks Tentative connexion échouée #1 pour ache@gmail.com depuis 172.18.0.1
+WARNING 2025-10-04 16:36:10,644 middleware Échec connexion: ache@gmail.com depuis 172.18.0.1
+WARNING 2025-10-04 16:36:10,648 tasks Tentative connexion échouée #2 pour ache@gmail.com depuis 172.18.0.1
+WARNING 2025-10-04 16:36:21,781 middleware Échec connexion: ache@gmail.com depuis 172.18.0.1
+WARNING 2025-10-04 16:36:21,785 tasks Tentative connexion échouée #3 pour ache@gmail.com depuis 172.18.0.1
+WARNING 2025-10-04 16:36:36,303 middleware Échec connexion: brahim@gmail.com depuis 172.18.0.1
+WARNING 2025-10-04 16:36:36,306 tasks Tentative connexion échouée #1 pour brahim@gmail.com depuis 172.18.0.1
+WARNING 2025-10-04 16:39:13,281 middleware Échec connexion: brahim@gmail.com depuis 172.18.0.1
+WARNING 2025-10-04 16:39:13,285 tasks Tentative connexion échouée #2 pour brahim@gmail.com depuis 172.18.0.1
+WARNING 2025-10-04 16:39:13,784 log Not Found: /favicon.ico
+WARNING 2025-10-04 16:39:15,429 middleware Échec connexion: brahim@gmail.com depuis 172.18.0.1
+WARNING 2025-10-04 16:39:15,434 tasks Tentative connexion échouée #3 pour brahim@gmail.com depuis 172.18.0.1
+WARNING 2025-10-04 16:39:15,638 log Not Found: /favicon.ico
+WARNING 2025-10-04 16:39:23,925 middleware Échec connexion: brahim@gmail.com depuis 172.18.0.1
+WARNING 2025-10-04 16:39:23,929 tasks Tentative connexion échouée #4 pour brahim@gmail.com depuis 172.18.0.1
+WARNING 2025-10-04 16:40:24,234 log Not Found: /favicon.ico
+WARNING 2025-10-04 16:40:28,393 log Not Found: /favicon.ico
+WARNING 2025-10-04 16:40:35,980 log Not Found: /static/rdv/js/admin/users/user_forms.js.js
+WARNING 2025-10-04 16:57:43,833 log Not Found: /favicon.ico
+WARNING 2025-10-04 16:57:44,798 log Not Found: /favicon.ico
+WARNING 2025-10-04 16:57:45,504 log Not Found: /favicon.ico
+WARNING 2025-10-04 16:57:46,396 log Not Found: /favicon.ico
+WARNING 2025-10-04 17:02:44,264 log Not Found: /favicon.ico
+WARNING 2025-10-04 17:02:44,819 log Not Found: /favicon.ico
+WARNING 2025-10-04 17:02:45,354 log Not Found: /favicon.ico
+WARNING 2025-10-04 17:02:46,100 log Not Found: /favicon.ico
+WARNING 2025-10-04 17:02:46,727 log Not Found: /favicon.ico
+WARNING 2025-10-04 17:13:06,814 log Not Found: /favicon.ico
+WARNING 2025-10-04 17:14:53,696 log Not Found: /favicon.ico
+WARNING 2025-10-04 17:16:27,098 log Not Found: /favicon.ico
+WARNING 2025-10-04 21:22:03,118 log Not Found: /favicon.ico
+WARNING 2025-10-04 21:22:08,335 log Not Found: /favicon.ico
+WARNING 2025-10-04 23:17:41,797 log Not Found: /favicon.ico
+WARNING 2025-10-04 23:17:56,899 middleware Échec connexion: youssouf@gmail.com depuis 172.18.0.1
+WARNING 2025-10-04 23:17:57,481 tasks Tentative connexion échouée #1 pour youssouf@gmail.com depuis 172.18.0.1
+WARNING 2025-10-04 23:18:05,971 tasks Tentative connexion échouée #2 pour youssouf@gmail.com depuis 172.18.0.1
+WARNING 2025-10-04 23:18:05,963 middleware Échec connexion: youssouf@gmail.com depuis 172.18.0.1
+WARNING 2025-10-04 23:18:36,971 log Not Found: /favicon.ico

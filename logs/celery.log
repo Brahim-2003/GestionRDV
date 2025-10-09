@@ -9770,3 +9770,5 @@ Traceback (most recent call last):
     ```
     ^
 SyntaxError: invalid syntax
+INFO 2025-10-05 20:16:36,996 celery Celery configuré avec timezone: Africa/Ndjamena
+INFO 2025-10-05 20:16:37,024 celery Beat scheduler: django_celery_beat.schedulers:DatabaseScheduler

@@ -271,6 +271,10 @@ class Disponibilite(models.Model):
             date = self.date_specific
             start = timezone.datetime.combine(date, self.heure_debut)
             end   = timezone.datetime.combine(date, self.heure_fin)
+            if timezone.is_naive(start):
+                start = timezone.make_aware(start, timezone.get_current_timezone())
+            if timezone.is_naive(end):
+                end = timezone.make_aware(end, timezone.get_current_timezone())
             slots.append((start, end))
         else:
             if not reference_week_start:
@@ -281,6 +285,10 @@ class Disponibilite(models.Model):
             date = reference_week_start + timezone.timedelta(days=delta_days)
             start = timezone.datetime.combine(date, self.heure_debut)
             end   = timezone.datetime.combine(date, self.heure_fin)
+            if timezone.is_naive(start):
+                start = timezone.make_aware(start, timezone.get_current_timezone())
+            if timezone.is_naive(end):
+                end = timezone.make_aware(end, timezone.get_current_timezone())
             slots.append((start, end))
         return slots
 
@@ -435,14 +443,12 @@ class RendezVous(models.Model):
                 description='',
                 extra={}
             )
-
         try:
             subject = "Rendez-vous confirmé"
-            message = f"Bonjour M. {self.patient.user.nom_complet()}, votre rendez-vous du {self.date_heure_rdv.strftime('%d/%m/%Y %H:%M')} avec Dr. {self.medecin.user.nom_complet()} a été confirmé."
+            message = f"Bonjour M(me). {self.patient.user.nom_complet()}, votre rendez-vous du {self.date_heure_rdv.strftime('%d/%m/%Y %H:%M')} avec Dr. {self.medecin.user.nom_complet()} a été confirmé."
             self._create_notification_safe(self.patient.user, subject, message, notif_type='success', category='appointment')
         except Exception:
             pass
-
         return self
 
 
@@ -473,15 +479,14 @@ class RendezVous(models.Model):
                 extra={}
             )
 
-        # notification non-bloquante
-        try:
-            subject = "Rendez-vous annulé"
-            message = f"Bonjour M. {self.patient.user.nom_complet()},\n\nVotre rendez-vous prévu le {self.date_heure_rdv.strftime('%d/%m/%Y %H:%M')} avec Dr. {self.medecin.user.nom_complet()} a été annulé."
-            if description:
-                message += f"\nRaison : {description}"
-            self._create_notification_safe(self.patient.user, subject, message, notif_type='warning', category='appointment')
-        except Exception:
-            pass
+            try:
+                subject = "Rendez-vous annulé"
+                message = f"Bonjour M(e). {self.patient.user.nom_complet()},\n\nVotre rendez-vous prévu le {self.date_heure_rdv.strftime('%d/%m/%Y %H:%M')} avec Dr. {self.medecin.user.nom_complet()} a été annulé."
+                if description:
+                    message += f"\nRaison : {description}"
+                self._create_notification_safe(self.patient.user, subject, message, notif_type='warning', category='appointment')
+            except Exception:
+                pass
 
         return self
 
@@ -527,24 +532,24 @@ class RendezVous(models.Model):
                 extra={'report_initiator': initiator}
             )
 
-        # notifications
-        try:
-            if initiator == 'medecin':
-                subject = "Rendez-vous déplacé et confirmé"
-                message = f"Votre rendez-vous avec Dr. {self.medecin.user.nom_complet()} a été déplacé et confirmé au {self.date_heure_rdv.strftime('%d/%m/%Y %H:%M')}."
-                self._create_notification_safe(self.patient.user, subject, message, notif_type='info', category='appointment')
-            else:
-                subject_patient = "Rendez-vous déplacé — en attente de confirmation"
-                message_patient = f"Votre rendez-vous avec Dr. {self.medecin.user.nom_complet()} a été déplacé au {self.date_heure_rdv.strftime('%d/%m/%Y %H:%M')} et attend la confirmation du médecin."
-                subject_medecin = "Rendez-vous déplacé — en attente de confirmation"
-                message_medecin = f"Le rendez-vous avec {self.patient.user.nom_complet()} a été déplacé au {self.date_heure_rdv.strftime('%d/%m/%Y %H:%M')} et attend votre confirmation."
+            try:
+                if initiator == 'medecin':
+                    subject = "Rendez-vous déplacé et confirmé"
+                    message = f"Votre rendez-vous avec Dr. {self.medecin.user.nom_complet()} a été déplacé et confirmé au {self.date_heure_rdv.strftime('%d/%m/%Y %H:%M')}."
+                    self._create_notification_safe(self.patient.user, subject, message, notif_type='info', category='appointment')
+                else:
+                    subject_patient = "Rendez-vous déplacé — en attente de confirmation"
+                    message_patient = f"Votre rendez-vous avec Dr. {self.medecin.user.nom_complet()} a été déplacé au {self.date_heure_rdv.strftime('%d/%m/%Y %H:%M')} et attend la confirmation du médecin."
+                    subject_medecin = "Rendez-vous déplacé en attente de confirmation"
+                    message_medecin = f"Le rendez-vous avec {self.patient.user.nom_complet()} a été déplacé au {self.date_heure_rdv.strftime('%d/%m/%Y %H:%M')} et attend votre confirmation."
 
-            if raison:
-                message_patient += f"\nRaison : {raison}"
-                self._create_notification_safe(self.patient.user, subject_patient, message_patient, notif_type='info', category='appointment')
-                self._create_notification_safe(self.medecin.user, subject_medecin, message_medecin, notif_type='info', category='appointment')
-        except Exception:
-            pass
+                if raison:
+                    message_patient += f"\nRaison : {raison}"
+                    self._create_notification_safe(self.patient.user, subject_patient, message_patient, notif_type='info', category='appointment')
+                    self._create_notification_safe(self.medecin.user, subject_medecin, message_medecin, notif_type='info', category='appointment')
+            except Exception:
+                pass
+            
 
         return self
 

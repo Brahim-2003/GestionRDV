@@ -5,7 +5,7 @@
   flex-shrink: 0;
   padding: 1rem 1rem 0.875rem;
   border-bottom: 1px solid var(--border-color);
-  background: #ffffff;
+  background: #f0eeee;
   position: relative;
 }
 
@@ -18,7 +18,7 @@
 .brand-icon {
   width: 32px;
   height: 32px;
-  background: #ffffff;
+  background: #f0eeee;
   border-radius: 8px;
   display: flex;
   align-items: center;
@@ -58,7 +58,7 @@
   position: fixed;
   top: 1rem;
   left: 1rem;
-  z-index: 1002;
+  z-index: 1120;
   width: 40px;
   height: 40px;
   background: #ffffff;
@@ -84,7 +84,7 @@
 }
 
 .sidebar-toggle-btn:hover {
-  background: #f9fafb;
+  background: #ffffff;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
@@ -93,16 +93,15 @@
 }
 
 /* Animation hamburger vers X */
-.sidebar.open ~ .sidebar-toggle-btn span:nth-child(1) {
+/* Animation hamburger via body.sidebar-open (robuste quel que soit l'ordre DOM) */
+body.sidebar-open .sidebar-toggle-btn span:nth-child(1) {
   transform: translateY(6px) rotate(45deg);
 }
-
-.sidebar.open ~ .sidebar-toggle-btn span:nth-child(2) {
+body.sidebar-open .sidebar-toggle-btn span:nth-child(2) {
   opacity: 0;
   transform: translateX(-20px);
 }
-
-.sidebar.open ~ .sidebar-toggle-btn span:nth-child(3) {
+body.sidebar-open .sidebar-toggle-btn span:nth-child(3) {
   transform: translateY(-6px) rotate(-45deg);
 }
 
@@ -114,7 +113,7 @@
   right: 1rem;
   width: 32px;
   height: 32px;
-  background: #f3f4f6;
+  background: #ffffff;
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -126,7 +125,7 @@
 }
 
 .sidebar-close-btn:hover {
-  background: #e5e7eb;
+  background:#ffffff;
   color: #111827;
 }
 
@@ -135,7 +134,7 @@
   flex-shrink: 0;
   padding: 0.875rem 1rem;
   border-bottom: 1px solid var(--border-color);
-  background: #ffffff;
+  background: #f0eeee;
 }
 
 .search-container {
@@ -283,8 +282,9 @@
   flex-shrink: 0;
   padding: 0.875rem 1rem;
   border-top: 1px solid var(--border-color);
-  background: #fafafa;
+  background: #f0eeee;
   margin-top: auto;
+  border-top: 1px solid #cccfd5;
 }
 
 .user-profile {
@@ -293,7 +293,7 @@
   gap: 0.5rem;
   padding: 0.5rem;
   border-radius: 8px;
-  background: #ffffff;
+  background: #fafafa;
   border: 1px solid #e5e7eb;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -405,6 +405,7 @@
     transform: translateX(-100%);
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     width: 280px;
+    position: relative;
   }
   
   /* Sidebar visible quand ouverte */
@@ -412,15 +413,6 @@
     transform: translateX(0);
   }
   
-  /* Overlay visible quand sidebar ouverte */
-  .sidebar-overlay {
-    display: block;
-  }
-  
-  .sidebar-overlay.active {
-    opacity: 1;
-    visibility: visible;
-  }
   
   /* Ajustements du contenu */
   .sidebar-header {
@@ -557,7 +549,6 @@
 /* Animations smooth pour toutes les transitions */
 @media (prefers-reduced-motion: no-preference) {
   .sidebar,
-  .sidebar-overlay,
   .sidebar-toggle-btn,
   .nav-tab,
   .logout {
@@ -568,10 +559,60 @@
 /* Pour les utilisateurs préférant moins d'animations */
 @media (prefers-reduced-motion: reduce) {
   .sidebar,
-  .sidebar-overlay,
   .sidebar-toggle-btn,
   .nav-tab,
   .logout {
     transition-duration: 0.01ms !important;
   }
+}
+
+
+/* mobile: ensure sidebar above overlay and toggle above all */
+@media (max-width: 768px) {
+  .sidebar { 
+    transform: translateX(-100%) !important;
+    position: fixed !important;
+    left: 0; top: 0;
+    height: 100vh;
+    z-index: 1110; /* sidebar above overlay */
+    transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+    will-change: transform;
+    background: #f0eeee;
+    box-shadow: 2px 0 12px rgba(11,20,30,0.12);
+    overflow-y: auto;
+  }
+  .sidebar.open { transform: translateX(0) !important; }
+
+  .sidebar-toggle-btn {
+    display: flex !important;
+    position: fixed !important;
+    top: 1rem !important;
+    left: 1rem !important;
+    z-index: 1120 !important; /* above sidebar & overlay */
+  }
+
+  .sidebar-close-btn {
+    display: flex !important;
+    z-index: 1125 !important;
+  }
+
+  body.sidebar-open {
+    overflow: hidden !important;
+    position: fixed !important;
+    width: 100% !important;
+    height: 100% !important;
+  }
+
+  #ajax-content {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+}
+
+/* === Desktop : masquer contrôles mobile (garantir propreté) === */
+@media (min-width: 769px) {
+  .sidebar-toggle-btn, .sidebar-close-btn { display: none !important; }
+ /* assurer l'espace pour le contenu */
+  #ajax-content { margin-left: var(--sidebar-width) !important; width: calc(100% - var(--sidebar-width)) !important; }
+  body.sidebar-open { position: static !important; overflow: visible !important; }
 }

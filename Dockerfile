@@ -28,9 +28,11 @@ COPY . .
 # Créer les dossiers nécessaires
 RUN mkdir -p logs staticfiles media
 
+RUN chmod +x /app/entrypoint.sh
+
 # Exposer le port
 EXPOSE 8000
 
 # Commande par défaut (sera surchargée par docker-compose)
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["gunicorn", "GestionRDV.wsgi:application", "--bind", "0.0.0.0:8000"]

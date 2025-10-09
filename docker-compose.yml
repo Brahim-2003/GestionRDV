@@ -1,3 +1,4 @@
+version: "3.8"
 services:
   redis:
     image: redis:7-alpine
@@ -16,18 +17,23 @@ services:
     container_name: gestionrdv_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: Zaka.BZB2003
-      POSTGRES_DB: gestion_rdv_db
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-gestion_rdv_db}
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
       - '5432:5432'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   web:
     build: .
     container_name: gestionrdv_web
-    command: gunicorn GestionRDV.wsgi:application --bind 0.0.0.0:8000 --workers 4
+    command: ["gunicorn","GestionRDV.wsgi:application","--bind","0.0.0.0:8000","--workers","4"]
     volumes:
       - .:/app:rw
     env_file: .env
@@ -41,32 +47,35 @@ services:
   worker:
     build: .
     container_name: gestionrdv_celery_worker
-    command: celery -A GestionRDV worker -l info --concurrency=2
+    command: ["celery","-A","GestionRDV","worker","-l","info","--concurrency=2"]
     volumes:
       - .:/app:rw
     env_file: .env
     depends_on:
       - redis
       - db
-      - web
     restart: unless-stopped
 
   beat:
     build: .
     container_name: gestionrdv_celery_beat
-    # Ajouter --pidfile avec un chemin absolu
-    command: celery -A GestionRDV beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler --pidfile=/tmp/celerybeat.pid
+    command:
+      - celery
+      - -A
+      - GestionRDV
+      - beat
+      - -l
+      - INFO
+      - --scheduler
+      - django_celery_beat.schedulers:DatabaseScheduler
+      - --pidfile=/tmp/celerybeat.pid
     volumes:
       - .:/app:rw
     env_file: .env
     depends_on:
       - redis
       - db
-      - web
     restart: unless-stopped
-    # Ne PAS mettre tty/stdin_open
+
 volumes:
   pgdata:
-
-
-  

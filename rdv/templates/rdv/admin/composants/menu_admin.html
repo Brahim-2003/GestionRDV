@@ -1,21 +1,7 @@
 {% load static %}
 
-<!-- Bouton hamburger mobile (fixe, en dehors de la sidebar) -->
-<button class="sidebar-toggle-btn" aria-label="Toggle menu">
-    <span></span>
-    <span></span>
-    <span></span>
-</button>
-
-<!-- Overlay pour mobile -->
-<div class="sidebar-overlay"></div>
-
 <!-- Header avec brand -->
 <div class="sidebar-header">
-    <!-- Bouton de fermeture (visible sur mobile uniquement) -->
-    <button class="sidebar-close-btn" aria-label="Fermer le menu">
-        <i class='bx bx-x'></i>
-    </button>
     
     <div class="brand">
         <div class="brand-icon">
@@ -41,7 +27,6 @@
     <div class="nav-section">
         <h6 class="nav-section-title">Navigation</h6>
 
-        <!-- Votre structure HTML adaptée -->
         <nav class="nav-tabs">
             <a href="{% url 'rdv:dashboard_redirect' %}" class="nav-tab active">
                 <i class='bx bx-home'></i>
@@ -88,9 +73,9 @@
     </a>
 
     <div class="user-profile">
-        <div class="user-avatar">{{ user.nom|slice:":1" }} {{ user.prenom|slice:":1" }}</div>
+        <div class="user-avatar">{{ user.prenom|slice:":1" }} {{ user.nom|slice:":1" }}</div>
         <div class="user-info">
-            <h4>{{ user.nom }} {{ user.prenom }}</h4>
+            <h4>{{ user.nom_complet }}</h4>
             <span>{{ user.role }}</span>
         </div>
         <div class="status-dot online"></div>

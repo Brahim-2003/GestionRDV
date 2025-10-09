@@ -1,7 +1,5 @@
 {% load static %}
 
-<!-- Overlay pour mobile -->
-<div class="sidebar-overlay" onclick="toggleSidebar()"></div>
 
     <!-- Header avec brand -->
     <div class="sidebar-header">
@@ -29,7 +27,7 @@
         <div class="nav-section">
             <h6 class="nav-section-title">Navigation</h6>
 
-                <!-- Votre structure HTML adaptée -->
+                
                 <nav class="nav-tabs">
                     <a href="{% url 'rdv:dashboard_patient' %}" class="nav-tab active">
                         <i class='bx bx-home'></i>
@@ -68,9 +66,9 @@
             </a>
 
             <div class="user-profile">
-                <div class="user-avatar">{{ user.nom|slice:":1" }} {{ user.prenom|slice:":1" }}</div>
+                <div class="user-avatar">{{ user.prenom|slice:":1" }} {{ user.nom|slice:":1" }}</div>
                 <div class="user-info">
-                    <h4>{{ user.nom }} {{ user.prenom }}</h4>
+                    <h4>{{ user.nom_complet }}</h4>
                     <span>{{ user.role }}</span>
                 </div>
                 <div class="status-dot online"></div>

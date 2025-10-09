@@ -15,33 +15,6 @@
   --dispo-gray-900: #111827;
 }
 
-/* ===== SECTION HEADER DISPONIBILITÉS ===== */
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin: 20px 20px 30px 20px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--dispo-gray-200);
-}
-
-.section-header h2 {
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin: 0;
-  color: var(--dispo-gray-900);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.section-header p {
-  color: var(--dispo-gray-500);
-  margin: 4px 0 0;
-  font-size: 0.875rem;
-  font-weight: 400;
-}
-
 .btn-sm {
   padding: 8px 16px;
   font-size: 0.875rem;
@@ -94,9 +67,6 @@
 
 .tab-content {
   display: none;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
   overflow: hidden;
 }
 
@@ -115,33 +85,6 @@
 }
 
 /* ===== BARRE DE FILTRES ===== */
-.search-filter-bar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: center;
-  padding: 16px 20px;
-  background: var(--dispo-gray-50);
-  border-bottom: 1px solid var(--dispo-gray-200);
-}
-
-.search-filter-bar .filter-select,
-.search-filter-bar .date-input {
-  padding: 8px 12px;
-  border: 1px solid var(--dispo-gray-300);
-  border-radius: 6px;
-  font-size: 0.875rem;
-  background: white;
-  color: var(--dispo-gray-700);
-  min-width: 140px;
-}
-
-.search-filter-bar .filter-select:focus,
-.search-filter-bar .date-input:focus {
-  outline: none;
-  border-color: var(--dispo-primary);
-  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
-}
 
 #clear-filters {
   background: var(--dispo-gray-100);
@@ -400,7 +343,7 @@
 
 /* ===== TABLE PONCTUEL ===== */
 #ponctuel-content {
-  background: white;
+  background: var(--dispo-gray-50);
 }
 
 #dispo-table-container {
@@ -435,25 +378,6 @@
   margin: 0;
 }
 
-/* Table styles - hérite de base.css mais avec ajustements */
-.data-table {
-  margin: 0;
-  border-radius: 0;
-}
-
-.data-table th {
-  background: var(--dispo-gray-50);
-  color: var(--dispo-gray-700);
-  font-size: 0.875rem;
-  font-weight: 600;
-  padding: 16px 12px;
-}
-
-.data-table td {
-  padding: 12px;
-  font-size: 0.875rem;
-  vertical-align: middle;
-}
 
 .data-table tbody tr:hover {
   background-color: var(--dispo-gray-50);

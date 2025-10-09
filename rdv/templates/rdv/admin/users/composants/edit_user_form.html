@@ -1,11 +1,17 @@
 {% load static %}
 <link rel="stylesheet" href="{% static 'rdv/css/boxicons.min.css' %}">
 
-<form id="edit-user-form" method="post" action="{% url 'users:modifier_utilisateur', user.id %}" class="modern-form">
+<form id="edit-user-form" method="post" action="{% url 'users:edit_user_admin' user.id %}" class="modern-form">
   {% csrf_token %}
   <h3 class="form-title">
-    <i class='bx bxs-user-plus'></i> Modifier les infos de l'utilisateur
+    <i class='bx bx-edit'></i> Modifier l'utilisateur
   </h3>
+
+  {% if form.non_field_errors %}
+    <div class="alert alert-danger">
+      {{ form.non_field_errors }}
+    </div>
+  {% endif %}
 
   {{ form.as_p }}
 
@@ -14,7 +20,7 @@
       <i class='bx bxs-save'></i>
       <span>Enregistrer</span>
     </button>
-    <button type="button" class="btn-secondary modal-cancel">
+    <button type="button" class="btn-secondary modal-cancel modal-close">
       <i class='bx bxs-x-circle'></i>
       Annuler
     </button>

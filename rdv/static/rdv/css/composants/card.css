@@ -2,7 +2,7 @@
   display: grid;
   /* 4 colonnes égales sur grand écran, retombe à 2 sur tablettes, 1 sur mobile */
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 2rem;       /* espace entre les cartes */
+  gap: 1rem;       /* espace entre les cartes */
   margin: 1.5rem 0;    /* un peu d'air au-dessus et en dessous */
 }
 

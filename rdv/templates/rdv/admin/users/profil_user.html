@@ -1,14 +1,26 @@
-{% extends 'rdv/admin/base_admin.html' %}
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>profil User</title>
 
-{% block menu_block %}
-    {% include 'rdv/admin/composants/menu_admin.html' %}
-{% endblock %}
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ 
+  
+  <link rel="stylesheet" href="{% static 'rdv/css/admin/users/profil_user.css' %}">
 
-{% block content %}
+  <!-- ICONES -->
+  <link rel="stylesheet" href="{% static 'rdv/css/boxicons.min.css' %}">
+  <link rel="stylesheet" href="{% static 'rdv/css/animations.css' %}">
+  <link rel="stylesheet" href="{% static 'rdv/css/transformations.css' %}">
+
+  <link rel="stylesheet" href="{% static 'rdv/css/base.css' %}">
+
+</head>
+
+<body>
+
     {% include 'rdv/profil/profil_content.html' %}
-{% endblock %}
-
-{% block extra_js %}
-    {{ block.super }}
-{% endblock %}
-
+    
+</body>

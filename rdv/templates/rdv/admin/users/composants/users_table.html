@@ -19,14 +19,15 @@
                 <td><span class="user-status">{% if user.is_actif %}<i class='bx bxs-check-circle' style='color:#2d7318' ></i>{% else %}<i class='bx bx-x' style='color:#af1014'></i>{% endif %}</span></td>
                 <td>
                     <button 
-                        style="color: #47bb24;"
                         class="edit-btn" 
-                        data-form-url="{% url 'users:edit_user' %}"
+                        data-user-id="{{ user.id }}" 
+                        data-form-url="{% url 'users:edit_user_admin' user.id %}"
                         data-target="#edit-user-modal"
                         data-container="#edit-user-modal-form-container"
-                        >
-                        <i class='bx bx-edit'></i>
+                    >
+                        <i class='bx bx-edit' style='color:#20a52d'></i>
                     </button>
+
                     <a 
                         href="#" 
                         class="action-btn-delete" 

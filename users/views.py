@@ -5,7 +5,7 @@ from django.contrib.auth.forms import PasswordChangeForm
 from django.core.paginator import Paginator 
 from django.db.models import Q, Max
 from django.db import transaction
-from django.http import JsonResponse, HttpResponseForbidden
+from django.http import JsonResponse, HttpResponseForbidden, HttpResponseBadRequest
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.utils.dateparse import parse_datetime
@@ -16,7 +16,7 @@ from django.views.decorators.http import require_POST, require_http_methods
 # App imports
 from .models import Utilisateur
 from rdv.models import Patient, Medecin
-from .forms import ConnexionForm, RegisterForm, UtilisateurCreationForm, UtilisateurUpdateForm, UserEditForm, PatientEditForm, MedecinEditForm, CustomPasswordChangeForm
+from .forms import ConnexionForm, RegisterForm, UtilisateurCreationForm, UserEditForm, PatientEditForm, MedecinEditForm, CustomPasswordChangeForm, UtilisateurEditForm
 from users.tasks import notify_admins_on_user_create
 
 
@@ -413,22 +413,38 @@ def creer_utilisateur(request):
     return render(request, template, {'form': form})
 
 
+
 @login_required(login_url='users:login')
 @permission_required('users.can_view_all_users', raise_exception=True)
-def modifier_utilisateur(request, user_id):
-    """Modifier un utilisateur (admin uniquement)"""
-    user = Utilisateur.objects.get(pk=user_id)
+def edit_user(request, user_id):
+    """
+    Édite un utilisateur existant.
+    Renvoie le formulaire en GET, traite la soumission en POST.
+    """
+    user = get_object_or_404(Utilisateur, id=user_id)
+    
     if request.method == 'POST':
-        form = UtilisateurUpdateForm(request.POST, instance=user)
+        form = UtilisateurEditForm(request.POST, instance=user)
         if form.is_valid():
             form.save()
-            return JsonResponse({"success": True, "message": "Informations utilisateur mises à jour."})
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'status': 'ok',
+                    'message': 'Utilisateur modifié avec succès'
+                })
+            return redirect('users:list_users')
+        else:
+            # Si erreurs de validation et requête AJAX
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'status': 'error',
+                    'errors': form.errors
+                }, status=400)
     else:
-        form = UtilisateurUpdateForm(instance=user)
-    
-    return render(request, 'rdv/admin/users/composants/edit_user_form.html', {'form': form})
+        form = UtilisateurEditForm(instance=user)
 
-
+    template = 'rdv/admin/users/composants/edit_user_form.html'
+    return render(request, template, {'form': form, 'user': user})
 
 @login_required(login_url='users:login')
 @permission_required('users.can_view_all_users', raise_exception=True)

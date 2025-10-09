@@ -117,7 +117,7 @@
               <i class='bx bx-trash'></i>
           {% endif %}
           {{ action_label }}
-          <span class="badge">{{ action_stats|default_if_none:0 }}</span>
+          <span class="badge">{{ action_stats|get_item:action_code }}</span>
       </button>
       {% endfor %}
   </div>
@@ -221,7 +221,7 @@
 
               <!-- Bouton pour voir le détail complet du RDV -->
               <div class="history-actions">
-                  <a href="{% url 'rdv:history_detail' item.rdv.id %}" 
+                  <a href="#" 
                      class="btn-link view-detail"
                      data-rdv-id="{{ item.rdv.id }}">
                       <i class='bx bx-show'></i>
@@ -285,3 +285,5 @@
 
 
 <script defer src="{% static 'rdv/js/admin/history/history.js' %}"></script>
+
+

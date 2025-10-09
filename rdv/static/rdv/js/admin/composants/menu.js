@@ -1,212 +1,229 @@
 // static/rdv/js/admin/menu.js
-// Gestion responsive et idempotente du menu
-
+// Menu responsive – contrôle fiable de l'overlay (display + active)
 (function () {
-  if (window.__rdv_menu_init) return;
-  window.__rdv_menu_init = true;
+  if (window.__rdv_menu_final) return;
+  window.__rdv_menu_final = true;
 
-  // Utilitaire safe pour récupérer un élément
   const $ = sel => document.querySelector(sel);
+  const isMobile = () => window.innerWidth <= 768;
 
-  // Toggle sidebar (exposé globalement)
-  function toggleSidebar() {
-    const sidebar = $('#sidebar') || $('.sidebar');
-    const overlay = $('.sidebar-overlay');
-    const body = document.body;
-    
-    if (!sidebar) return;
-    
-    const isOpen = sidebar.classList.toggle('open');
-    
-    // Gestion de l'overlay
-    if (overlay) {
-      overlay.classList.toggle('active', isOpen);
+  function elSidebar() { return $('#sidebar') || document.querySelector('.sidebar'); }
+  function elToggle() { return $('#sidebar-toggle-btn') || document.querySelector('.sidebar-toggle-btn'); }
+  function elOverlay() { return $('#sidebar-overlay') || document.querySelector('.sidebar-overlay'); }
+
+  function ensureOverlay() {
+    let ov = elOverlay();
+    if (!ov) {
+      ov = document.createElement('div');
+      ov.id = 'sidebar-overlay';
+      ov.className = 'sidebar-overlay';
+      ov.setAttribute('aria-hidden', 'true');
+      // minimal safe inline defaults so it doesn't block before CSS loads
+      Object.assign(ov.style, {
+        display: 'none',
+        pointerEvents: 'none',
+        opacity: '0',
+        visibility: 'hidden',
+        position: 'fixed',
+        inset: '0',
+        background: 'rgba(0,0,0,0.45)',
+        zIndex: '1090',
+      });
+      document.body.appendChild(ov);
     }
-    
-    // Empêcher le scroll du body sur mobile quand sidebar ouverte
-    if (window.innerWidth <= 768) {
-      body.classList.toggle('sidebar-open', isOpen);
-    }
+    return ov;
   }
-  
-  // Fonction pour fermer la sidebar
+
+  function openSidebar() {
+    const sidebar = elSidebar();
+    const overlay = ensureOverlay();
+    const toggle = elToggle();
+    if (!sidebar) return;
+
+    // Show overlay
+    overlay.style.display = 'block';     // ensure it's in layout (important)
+    // force reflow so transition works reliably
+    overlay.getBoundingClientRect();
+    overlay.classList.add('active');
+    overlay.setAttribute('aria-hidden', 'false');
+    overlay.style.pointerEvents = 'auto';
+
+    // Show sidebar
+    sidebar.classList.add('open');
+    sidebar.setAttribute('aria-hidden', 'false');
+    document.body.classList.add('sidebar-open');
+
+    if (toggle) toggle.setAttribute('aria-expanded', 'true');
+
+    // defensive cleanup
+    try {
+      const ajax = document.getElementById('ajax-content');
+      if (ajax) { ajax.style.filter = 'none'; ajax.style.backdropFilter = 'none'; }
+      document.documentElement.style.filter = 'none';
+      document.documentElement.style.backdropFilter = 'none';
+    } catch (e) {}
+  }
+
   function closeSidebar() {
-    const sidebar = $('#sidebar') || $('.sidebar');
-    const overlay = $('.sidebar-overlay');
-    const body = document.body;
-    
+    const sidebar = elSidebar();
+    const overlay = elOverlay();
+    const toggle = elToggle();
     if (!sidebar) return;
-    
+
+    // Hide sidebar
     sidebar.classList.remove('open');
-    if (overlay) overlay.classList.remove('active');
-    body.classList.remove('sidebar-open');
-  }
-  
-  // Exposer les fonctions globalement
-  window.toggleSidebar = toggleSidebar;
-  window.closeSidebar = closeSidebar;
+    sidebar.setAttribute('aria-hidden', 'true');
 
-  // Resize handler: fermer la sidebar automatiquement sur grands écrans
-  if (!window.__rdv_menu_resize_bound) {
-    let resizeTimer;
-    window.addEventListener('resize', function () {
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(() => {
-        if (window.innerWidth > 768) {
-          closeSidebar();
-        }
-      }, 150);
-    });
-    window.__rdv_menu_resize_bound = true;
+    // Hide overlay visually and then remove from flow after transition
+    if (overlay) {
+      overlay.classList.remove('active');
+      overlay.setAttribute('aria-hidden', 'true');
+      overlay.style.pointerEvents = 'none';
+      // after transition, ensure display none so it cannot intercept clicks
+      setTimeout(() => {
+        try { overlay.style.display = 'none'; } catch (e) {}
+      }, 300);
+    }
+
+    document.body.classList.remove('sidebar-open');
+    if (toggle) toggle.setAttribute('aria-expanded', 'false');
+
+    // defensive cleanup
+    try {
+      const ajax = document.getElementById('ajax-content');
+      if (ajax) { ajax.style.filter = 'none'; ajax.style.backdropFilter = 'none'; }
+      document.documentElement.style.filter = 'none';
+      document.documentElement.style.backdropFilter = 'none';
+    } catch (e) {}
   }
 
-  // Delegated click handler (nav tabs, logout, sidebar toggles)
+  function toggleSidebar() {
+    const sidebar = elSidebar();
+    if (!sidebar) return;
+    if (!isMobile()) {
+      // ensure persistent visible sidebar on desktop
+      sidebar.classList.add('open');
+      sidebar.setAttribute('aria-hidden', 'false');
+      const ov = elOverlay();
+      if (ov) { ov.classList.remove('active'); ov.style.display = 'none'; ov.style.pointerEvents = 'none'; }
+      document.body.classList.remove('sidebar-open');
+      elToggle()?.setAttribute('aria-expanded', 'false');
+      return;
+    }
+    if (sidebar.classList.contains('open')) closeSidebar();
+    else openSidebar();
+  }
+
+  // Delegated click handling (one listener)
   if (!window.__rdv_menu_click_bound) {
     document.addEventListener('click', function (ev) {
-      
-      // NAV TABS - fermer la sidebar sur mobile après navigation
-      const nav = ev.target.closest && ev.target.closest('.nav-tab');
-      if (nav) {
+      // logout button confirmation
+      const logoutBtn = ev.target.closest && ev.target.closest('#logout-link, .logout');
+      if (logoutBtn) {
         ev.preventDefault();
-        
-        // Fermer la sidebar sur mobile
-        if (window.innerWidth <= 768) {
-          closeSidebar();
-        }
-        
-        // Navigation AJAX ou normale
-        if (typeof window.loadContent === 'function') {
-          window.loadContent(nav.href || nav.getAttribute('href'));
-        } else {
-          window.location.href = nav.href || nav.getAttribute('href');
-        }
-        return;
-      }
-
-      // LOGOUT
-      const logoutSel = ev.target.closest && ev.target.closest('#logout-link, .logout-btn, a.logout, [data-logout]');
-      if (logoutSel) {
-        ev.preventDefault();
-        if (confirm("Êtes-vous sûr de vouloir vous déconnecter ?")) {
-          const href = logoutSel.getAttribute('href') || logoutSel.dataset.href;
+        if (confirm('Êtes-vous sûr de vouloir vous déconnecter ?')) {
+          const href = logoutBtn.href || logoutBtn.getAttribute('href');
           if (href) window.location.href = href;
         }
         return;
       }
 
-      // SIDEBAR TOGGLE (bouton hamburger ou autres toggles)
-      const toggle = ev.target.closest && ev.target.closest('[data-toggle="sidebar"], .sidebar-toggle, .sidebar-toggle-btn, #sidebar-toggle');
+      // nav-tabs (AJAX)
+      const nav = ev.target.closest && ev.target.closest('.nav-tab');
+      if (nav) {
+        ev.preventDefault();
+        if (isMobile()) closeSidebar();
+        const href = nav.href || nav.getAttribute('href');
+        if (href && typeof window.loadContent === 'function') window.loadContent(href);
+        else if (href) window.location.href = href;
+        return;
+      }
+
+      // toggle button
+      const toggle = ev.target.closest && ev.target.closest('#sidebar-toggle-btn, .sidebar-toggle-btn, [data-toggle="sidebar"]');
       if (toggle) {
         ev.preventDefault();
+        // make sure overlay exists and is display:block before toggling
+        const ov = ensureOverlay();
+        ov.style.display = 'block';
         toggleSidebar();
         return;
       }
-      
-      // SIDEBAR CLOSE (bouton de fermeture spécifique)
+
+      // close button inside sidebar
       const closeBtn = ev.target.closest && ev.target.closest('.sidebar-close-btn');
-      if (closeBtn) {
-        ev.preventDefault();
-        closeSidebar();
-        return;
-      }
-      
-      // OVERLAY CLICK - fermer la sidebar
-      if (ev.target.classList.contains('sidebar-overlay')) {
+      if (closeBtn) { ev.preventDefault(); closeSidebar(); return; }
+
+      // overlay click -> close
+      if (ev.target && (ev.target.id === 'sidebar-overlay' || ev.target.classList?.contains('sidebar-overlay'))) {
         ev.preventDefault();
         closeSidebar();
         return;
       }
     }, false);
-
     window.__rdv_menu_click_bound = true;
   }
 
-  // Gestion du clavier (Escape pour fermer la sidebar)
+  // Escape key to close (mobile only)
   if (!window.__rdv_menu_keyboard_bound) {
-    document.addEventListener('keydown', function(ev) {
+    document.addEventListener('keydown', function (ev) {
       if (ev.key === 'Escape' || ev.keyCode === 27) {
-        const sidebar = $('#sidebar') || $('.sidebar');
-        if (sidebar && sidebar.classList.contains('open')) {
+        const s = elSidebar();
+        if (s && s.classList.contains('open') && isMobile()) {
           ev.preventDefault();
           closeSidebar();
         }
       }
-    });
+    }, false);
     window.__rdv_menu_keyboard_bound = true;
   }
 
-  // Cleanup des handlers inline pour éviter les doublons
-  try {
-    const logoutEl = $('#logout-link') || $('.logout-btn') || $('a.logout') || $('[data-logout]');
-    if (logoutEl) {
-      if (logoutEl.hasAttribute('onclick')) {
-        logoutEl.removeAttribute('onclick');
-      }
-      try { logoutEl.onclick = null; } catch (e) {}
-    }
-  } catch (e) {
-    // ignore
-  }
-
-  // Fermer la sidebar si on clique à l'extérieur (touch devices)
-  if ('ontouchstart' in window && !window.__rdv_menu_touch_bound) {
-    document.addEventListener('touchstart', function(ev) {
-      const sidebar = $('#sidebar') || $('.sidebar');
-      const toggleBtn = $('.sidebar-toggle-btn');
-      
-      if (sidebar && sidebar.classList.contains('open')) {
-        // Si le clic n'est ni dans la sidebar ni sur le bouton toggle
-        if (!sidebar.contains(ev.target) && !toggleBtn?.contains(ev.target)) {
-          closeSidebar();
+  // Resize: if going to desktop, ensure overlay hidden and sidebar visible
+  if (!window.__rdv_menu_resize_bound) {
+    let rt;
+    window.addEventListener('resize', function () {
+      clearTimeout(rt);
+      rt = setTimeout(() => {
+        if (!isMobile()) {
+          const s = elSidebar();
+          if (s) { s.classList.add('open'); s.setAttribute('aria-hidden', 'false'); }
+          const ov = elOverlay();
+          if (ov) { ov.classList.remove('active'); ov.style.display = 'none'; ov.style.pointerEvents = 'none'; }
+          document.body.classList.remove('sidebar-open');
+          elToggle()?.setAttribute('aria-expanded', 'false');
         }
-      }
-    }, { passive: true });
-    window.__rdv_menu_touch_bound = true;
+      }, 120);
+    }, false);
+    window.__rdv_menu_resize_bound = true;
   }
 
-  // Support du swipe pour fermer la sidebar sur mobile
-  if (!window.__rdv_menu_swipe_bound) {
-    let touchStartX = 0;
-    let touchEndX = 0;
-    
-    document.addEventListener('touchstart', function(ev) {
-      const sidebar = $('#sidebar') || $('.sidebar');
-      if (sidebar && sidebar.classList.contains('open') && sidebar.contains(ev.target)) {
-        touchStartX = ev.changedTouches[0].screenX;
-      }
-    }, { passive: true });
-    
-    document.addEventListener('touchend', function(ev) {
-      const sidebar = $('#sidebar') || $('.sidebar');
-      if (sidebar && sidebar.classList.contains('open')) {
-        touchEndX = ev.changedTouches[0].screenX;
-        handleSwipe();
-      }
-    }, { passive: true });
-    
-    function handleSwipe() {
-      const swipeDistance = touchEndX - touchStartX;
-      // Swipe vers la gauche pour fermer (distance > 50px)
-      if (swipeDistance < -50) {
-        closeSidebar();
-      }
+  // initial state on load
+  function initState() {
+    ensureOverlay(); // create if missing
+    const s = elSidebar();
+    if (!s) return;
+    if (!isMobile()) {
+      s.classList.add('open');
+      s.setAttribute('aria-hidden', 'false');
+      const ov = elOverlay();
+      if (ov) { ov.classList.remove('active'); ov.style.display = 'none'; ov.style.pointerEvents = 'none'; }
+      document.body.classList.remove('sidebar-open');
+    } else {
+      s.classList.remove('open');
+      s.setAttribute('aria-hidden', 'true');
+      const ov = elOverlay();
+      if (ov) { ov.classList.remove('active'); ov.style.display = 'none'; ov.style.pointerEvents = 'none'; }
+      document.body.classList.remove('sidebar-open');
     }
-    
-    window.__rdv_menu_swipe_bound = true;
   }
 
-  // Export API pour debugging
-  window.__rdv_menu = {
-    toggleSidebar,
-    closeSidebar,
-    isInit: () => !!window.__rdv_menu_init,
-    isOpen: () => {
-      const sidebar = $('#sidebar') || $('.sidebar');
-      return sidebar ? sidebar.classList.contains('open') : false;
-    }
-  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initState);
+  else initState();
 
-  // Log de confirmation (retirer en production)
-  console.log('📱 Menu responsive initialisé');
+  // Public API
+  window.toggleSidebar = toggleSidebar;
+  window.openSidebar = openSidebar;
+  window.closeSidebar = closeSidebar;
 
+  console.log('menu.js: overlay control ready');
 })();

@@ -39,7 +39,7 @@ h3 i, h3 span {
   margin-top: 1rem;
   font-size: 0.9rem;
   color: #007bff;
-  text-decoration: none;
+  text-decoration: underline;
 }
 
 .btn-view-more:hover {

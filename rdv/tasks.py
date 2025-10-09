@@ -29,7 +29,7 @@ def notify_medecin_new_rdv(self, rdv_id):
             rdv.medecin.user,
             "Nouveau rendez-vous programmé",
             f"Un nouveau rendez-vous a été programmé avec {rdv.patient.user.nom_complet()} "
-            f"le {rdv.date_heure_rdv.strftime('%d/%m/%Y à %H:%M')}.\n"
+            f"le {timezone.localtime(rdv.date_heure_rdv).strftime('%d/%m/%Y à %H:%M')}.\n"
             f"Motif : {rdv.motif or 'Non précisé'}",
             notif_type='info',
             category='appointment',
@@ -48,6 +48,7 @@ def notify_medecin_new_rdv(self, rdv_id):
 def handle_status_change(self, rdv_id, old_status, new_status):
     """
     Gère les notifications selon le changement de statut (appelé par signal).
+    CORRECTION: Suppression du double appel à strftime()
     """
     try:
         from .models import RendezVous
@@ -60,14 +61,14 @@ def handle_status_change(self, rdv_id, old_status, new_status):
             ('programme', 'confirme'): {
                 'user': rdv.patient.user,
                 'subject': "Rendez-vous confirmé",
-                'message': f"Votre rendez-vous du {rdv.date_heure_rdv.strftime('%d/%m/%Y à %H:%M')} "
+                'message': f"Votre rendez-vous du {timezone.localtime(rdv.date_heure_rdv).strftime('%d/%m/%Y à %H:%M')} "
                           f"avec Dr. {rdv.medecin.user.nom_complet()} a été confirmé.",
                 'type': 'success'
             },
             ('confirme', 'annule'): {
                 'user': rdv.patient.user,
                 'subject': "Rendez-vous annulé",
-                'message': f"Votre rendez-vous du {rdv.date_heure_rdv.strftime('%d/%m/%Y à %H:%M')} "
+                'message': f"Votre rendez-vous du {timezone.localtime(rdv.date_heure_rdv).strftime('%d/%m/%Y à %H:%M')} "
                           f"a été annulé.\n"
                           f"Raison : {rdv.raison_annulation or 'Non précisée'}",
                 'type': 'warning'
@@ -75,7 +76,7 @@ def handle_status_change(self, rdv_id, old_status, new_status):
             ('programme', 'annule'): {
                 'user': rdv.patient.user,
                 'subject': "Rendez-vous annulé",
-                'message': f"Votre rendez-vous du {rdv.date_heure_rdv.strftime('%d/%m/%Y à %H:%M')} "
+                'message': f"Votre rendez-vous du {timezone.localtime(rdv.date_heure_rdv).strftime('%d/%m/%Y à %H:%M')} "
                           f"a été annulé.",
                 'type': 'warning'
             },
@@ -107,23 +108,28 @@ def handle_status_change(self, rdv_id, old_status, new_status):
         logger.exception(f"Erreur handle_status_change RDV #{rdv_id}: {e}")
         raise self.retry(exc=e, countdown=60)
 
-
 # ========================================
 # TÂCHES DE GESTION DES RENDEZ-VOUS
 # ========================================
+
 
 @shared_task(bind=True, max_retries=3)
 def auto_cancel_expired_rdv(self):
     """
     Annule automatiquement les RDV 'programmés' ou 'reportés' 
     dont la date est passée.
+    VERSION OPTIMISÉE : Ajout d'une fenêtre de grâce de 2h.
     """
     from .models import RendezVous
     
+    # AMÉLIORATION : Ajouter une fenêtre de grâce de 2h
+    # Ne pas annuler immédiatement si le RDV vient juste de passer
     now = timezone.now()
+    grace_period = now - timedelta(hours=2)
+    
     expired_rdvs = RendezVous.objects.filter(
         Q(statut='programme') | Q(statut='reporte'),
-        date_heure_rdv__lt=now
+        date_heure_rdv__lt=grace_period  # Pas "now" mais "grace_period"
     )
 
     total_cancelled = 0
@@ -131,7 +137,7 @@ def auto_cancel_expired_rdv(self):
     for rdv in expired_rdvs:
         try:
             rdv.cancel(
-                description="Annulation automatique - rendez-vous expiré",
+                description=f"Annulation automatique - rendez-vous expiré (date passée de {(now - rdv.date_heure_rdv).days} jours)",
                 by_user=None
             )
             total_cancelled += 1
@@ -140,7 +146,6 @@ def auto_cancel_expired_rdv(self):
             logger.error(f"Erreur annulation auto RDV #{rdv.id}: {e}")
 
     return f"{total_cancelled} rendez-vous expirés annulés"
-
 
 @shared_task(bind=True, max_retries=3)
 def auto_start_rdv(self):
@@ -188,20 +193,24 @@ def auto_start_rdv(self):
 def auto_complete_rdv(self):
     """
     Termine automatiquement les RDV 'en_cours' après leur durée prévue.
+    VERSION OPTIMISÉE : Filtre sur la date pour éviter de scanner tous les RDV.
     """
     from .models import RendezVous
     from .utils import create_and_send_notification
     
     now = timezone.now()
     
+    # OPTIMISATION : Chercher seulement les RDV en cours qui ont commencé il y a plus de 30 min
+    # Au lieu de tous les RDV en_cours
     rdvs_to_complete = RendezVous.objects.filter(
-        statut='en_cours'
+        statut='en_cours',
+        date_heure_rdv__lt=now - timedelta(minutes=30)  # Par défaut 30 min
     ).select_related('patient__user', 'medecin__user')
 
     completed_count = 0
 
     for rdv in rdvs_to_complete:
-        # Utiliser la durée du RDV ou 30 minutes par défaut
+        # Vérifier la durée réelle du RDV
         duration = timedelta(minutes=rdv.duree_minutes)
         end_time = rdv.date_heure_rdv + duration
         
@@ -227,23 +236,26 @@ def auto_complete_rdv(self):
 
     return f"{completed_count} rendez-vous terminés"
 
-
 # ========================================
 # TÂCHES DE RAPPEL
 # ========================================
+
 
 @shared_task(bind=True, max_retries=3)
 def send_rdv_reminder_24h(self):
     """
     Envoie un rappel 24h avant le RDV aux patients.
+    VERSION OPTIMISÉE : Fenêtre plus précise et meilleure gestion des doublons.
     """
     from .models import RendezVous, Notification
     from .utils import create_and_send_notification
     
     now = timezone.now()
     tomorrow = now + timedelta(hours=24)
-    window_start = tomorrow - timedelta(minutes=30)
-    window_end = tomorrow + timedelta(minutes=30)
+    
+    # OPTIMISATION : Fenêtre de 15 minutes au lieu de 60
+    window_start = tomorrow - timedelta(minutes=15)
+    window_end = tomorrow + timedelta(minutes=15)
 
     rdvs = RendezVous.objects.filter(
         statut__in=['confirme', 'programme'],
@@ -255,11 +267,19 @@ def send_rdv_reminder_24h(self):
 
     for rdv in rdvs:
         try:
-            # Vérifier qu'on n'a pas déjà envoyé
-            date_str = rdv.date_heure_rdv.strftime('%d/%m/%Y')
+            # AMÉLIORATION : Vérifier avec un identifiant unique pour ce RDV
+            cache_key = f"reminder_24h_{rdv.id}_{rdv.date_heure_rdv.date()}"
+            
+            # Vérifier dans le cache d'abord (plus rapide que DB)
+            from django.core.cache import cache
+            if cache.get(cache_key):
+                continue
+            
+            # Double vérification en DB pour sécurité
             already_sent = Notification.objects.filter(
                 user=rdv.patient.user,
-                message__contains=f"rappel de votre rendez-vous du {date_str}",
+                category='reminder',
+                message__contains=f"rendez-vous du {rdv.date_heure_rdv.strftime('%d/%m/%Y')}",
                 date_envoi__gte=now - timedelta(hours=25)
             ).exists()
 
@@ -267,14 +287,18 @@ def send_rdv_reminder_24h(self):
                 create_and_send_notification(
                     rdv.patient.user,
                     "Rappel : Rendez-vous demain",
-                    f"Rappel de votre rendez-vous du {rdv.date_heure_rdv.strftime('%d/%m/%Y à %H:%M')} "
+                    f"Rappel de votre rendez-vous du {timezone.localtime(rdv.date_heure_rdv).strftime('%d/%m/%Y à %H:%M')} "
                     f"avec Dr. {rdv.medecin.user.nom_complet()}.\n"
                     f"Adresse : {rdv.medecin.adresse_cabinet or 'Cabinet médical'}",
                     notif_type='info',
                     category='reminder',
                     rdv=rdv
                 )
+                
+                # Marquer comme envoyé dans le cache (expire dans 26h)
+                cache.set(cache_key, True, 60*60*26)
                 sent_count += 1
+                
         except Exception as e:
             logger.error(f"Erreur rappel 24h RDV #{rdv.id}: {e}")
 
@@ -317,7 +341,7 @@ def send_rdv_reminder_2h(self):
                     rdv.patient.user,
                     "Rappel : Rendez-vous dans 2 heures",
                     f"Rappel : Votre rendez-vous avec Dr. {rdv.medecin.user.nom_complet()} "
-                    f"est prévu dans 2 heures ({rdv.date_heure_rdv.strftime('%H:%M')}).\n"
+                    f"est prévu dans 2 heures ({timezone.localtime(rdv.date_heure_rdv).strftime('%H:%M')}).\n"
                     f"Adresse : {rdv.medecin.adresse_cabinet or 'Cabinet médical'}",
                     notif_type='warning',
                     category='reminder',
@@ -351,7 +375,7 @@ def notify_admins_failed_login(self, email, ip_address, attempt_count):
         try:
             create_and_send_notification(
                 admin,
-                "⚠ Tentatives de connexion suspectes",
+                "Tentatives de connexion suspectes",
                 f"Alerte sécurité : {attempt_count} tentatives de connexion échouées "
                 f"pour l'email {email} depuis l'IP {ip_address}.",
                 notif_type='warning',
@@ -439,7 +463,7 @@ def alert_unconfirmed_rdv_to_doctors(self):
     for medecin, rdvs in rdvs_by_medecin.items():
         try:
             rdv_list = "\n".join([
-                f"• {rdv.patient.user.nom_complet()} - {rdv.date_heure_rdv.strftime('%d/%m/%Y à %H:%M')}"
+                f"• {rdv.patient.user.nom_complet()} - {timezone.localtime(rdv.date_heure_rdv).strftime('%d/%m/%Y à %H:%M')}"
                 for rdv in rdvs[:5]
             ])
 
@@ -552,18 +576,37 @@ def send_weekly_stats_to_doctors(self):
 def cleanup_old_notifications(self):
     """
     Supprime les notifications lues de plus de 30 jours.
+    VERSION OPTIMISÉE : Suppression par lots pour éviter le verrouillage.
     """
     from .models import Notification
     
     threshold = timezone.now() - timedelta(days=30)
+    batch_size = 1000
+    total_deleted = 0
 
-    deleted_count, _ = Notification.objects.filter(
-        is_read=True,
-        date_read__lt=threshold
-    ).delete()
+    while True:
+        # Récupérer un lot d'IDs à supprimer
+        ids = list(Notification.objects.filter(
+            is_read=True,
+            date_read__lt=threshold
+        ).values_list('id', flat=True)[:batch_size])
+        
+        if not ids:
+            break
+        
+        # Supprimer le lot
+        deleted_count = Notification.objects.filter(id__in=ids).delete()[0]
+        total_deleted += deleted_count
+        
+        logger.info(f"Supprimé {deleted_count} notifications (total: {total_deleted})")
+        
+        # Petit délai pour éviter de surcharger la DB
+        if deleted_count == batch_size:
+            import time
+            time.sleep(0.1)
 
-    logger.info(f"Nettoyage : {deleted_count} notifications supprimées")
-    return f"{deleted_count} notifications nettoyées"
+    logger.info(f"Nettoyage terminé : {total_deleted} notifications supprimées")
+    return f"{total_deleted} notifications nettoyées"
 
 
 @shared_task(bind=True)
@@ -598,7 +641,7 @@ def generate_daily_stats_report(self):
     admins = Utilisateur.objects.filter(role='admin', is_actif=True)
 
     message = (
-        f"📊 Rapport quotidien du {today.strftime('%d/%m/%Y')}\n\n"
+        f"  Rapport quotidien du {today.strftime('%d/%m/%Y')}\n\n"
         f"• Nouveaux patients : {stats['nouveaux_patients']}\n"
         f"• RDV créés : {stats['rdv_crees']}\n"
         f"• RDV terminés : {stats['rdv_termines']}\n"

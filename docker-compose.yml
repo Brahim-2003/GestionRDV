@@ -24,8 +24,6 @@ services:
     ports:
       - '5432:5432'
 
-
-
   web:
     build: .
     container_name: gestionrdv_web
@@ -56,7 +54,8 @@ services:
   beat:
     build: .
     container_name: gestionrdv_celery_beat
-    command: celery -A GestionRDV beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    # Ajouter --pidfile avec un chemin absolu
+    command: celery -A GestionRDV beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler --pidfile=/tmp/celerybeat.pid
     volumes:
       - .:/app:rw
     env_file: .env
@@ -65,7 +64,9 @@ services:
       - db
       - web
     restart: unless-stopped
-
+    # Ne PAS mettre tty/stdin_open
 volumes:
   pgdata:
 
+
+  

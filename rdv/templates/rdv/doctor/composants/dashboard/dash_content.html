@@ -1,13 +1,7 @@
 <div class="section-header">
     <div class="welcome-section">
         <h2 class="welcome-title">Bonjour Dr. {{ user.nom_complet }}</h2>
-        <p class="specialty">Spécialité: 
-            {% if user.specialite %}
-            {{ user.specialite }}
-            {% else %}
-            Aucune information
-            {% endif %} 
-        </p>
+        <p class="specialty">Spécialité: {{ user.profil_medecin.get_specialite_display  }}</p>
     </div>
     
 </div>

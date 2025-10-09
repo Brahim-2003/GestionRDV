@@ -1102,7 +1102,7 @@ def annuler_rdv(request, rdv_id):
             rdv.cancel(description=description, by_user=request.user)
 
             RdvHistory.objects.create(
-                rdv=rdv,   # ⚠️ adapter au vrai champ de ton modèle
+                rdv=rdv,   
                 action="annule",
                 performed_by=request.user,
                 description=f"Rendez-vous annulé. Raison: {description}"
@@ -2048,7 +2048,6 @@ def api_creneaux_medecin(request, medecin_id):
         'creneaux': creneaux
     })
 
-
 @login_required
 @require_POST
 def api_reserver_rdv(request):
@@ -2057,15 +2056,29 @@ def api_reserver_rdv(request):
     patient = get_object_or_404(Patient, user=request.user)
     medecin = get_object_or_404(Medecin, id=data['medecin_id'])
     
-    # Parser datetime
-    dt = datetime.fromisoformat(data['datetime'])
-    if timezone.is_naive(dt):
-        dt = timezone.make_aware(dt)
+    # Parser datetime - CORRECTION ICI
+    dt_str = data['datetime']
+    
+    # Si le format contient 'T', c'est un ISO local
+    if 'T' in dt_str:
+        # Parser la date locale (sans timezone)
+        dt = datetime.fromisoformat(dt_str.replace('Z', '+00:00'))
+        
+        # Si elle est naive (pas de timezone), la rendre aware avec la timezone locale
+        if timezone.is_naive(dt):
+            dt = timezone.make_aware(dt, timezone.get_current_timezone())
+    else:
+        # Fallback pour autres formats
+        dt = datetime.fromisoformat(dt_str)
+        if timezone.is_naive(dt):
+            dt = timezone.make_aware(dt, timezone.get_current_timezone())
     
     # Vérifier disponibilité
+    end_time = dt + timedelta(minutes=30)
     if RendezVous.objects.filter(
         medecin=medecin,
-        date_heure_rdv=dt,
+        date_heure_rdv__lt=end_time,
+        date_heure_rdv__gte=dt,
         statut__in=['programme', 'confirme']
     ).exists():
         return JsonResponse({'success': False, 'error': 'Créneau déjà pris'}, status=400)
@@ -2074,10 +2087,16 @@ def api_reserver_rdv(request):
     rdv = RendezVous.objects.create(
         patient=patient,
         medecin=medecin,
-        date_heure_rdv=dt,
+        date_heure_rdv=dt,  # dt est maintenant correctement aware
         motif=data.get('motif', ''),
         statut='programme',
         duree_minutes=30
+    )
+    RdvHistory.objects.create(
+        rdv=rdv,
+        action="create",
+        performed_by=request.user,
+        description="Rendez-vous créé"
     )
     
     return JsonResponse({
@@ -2085,6 +2104,7 @@ def api_reserver_rdv(request):
         'rdv_id': rdv.id,
         'message': 'Rendez-vous réservé avec succès'
     })
+
 
 @login_required
 @require_POST  

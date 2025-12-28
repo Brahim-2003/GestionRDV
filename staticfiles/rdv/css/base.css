@@ -36,7 +36,6 @@ h1, h2, h3, h4, h5, h6 {
 a {
   text-decoration: none;
   color: var(--primary-color);
-  
 }
 
 button {
@@ -51,22 +50,31 @@ button {
   position: relative;
 }
 
+/* ===== SIDEBAR (consolidé) =====
+   - background légèrement translucide pour desktop selon ton code d'origine.
+   - position fixed / off-canvas géré en responsive plus bas.
+*/
 .sidebar {
   position: fixed;
   top: 0;
   left: 0;
   width: var(--sidebar-width);
   height: 100vh;
-  background-color: #ffffff;
+  background-color: #f0eeee; /* conservé */
   display: flex;
   flex-direction: column;
-  border-right: 5px solid var(--border-color);
-  z-index: 1000;
+  z-index: 1110; /* sidebar above overlay on mobile */
   overflow: hidden;
+  border-right: 1px solid rgb(195, 198, 199);
+  -webkit-overflow-scrolling: touch;
 }
 
+/* Safety duplicate removed; if besoin, on peut surcharger via media queries */
+.sidebar-toggle-btn {
+  z-index: 1120; /* toggle above sidebar & overlay */
+}
 
-/* override fiable pour #ajax-content */
+/* ===== override fiable pour #ajax-content ===== */
 #ajax-content {
   margin-left: var(--sidebar-width);
   width: calc(100vw - var(--sidebar-width));
@@ -80,31 +88,47 @@ button {
   overflow-y: auto;
 }
 
-
-/* ===== OVERLAY MOBILE ===== */
-.sidebar-overlay {
-  display: none;
+.sidebar-overlay,
+#sidebar-overlay {
+  /* keep element present for transitions, but no blur by default */
+  display: block;
   position: fixed;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 999;
+  width: 100vw;
+  height: 100vh;
+
+  /* invisible / non cliquable par défaut */
+  background: rgba(0, 0, 0, 0); /* transparent */
   opacity: 0;
   visibility: hidden;
-  transition: all 0.3s ease;
+  pointer-events: none;
+
+  /* no blur by default (important) */
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+
+  transition: opacity 0.28s ease, visibility 0.28s ease, background 0.28s ease;
+  z-index: 1090; /* en dessous de la sidebar qui doit être > 1090 */
 }
 
-.sidebar-overlay.active {
-  display: block;
+/* état visible : applique le flou et accepte les clics */
+.sidebar-overlay.active,
+#sidebar-overlay.active {
+  background: rgba(0, 0, 0, 0.45);
   opacity: 1;
   visibility: visible;
+  pointer-events: auto;
+
+  /* blur activé seulement quand actif */
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
 }
 
-/* Bouton principal */
+
+/* ===== Boutons globaux / utilitaires ===== */
 .btn-primary {
-  background: #007bff;
+  background: var(--primary-color);
   color: #fff;
   border: none;
   padding: 0.5rem 1rem;
@@ -118,53 +142,50 @@ button {
   background: #0056b3;
 }
 
-/* En-tête de section */
+/* ===== EN-TÊTE DE SECTION ===== */
 .section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin: 10px 20px;
+  width: 90%;
+  margin-left: 2rem;
 }
-
 .section-header h2 {
   font-size: 1.25rem;
   font-weight: 700;
   margin: 0;
   color: #22223b;
 }
-
 .section-header p {
   color: #6c757d;
   margin: 2px 0 0;
   font-size: 0.875rem;
 }
-/* Conteneur form en flex */
+
+/* ===== SEARCH / FILTRES ===== */
 .search-filter-bar {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
   align-items: center;
-  width: 100%;
+  width: 95%;
   padding: 8px;
   background: #fff;
   border-radius: 8px;
   box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  margin-left: 1rem;
+  margin-bottom: 1rem;
 }
-
-/* Tous les direct children prennent de la place */
 .search-filter-bar > * {
   flex: 1;
   min-width: 0;
 }
-
-/* Zone recherche : peut être .search-input-container ou .search-filter-bar (cas erroné) */
 .search-filter-bar .search-input-container,
 .search-filter-bar > .search-filter-bar {
-  flex: 2;               /* 2 parts */
+  flex: 2;
   position: relative;
 }
-
-/* Icône dans la zone recherche */
 .search-filter-bar .search-icon {
   position: absolute;
   left: 12px;
@@ -174,8 +195,6 @@ button {
   color: #6c757d;
   pointer-events: none;
 }
-
-/* Inputs et select remplissent leur conteneur */
 .search-filter-bar input,
 .search-filter-bar select {
   width: 100%;
@@ -186,29 +205,18 @@ button {
   font-size: 0.875rem;
   background: #f8f9fa;
   transition: border-color 0.2s, box-shadow 0.2s;
-  /* si icône présente, on compense le padding */
 }
-.search-filter-bar .search-input-container input {
-  padding-left: 36px;
-}
-
+.search-filter-bar .search-input-container input { padding-left: 36px; }
 .search-filter-bar input:focus,
 .search-filter-bar select:focus {
-  border-color: #007bff;
+  border-color: var(--primary-color);
   box-shadow: 0 0 0 0.1rem rgba(0,123,255,0.25);
   outline: none;
 }
-
-/* Champ date et select : 1 part chacun */
 .search-filter-bar .date-input,
-.search-filter-bar .filter-select {
-  flex: 1;
-}
+.search-filter-bar .filter-select { flex: 1; }
 
-
-
-
-/* Conteneur principal */
+/* ===== CONTENEUR PRINCIPAL / TAB CONTENT ===== */
 .tab-content {
   background: #f8fafc;
   padding: 20px 16px;
@@ -216,22 +224,21 @@ button {
   max-width: 1100px;
   margin: 20px auto;
   font-family: 'Inter', Arial, sans-serif;
+  margin-left: 2rem;
 }
 
-/* Tableau */
+/* ===== TABLEAUX ===== */
 .data-table {
-  width: 100%;
+  width: 95%;
   border-collapse: separate;
   border-spacing: 0;
   background: #fff;
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 2px 6px rgba(60, 72, 88, 0.06);
+  margin-left: 1rem;
 }
-.data-table th, .data-table td {
-  padding: 12px;
-  text-align: left;
-}
+.data-table th, .data-table td { padding: 12px; text-align: left; }
 .data-table thead th {
   background: #f1f5f9;
   color: #22223b;
@@ -239,18 +246,11 @@ button {
   font-size: 0.875rem;
   border-bottom: 1px solid #e0e6ed;
 }
-.data-table tbody tr {
-  border-bottom: 1px solid #e0e6ed;
-}
-.data-table tbody tr:last-child {
-  border-bottom: none;
-}
-.data-table td {
-  font-size: 0.875rem;
-  color: #22223b;
-}
+.data-table tbody tr { border-bottom: 1px solid #e0e6ed; }
+.data-table tbody tr:last-child { border-bottom: none; }
+.data-table td { font-size: 0.875rem; color: #22223b; }
 
-/* Actions */
+/* ===== ACTIONS (icônes / boutons) ===== */
 .action-btn-edit{
   color: rgb(44, 233, 44);
   background: none;
@@ -260,7 +260,6 @@ button {
   margin-right: 0.5rem;
   transition: transform 0.2s;
 }
-
 .action-btn-delete {
   color: rgb(232, 71, 71);
   background: none;
@@ -270,25 +269,13 @@ button {
   margin-right: 0.5rem;
   transition: transform 0.2s;
 }
-.action-btn-edit:hover {
-  transform: scale(1.02);
-  color: #157f20;
-}
-.action-btn-delete:hover {
-  transform: scale(1.02);
-  color: #b1202e;
-}
+.action-btn-edit:hover { transform: scale(1.02); color: #157f20; }
+.action-btn-delete:hover { transform: scale(1.02); color: #b1202e; }
 
-
-
-
-
-/* modal.css */
-
-/* ===== MODAL OVERLAY (fond fixe) ===== */
+/* ===== MODAL (consolidé) ===== */
 .modal-overlay {
   position: fixed;
-  inset: 0;                    /* top/right/bottom/left = 0 */
+  inset: 0;
   background: rgba(12,20,30,0.45);
   display: flex;
   align-items: center;
@@ -298,15 +285,11 @@ button {
   -webkit-backdrop-filter: blur(2px);
   backdrop-filter: blur(2px);
 }
-
-/* helper pour cacher le modal (utilisé par ton JS) */
 .modal-overlay.hidden { display: none; }
-
-/* ===== MODAL BOX ===== */
 
 .modal {
   width: 100%;
-  max-width: 880px;           /* large enough for desktop */
+  max-width: 880px;
   background: #fff;
   border-radius: 12px;
   box-shadow: 0 18px 40px rgba(11,20,30,0.18);
@@ -315,9 +298,6 @@ button {
   display: flex;
   flex-direction: column;
 }
-
-/* ===== HEADER ===== */
-
 .modal-header {
   display: flex;
   align-items: center;
@@ -330,12 +310,11 @@ button {
   margin: 0;
   font-size: 20px;
   font-weight: 700;
-  color: #0b2340; /* titre sombre */
+  color: #0b2340;
   display: flex;
   align-items: center;
   gap: 10px;
 }
-
 .modal-header .modal-close {
   background: transparent;
   border: none;
@@ -347,28 +326,20 @@ button {
   border-radius: 8px;
 }
 .modal-header .modal-close:hover { background: rgba(0,0,0,0.04); }
+.modal-body { padding: 20px 24px; overflow: auto; }
 
-/* ===== BODY (scrollable) ===== */
-.modal-body {
-  padding: 20px 24px;
-  overflow: auto;
-}
-
-
-/* ===== ANIMATION ===== */
+/* ===== ANIMATIONS ===== */
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(-10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* ===== FORMULAIRE COMPACT ET MODERNE ===== */
+/* ===== FORMULAIRE COMPACT & MODERN-FORM ===== */
 .modern-form {
   font-family: "Inter", system-ui, -apple-system, "Helvetica Neue", Arial;
   color: #24303b;
   max-width: 100%;
 }
-
-/* titre du formulaire (dans le fragment) */
 .modern-form .form-title {
   margin: 0 0 12px 0;
   font-size: 18px;
@@ -377,25 +348,20 @@ button {
   align-items:center;
   gap:10px;
 }
-
-
-/* paragraph d'aide ou instructions */
 .modern-form p, .modern-form .helptext {
   color: #55656f;
   margin: 8px 0 14px;
   line-height: 1.4;
   font-size: 14px;
 }
-
-
-/* Label */
 .modern-form label {
   font-weight: 600;
   font-size: 0.85rem;
   color: #374151;
+  display: block;
+  font-size: 13px;
+  margin-bottom: 6px;
 }
-
-/* Champs input/select */
 .modern-form .form-control,
 .modern-form input,
 .modern-form select {
@@ -413,9 +379,6 @@ button {
   border-color: #3b82f6;
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
-
-/* affichage des champs générés par form.as_p
-   on cible .form-control que tu utilises dans ton Form */
 .modern-form .form-control,
 .modern-form input[type="time"],
 .modern-form input[type="date"],
@@ -434,7 +397,7 @@ button {
   transition: box-shadow .15s, border-color .15s;
 }
 
-/* Actions (boutons) */
+/* Actions (boutons inside forms) */
 .form-actions {
   display:flex;
   gap:12px;
@@ -464,75 +427,24 @@ button {
   color: #24303b;
   border: 1px solid rgba(18,32,42,0.04);
 }
-
-.form-actions .btn-secondary:hover {
-  background: #dadfea;
-}
+.form-actions .btn-secondary:hover { background: #dadfea; }
 .form-actions .modal-cancel { padding-left:10px; }
 
-
-/* labels générés par as_p (p > label etc.) */
-.modern-form label {
-  display: block;
-  font-size: 13px;
-  margin-bottom: 6px;
-  color: #32414b;
-  font-weight: 600;
-}
-
-/* erreurs / help text */
-.modern-form .errorlist {
-  margin: 6px 0 12px;
-  color: #d64545;
-  font-size: 13px;
-  list-style: none;
-  padding-left: 0;
-}
-.modern-form .nonfield-errors {
-  color:#c41c1c;
-  font-size:14px;
-  margin-bottom:10px;
-}
-
+/* Errors & helper */
+.modern-form .errorlist { margin: 6px 0 12px; color: #d64545; font-size: 13px; list-style: none; padding-left: 0; }
+.modern-form .nonfield-errors { color:#c41c1c; font-size:14px; margin-bottom:10px; }
 
 /* checkbox */
-.form-check {
-  display:flex;
-  align-items:center;
-  gap:8px;
-}
-.form-check-input {
-  width:18px;
-  height:18px;
-  accent-color: #2c7be5; /* modern checkbox color in supporting browsers */
-}
+.form-check { display:flex; align-items:center; gap:8px; }
+.form-check-input { width:18px; height:18px; accent-color: #2c7be5; }
 
+/* ===== SCROLLBAR PERSONNALISÉE POUR MODALS & SIDEBAR ===== */
+.modal-body::-webkit-scrollbar { width: 6px; }
+.modal-body::-webkit-scrollbar-track { background: #f1f5f9; }
+.modal-body::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+.modal-body::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
 
-
-/* ===== SCROLLBAR PERSONNALISÉE POUR LE MODAL ===== */
-.modal-body::-webkit-scrollbar {
-  width: 6px;
-}
-.modal-body::-webkit-scrollbar-track {
-  background: #f1f5f9;
-}
-.modal-body::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
-}
-.modal-body::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-
-/* small screens: buttons stacked */
-@media (max-width:540px){
-  .modal { max-width: 92vw; }
-  .form-actions { flex-direction: column-reverse; gap:10px; }
-  .form-actions .btn-primary, .form-actions .btn-secondary { width: 100%; }
-}
-
-
-
+/* ===== BADGES ===== */
 .badge {
   display: inline-block;
   padding: 0.25rem 0.5rem;
@@ -541,91 +453,15 @@ button {
   font-weight: 400;
   color: #212529;
 }
-
-.badge-programme  { background: #c0c4c750; } /* gris */
-.badge-confirme   { background: #9ff5b379; } /* vert */
-.badge-en_cours   { background: #36c5db81; } /* bleu */
-.badge-termine    { background: #4d53587e; } /* sombre */
-.badge-annule     { background: #ea75808d; } /* rouge */
-.badge-reporte    { background: #f2d6819a; } /* jaune (texte sombre) */
-
-
-
-
-
-
-
-
-/* Responsive */
-@media (max-width: 600px) {
-  .search-filter-bar {
-    flex-direction: column;
-  }
-  .search-filter-bar input[type="search"] {
-    width: 100%;
-  }
-}
-
-/* Responsive : sur très petit écran, on empile */
-@media (max-width: 500px) {
-  .search-filter-bar {
-    flex-direction: column;
-    gap: 8px;
-  }
-  .search-filter-bar > * {
-    width: 100%;
-  }
-}
-
-
-
-
-
-/* ===== RESPONSIVE DESIGN ===== */
-@media (max-width: 1200px) {
-  :root {
-    --sidebar-width: 240px;
-  }
-}
-
-@media (max-width: 768px) {
-  .app-container {
-    flex-direction: row;
-  }
-  
-  .sidebar {
-    transform: translateX(-100%);
-    transition: transform 0.3s ease;
-    width: 280px;
-    z-index: 1001;
-  }
-  
-  .sidebar.open {
-    transform: translateX(0);
-  }
-  
-  #ajax-content {
-    margin-left: 0;
-    width: 100%;
-  }
-  
-  .sidebar-overlay.active {
-    display: block;
-  }
-}
-
-@media (max-width: 480px) {
-  .sidebar {
-    width: 100vw;
-  }
-}
+.badge-programme  { background: #c0c4c750; }
+.badge-confirme   { background: #9ff5b379; }
+.badge-en_cours   { background: #36c5db81; }
+.badge-termine    { background: #4d53587e; }
+.badge-annule     { background: #ea75808d; }
+.badge-reporte    { background: #f2d6819a; }
 
 /* ===== UTILITAIRES ===== */
-.text-truncate {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+.text-truncate { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .main-content {
   padding: 2rem;
@@ -634,7 +470,7 @@ button {
   overflow-x: auto;
 }
 
-/* Fix pour éviter les conflits */
+/* Fix localisé pour conflits d'app-container -> main-content -> ajax-content */
 .app-container .main-content #ajax-content {
   margin: 0 !important;
   padding: 0 !important;
@@ -642,4 +478,255 @@ button {
   box-shadow: none !important;
 }
 
+/* ===== AJOUTS RESPONSIVITÉ (body.sidebar-open) =====
+   - On garde position:fixed pour bloquer le scroll sur mobile, mais
+     on s'assure que sidebar z-index > overlay pour que le menu reste cliquable.
+*/
+body.sidebar-open {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+}
 
+/* ===== RESPONSIVE RULES (regroupées & nettoyées) ===== */
+
+/* Large screens defaults (>= 1200px) */
+@media (min-width: 1200px) {
+  :root { --sidebar-width: 260px; }
+  .main-content { max-width: 1400px; margin: 0 auto; }
+  .tab-content { max-width: 1200px; }
+}
+
+/* Very large screens */
+@media (min-width: 1440px) {
+  :root { --sidebar-width: 280px; }
+  .section-header h2 { font-size: 1.35rem; }
+}
+
+/* Tablet -> Desktop breakpoint (<= 1200px) */
+@media (max-width: 1200px) {
+  :root { --sidebar-width: 240px; }
+  .section-header { margin: 8px 16px; }
+  .section-header h2 { font-size: 1.15rem; }
+  .nav-tab, .logout { padding: 0.6875rem 0.875rem; font-size: 0.8125rem; }
+}
+
+/* Mobile & small tablets (<= 768px) — consolidated once */
+@media (max-width: 768px) {
+  /* MAIN LAYOUT */
+  .app-container { flex-direction: row; }
+
+  /* SIDEBAR off-canvas behaviour (mobile) */
+  .sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.4,0,0.2,1);
+    width: 280px;
+    z-index: 1110;
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100vh;
+    background: #f0eeee;/* ensure menu is opaque on mobile */
+    box-shadow: 2px 0 12px rgba(11,20,30,0.12);
+    overflow-y: auto;
+    will-change: transform;
+  }
+  .sidebar.open { transform: translateX(0); }
+
+  /* Toggle and close buttons */
+  .sidebar-toggle-btn { display: flex; position: fixed; top: 1rem; left: 1rem; z-index: 1120; }
+  .sidebar-close-btn { display: flex; z-index: 1125; position: absolute; top: 1rem; right: 1rem; }
+
+  /* Overlay visible but kept under sidebar (z-index order ensures menu clickable) */
+ /* ===== OVERLAY (fix flou persistant & clic bloqué) =====
+   - Le backdrop-filter n'est PAS appliqué par défaut.
+   - pointer-events désactivés quand l'overlay n'est pas actif.
+   - Le flou + l'opacity ne s'activent qu'avec la classe .active.
+*/
+.sidebar-overlay,
+#sidebar-overlay {
+  /* keep element present for transitions, but no blur by default */
+  display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+
+  /* invisible / non cliquable par défaut */
+  background: rgba(0, 0, 0, 0); /* transparent */
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+
+  /* no blur by default (important) */
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+
+  transition: opacity 0.28s ease, visibility 0.28s ease, background 0.28s ease;
+  z-index: 1090; /* en dessous de la sidebar qui doit être > 1090 */
+}
+
+/* état visible : applique le flou et accepte les clics */
+.sidebar-overlay.active,
+#sidebar-overlay.active {
+  background: rgba(0, 0, 0, 0.45);
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+
+  /* blur activé seulement quand actif */
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+
+  /* Content area adjusts */
+  #ajax-content { margin-left: 0; width: 100%; padding: 1rem; }
+  .main-content { padding: 1rem; }
+
+  /* Section header adjustments for small screens */
+  .section-header { flex-direction: column; align-items: flex-start; gap: 0.75rem; margin: 8px 12px; }
+  .section-header h2 { font-size: 1.1rem; }
+  .section-header p { font-size: 0.8125rem; }
+
+  /* Search/filter bar goes vertical */
+  .search-filter-bar { flex-direction: column; gap: 10px; padding: 10px; }
+  .search-filter-bar > * { width: 95%; }
+
+  /* Tab/content adjustments */
+  .tab-content { padding: 12px 8px; margin: 12px 8px; }
+  .data-table { font-size: 0.8125rem; }
+  .data-table th, .data-table td { padding: 8px 6px; }
+  .data-table thead th { font-size: 0.8rem; }
+
+  /* Modals */
+  .modal { max-width: calc(100vw - 32px); margin: 16px; }
+  .modal-header, .modal-body { padding: 16px; }
+  .modal-title { font-size: 18px; }
+}
+
+/* Very small mobiles (<= 480px) */
+@media (max-width: 480px) {
+  .sidebar { width: 100%; max-width: 320px; }
+  #ajax-content { padding: 0.75rem; }
+  .main-content { padding: 0.75rem; }
+  .section-header { margin: 6px 8px; }
+  .section-header h2 { font-size: 1rem; }
+  .section-header p { font-size: 0.75rem; }
+
+  .btn-primary { padding: 0.4rem 0.75rem; font-size: 0.8125rem; }
+
+  .modern-form input, .modern-form select, .modern-form .form-control { font-size: 0.875rem; padding: 0.45rem 0.65rem; }
+  .modern-form label { font-size: 0.8rem; }
+
+  .form-actions { flex-direction: column; gap: 8px; }
+  .form-actions .btn-primary, .form-actions .btn-secondary { width: 100%; justify-content: center; padding: 0.75rem 1rem; }
+
+  .data-table th, .data-table td { padding: 6px 4px; font-size: 0.75rem; }
+  .data-table thead th { font-size: 0.75rem; }
+
+  .action-btn-edit, .action-btn-delete { font-size: 1rem; margin-right: 0.25rem; }
+  .badge { padding: 0.2rem 0.4rem; font-size: 0.75rem; }
+
+  .modal { max-width: 100%; max-height: 100vh; margin: 0; border-radius: 0; }
+  .modal-header, .modal-body { padding: 12px; }
+  .modal-title { font-size: 16px; }
+}
+
+/* Extra tiny screens (<= 360px) */
+@media (max-width: 360px) {
+  .sidebar { max-width: 100%; }
+  .section-header h2 { font-size: 0.9375rem; }
+  .btn-primary { font-size: 0.75rem; padding: 0.375rem 0.625rem; }
+  .data-table { font-size: 0.7rem; }
+  .data-table th, .data-table td { padding: 4px 3px; }
+  .sidebar-toggle-btn { width: 36px; height: 36px; top: 0.75rem; left: 0.75rem; }
+  .sidebar-toggle-btn span { width: 18px; }
+}
+
+/* Landscape small devices */
+@media (max-width: 768px) and (orientation: landscape) {
+  .sidebar { width: 260px; }
+  .modal { max-height: 90vh; }
+  .modal-body { max-height: calc(90vh - 120px); }
+  .sidebar-menu { max-height: calc(100vh - 200px); }
+  .sidebar-toggle-btn { display: flex; }
+}
+
+/* Optimisations pour appareils tactiles */
+@media (hover: none) and (pointer: coarse) {
+  .nav-tab, .logout, .btn-primary, .action-btn-edit, .action-btn-delete { min-height: 44px; }
+  .sidebar-toggle-btn { min-width: 44px; min-height: 44px; }
+  .nav-tab:active, .btn-primary:active { transform: scale(0.98); }
+}
+
+/* Réduire animations si préférence système */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .sidebar, .sidebar-overlay { transition: none !important; }
+}
+
+/* Impression */
+@media print {
+  .sidebar, .sidebar-overlay, .sidebar-toggle-btn, .action-btn-edit, .action-btn-delete, .btn-primary { display: none !important; }
+  #ajax-content { margin-left: 0; width: 100%; }
+  .data-table { page-break-inside: avoid; }
+}
+
+/* Safari iOS specific fix */
+@supports (-webkit-touch-callout: none) {
+  .sidebar { -webkit-overflow-scrolling: touch; }
+  body.sidebar-open { position: fixed; overflow: hidden; }
+}
+
+/* Fallback if backdrop-filter unsupported */
+@supports not (backdrop-filter: blur(2px)) {
+  .sidebar-overlay { background: rgba(0, 0, 0, 0.6); }
+}
+
+/* ===== Overlay sidebar : comportement robuste et accessible ===== */
+/* Overlay invisible / non-cliquable par défaut */
+#sidebar-overlay,
+.sidebar-overlay {
+  display: none;                 /* IMPORTANT : remove phantom overlay from layout */
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  z-index: 1090;                 /* dessous la sidebar */
+  transition: opacity .28s ease, visibility .28s ease, backdrop-filter .28s ease;
+}
+
+/* Overlay actif : visible et cliquable */
+#sidebar-overlay.active,
+.sidebar-overlay.active {
+  display: block;                /* rendered and reachable */
+  pointer-events: auto;
+  opacity: 1;
+  visibility: visible;
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+
+/* Sidebar au-dessus de l'overlay */
+#sidebar, .sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1110;                 /* plus haut que overlay */
+}
+
+/* Toggle au-dessus de tout */
+#sidebar-toggle-btn, .sidebar-toggle-btn {
+  position: fixed;
+  z-index: 1120;
+}

@@ -1,0 +1,29 @@
+/* Conteneur principal */
+.tab-content {
+  background: #f8fafc;
+  padding: 20px 16px;
+  border-radius: 8px;
+  max-width: 1100px;
+  margin: 20px auto;
+  font-family: 'Inter', Arial, sans-serif;
+}
+
+
+.stat {
+  font-size: 0.8125rem;
+  color: #0c5a11;
+  background-color: #caebd2;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+/* Badge de rôle */
+.user-date {
+  background: #e3f0ff;
+  color: #007bff;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.8125rem;
+}

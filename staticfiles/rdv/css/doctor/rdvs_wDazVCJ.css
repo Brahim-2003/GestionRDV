@@ -1,0 +1,218 @@
+/* =========================================================
+   Styles tableau rendez-vous - version finale & corrigée
+   ========================================================= */
+
+/* Variables globales — mettre au root pour éviter scope issues */
+:root {
+  --color-confirm: #1c9a33;        /* vert */
+  --color-confirm-dark: #1d702d;
+  --color-report: #c6aa1b;         /* jaune/orange */
+  --color-report-dark: #8e7814;
+  --color-cancel: #a63535;         /* rouge */
+  --color-cancel-dark: #791a1a;
+  --color-notifier: #1d6da6;       /* bleu */
+  --color-notifier-dark: #18507b;
+  --btn-text-color: #ffffff;       /* texte blanc sur fond coloré */
+  --btn-radius: 4px;
+}
+
+/* Conteneur principal */
+#rdv-content, .tab-content {
+  background: #fff;
+  padding: 20px 16px;
+  border-radius: 8px;
+  max-width: 100%;
+  margin: 10px auto;
+  font-family: 'Inter', Arial, sans-serif;
+}
+
+/* Assurer que la cellule actions n'écrase pas les boutons */
+.data-table td {
+  vertical-align: middle;
+  white-space: nowrap;      /* empêche le wrapping des icônes/texte */
+  overflow: visible;
+}
+
+/* ======================================
+   Sélecteur unifié pour <a> et <button>
+   applique les mêmes règles aux deux
+   (mais on évite de forcer background ici)
+   ====================================== */
+.data-table a[class^="action-btn-"],
+.data-table button[class^="action-btn-"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 40px;
+  height: 36px;
+  padding: 6px 10px;
+  margin-right: 0.4rem;
+  text-decoration: none;
+  box-sizing: border-box;
+  transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease, color 0.12s ease;
+  font-size: 1.05rem;
+  line-height: 1;
+  gap: 0.5rem;
+  cursor: pointer;
+  border: none;                  /* enlève la bordure native */
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: var(--btn-radius);
+  color: inherit;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.03);
+  align-self: center;
+  vertical-align: middle;
+}
+
+/* Focus accessible (remplacer outline par halo visible) */
+.data-table a[class^="action-btn-"]:focus,
+.data-table button[class^="action-btn-"]:focus {
+  outline: none;
+  transform: translateY(-1px);
+  z-index: 1;
+}
+
+/* Focus-visible */
+.data-table a[class^="action-btn-"]:focus-visible,
+.data-table button[class^="action-btn-"]:focus-visible {
+  box-shadow:
+    0 1px 0 rgba(0,0,0,0.03),
+    0 0 0 4px rgba(36,152,235,0.12);
+}
+
+/* texte du bouton */
+.button {
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Icônes (boxicons) : s'assurer qu'elles ne dépassent pas */
+.data-table a[class^="action-btn-"] i,
+.data-table button[class^="action-btn-"] i {
+  pointer-events: none;
+  font-size: 1.05rem;
+  vertical-align: middle;
+  display: inline-block;
+  line-height: 1;
+  color: inherit;
+  opacity: 0.98;
+}
+
+/* Réduction d'espace sur petits écrans */
+@media (max-width: 520px) {
+  .data-table a[class^="action-btn-"],
+  .data-table button[class^="action-btn-"] {
+    min-width: 34px;
+    height: 32px;
+    padding: 4px 6px;
+    margin-right: 0.25rem;
+    gap: 0.35rem;
+  }
+  .data-table td {
+    white-space: nowrap;
+  }
+}
+
+/* aligner la dernière colonne à droite pour éviter overflow */
+.data-table td:last-child {
+  text-align: right;
+}
+
+/* Badge statut */
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+}
+
+/* =========================================================
+   Couleurs par défaut pour chaque action (sélecteurs plus spécifiques)
+   On utilise .data-table button.action-btn-... et .data-table a.action-btn-...
+   pour gagner en spécificité contre frameworks externes.
+   ========================================================= */
+
+/* CONFIRMER */
+.data-table button.action-btn-confirm,
+.data-table a.action-btn-confirm {
+  background-color: var(--color-confirm);
+  color: var(--btn-text-color);
+  box-shadow: 0 2px 0 rgba(0,0,0,0.06);
+}
+.data-table button.action-btn-confirm:hover,
+.data-table a.action-btn-confirm:hover,
+.data-table button.action-btn-confirm:active,
+.data-table a.action-btn-confirm:active {
+  background-color: var(--color-confirm-dark);
+  transform: scale(1.01);
+}
+.data-table button.action-btn-confirm:focus-visible,
+.data-table a.action-btn-confirm:focus-visible {
+  box-shadow:
+    0 2px 0 rgba(0,0,0,0.06),
+    0 0 0 4px rgba(46,160,67,0.18);
+}
+
+/* REPORTER */
+.data-table button.action-btn-report,
+.data-table a.action-btn-report {
+  background-color: var(--color-report);
+  color: var(--btn-text-color);
+  box-shadow: 0 2px 0 rgba(0,0,0,0.06);
+}
+.data-table button.action-btn-report:hover,
+.data-table a.action-btn-report:hover,
+.data-table button.action-btn-report:active,
+.data-table a.action-btn-report:active {
+  background-color: var(--color-report-dark);
+  transform: scale(1.01);
+}
+.data-table button.action-btn-report:focus-visible,
+.data-table a.action-btn-report:focus-visible {
+  box-shadow:
+    0 2px 0 rgba(0,0,0,0.06),
+    0 0 0 4px rgba(212,178,0,0.16);
+}
+
+/* ANNULER */
+.data-table button.action-btn-cancel,
+.data-table a.action-btn-cancel {
+  background-color: var(--color-cancel);
+  color: var(--btn-text-color);
+  box-shadow: 0 2px 0 rgba(0,0,0,0.06);
+}
+.data-table button.action-btn-cancel:hover,
+.data-table a.action-btn-cancel:hover,
+.data-table button.action-btn-cancel:active,
+.data-table a.action-btn-cancel:active {
+  background-color: var(--color-cancel-dark);
+  transform: scale(1.01);
+}
+.data-table button.action-btn-cancel:focus-visible,
+.data-table a.action-btn-cancel:focus-visible {
+  box-shadow:
+    0 2px 0 rgba(0,0,0,0.06),
+    0 0 0 4px rgba(224,59,59,0.16);
+}
+
+/* NOTIFIER */
+.data-table button.action-btn-notifier,
+.data-table a.action-btn-notifier {
+  background-color: var(--color-notifier);
+  color: var(--btn-text-color);
+  box-shadow: 0 2px 0 rgba(0,0,0,0.06);
+}
+.data-table button.action-btn-notifier:hover,
+.data-table a.action-btn-notifier:hover,
+.data-table button.action-btn-notifier:active,
+.data-table a.action-btn-notifier:active {
+  background-color: var(--color-notifier-dark);
+  transform: scale(1.01);
+}
+.data-table button.action-btn-notifier:focus-visible,
+.data-table a.action-btn-notifier:focus-visible {
+  box-shadow:
+    0 2px 0 rgba(0,0,0,0.06),
+    0 0 0 4px rgba(36,152,235,0.16);
+}

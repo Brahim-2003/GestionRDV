@@ -2099,6 +2099,17 @@ def api_reserver_rdv(request):
         description="Rendez-vous créé"
     )
     
+    create_and_send_notification(
+            rdv.medecin.user,
+            "Nouveau rendez-vous programmé",
+            f"Un nouveau rendez-vous a été programmé avec {rdv.patient.user.nom_complet()} "
+            f"le {timezone.localtime(rdv.date_heure_rdv).strftime('%d/%m/%Y à %H:%M')}.\n"
+            f"Motif : {rdv.motif or 'Non précisé'}",
+            notif_type='info',
+            category='appointment',
+            rdv=rdv
+        )
+    
     return JsonResponse({
         'success': True,
         'rdv_id': rdv.id,

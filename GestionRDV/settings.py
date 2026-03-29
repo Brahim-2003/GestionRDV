@@ -14,6 +14,11 @@ from pathlib import Path
 import os
 from urllib.parse import urlparse
 
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -79,13 +84,16 @@ WSGI_APPLICATION = "GestionRDV.wsgi.application"
 
 # Database via DATABASE_URL env (ex: postgres://user:pass@host:port/dbname)
 
+
 database_url = os.environ.get('DATABASE_URL')
+
 if database_url:
     url = urlparse(database_url)
+
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.postgresql",
-            "NAME": url.path[1:],            # retire le slash initial
+            "NAME": url.path[1:],
             "USER": url.username,
             "PASSWORD": url.password,
             "HOST": url.hostname,
@@ -93,7 +101,6 @@ if database_url:
         }
     }
 else:
-    # fallback local sqlite3 (pratique en dev si .env absent)
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",

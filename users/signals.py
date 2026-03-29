@@ -75,85 +75,101 @@ def manage_profiles_on_role_change(sender, instance, created, **kwargs):
             logger.exception("Impossible de planifier notify_admins_on_user_create: %s", exc)
 
         
-
 @receiver(post_migrate)
 def create_default_groups_and_permissions(sender, **kwargs):
     """
-    Crée les groupes et permissions par défaut après migrations.
+    Crée les groupes et permissions UNE SEULE FOIS,
+    après que TOUTES les migrations soient terminées.
     """
+
+    # 🔒 Ne s'exécute qu'une seule fois (app users uniquement)
+    if sender.label != "users":
+        return
+
+    from django.contrib.auth.models import Group, Permission
+    from django.contrib.contenttypes.models import ContentType
+    from django.apps import apps
+
     # Création des groupes
     patients_group, _ = Group.objects.get_or_create(name='Patients')
     medecins_group, _ = Group.objects.get_or_create(name='Médecins')
     admins_group, _   = Group.objects.get_or_create(name='Administrateurs')
 
-    # Définition des permissions par modèle
-    models_permissions = {
-        'rdv.RendezVous': ['add', 'change', 'delete', 'view'],
-        'rdv.Patient':   ['add', 'change', 'view'],
-        'rdv.Medecin':   ['add', 'change', 'view'],
-        'users.Utilisateur': ['add', 'change', 'delete', 'view'],
-    }
+    # Helper sécurisé (évite les warnings)
+    def get_perm(app_label, model_name, action):
+        try:
+            model = apps.get_model(app_label, model_name)
+            ct = ContentType.objects.get_for_model(model)
+            return Permission.objects.get(
+                codename=f"{action}_{model_name.lower()}",
+                content_type=ct
+            )
+        except Permission.DoesNotExist:
+            return None
 
-    for model_path, actions in models_permissions.items():
-        app_label, model_name = model_path.split('.')
-        Model = apps.get_model(app_label, model_name)
-        content_type = ContentType.objects.get_for_model(Model)
+    # Permissions standards
+    permissions_map = [
+        # (app, model, action, groupes)
+        ('rdv', 'RendezVous', 'add',   [patients_group, medecins_group]),
+        ('rdv', 'RendezVous', 'change',[patients_group, medecins_group]),
+        ('rdv', 'RendezVous', 'view',  [patients_group, medecins_group]),
 
-        for action in actions:
-            codename = f"{action}_{model_name.lower()}"
-            try:
-                perm = Permission.objects.get(codename=codename, content_type=content_type)
-                if model_name == 'RendezVous' and action in ['add', 'change', 'view']:
-                    medecins_group.permissions.add(perm)
-                    patients_group.permissions.add(perm)
-                elif model_name == 'Patient' and action in ['add', 'change', 'view']:
-                    admins_group.permissions.add(perm)
-                    medecins_group.permissions.add(perm)
-                elif model_name == 'Medecin' and action in ['add', 'change', 'view']:
-                    admins_group.permissions.add(perm)
-                elif model_name == 'Utilisateur':
-                    if action == 'view':
-                        patients_group.permissions.add(perm)
-                        medecins_group.permissions.add(perm)
-                    admins_group.permissions.add(perm)
-            except Permission.DoesNotExist:
-                print(f"[WARNING] Permission '{codename}' non trouvée pour {model_name}")
+        ('rdv', 'Patient', 'add',   [admins_group, medecins_group]),
+        ('rdv', 'Patient', 'change',[admins_group, medecins_group]),
+        ('rdv', 'Patient', 'view',  [admins_group, medecins_group]),
 
-    # Permissions personnalisées
-    custom_permissions = {
-        'can_manage_appointments': gettext_lazy('Peut gérer les rendez-vous'),
-        'can_view_all_users':      gettext_lazy('Peut voir tous les utilisateurs'),
-        'can_manage_patients':     gettext_lazy('Peut gérer les patients'),
-        'can_manage_medecins':     gettext_lazy('Peut gérer les médecins'),
-        'can_view_statistics':     gettext_lazy('Peut consulter les statistiques'),
-        'can_export_data':         gettext_lazy('Peut exporter les données'),
-    }
+        ('rdv', 'Medecin', 'add',   [admins_group]),
+        ('rdv', 'Medecin', 'change',[admins_group]),
+        ('rdv', 'Medecin', 'view',  [admins_group]),
+
+        ('users', 'Utilisateur', 'add',    [admins_group]),
+        ('users', 'Utilisateur', 'change', [admins_group]),
+        ('users', 'Utilisateur', 'delete', [admins_group]),
+        ('users', 'Utilisateur', 'view',   [admins_group, patients_group, medecins_group]),
+    ]
+
+    for app_label, model, action, groups in permissions_map:
+        perm = get_perm(app_label, model, action)
+        if perm:
+            for group in groups:
+                group.permissions.add(perm)
+
+    # 🔹 Permissions personnalisées
     utilisateur_model = apps.get_model('users', 'Utilisateur')
     ct_users = ContentType.objects.get_for_model(utilisateur_model)
 
+    custom_permissions = {
+        'can_manage_appointments': "Peut gérer les rendez-vous",
+        'can_view_all_users': "Peut voir tous les utilisateurs",
+        'can_manage_patients': "Peut gérer les patients",
+        'can_manage_medecins': "Peut gérer les médecins",
+        'can_view_statistics': "Peut consulter les statistiques",
+        'can_export_data': "Peut exporter les données",
+    }
+
+    created_perms = {}
     for codename, name in custom_permissions.items():
         perm, _ = Permission.objects.get_or_create(
             codename=codename,
             content_type=ct_users,
             defaults={'name': name}
         )
+        created_perms[codename] = perm
 
-    # Affectation aux groupes
-    def assign(group, codenames):
-        for cd in codenames:
-            try:
-                p = Permission.objects.get(codename=cd, content_type=ct_users)
-                group.permissions.add(p)
-            except Permission.DoesNotExist:
-                print(f"[WARNING] Custom perm '{cd}' not found")
+    # Attribution propre (sans erreurs)
+    patients_group.permissions.add(
+        get_perm('users', 'Utilisateur', 'view')
+    )
 
-    assign(patients_group, ['view_utilisateur'])
-    assign(medecins_group,  ['view_utilisateur', 'can_manage_appointments'])
-    assign(admins_group,    [
-        'add_utilisateur','change_utilisateur','delete_utilisateur','view_utilisateur',
-        'can_view_all_users','can_manage_patients','can_manage_medecins',
-        'can_view_statistics','can_export_data','can_manage_appointments'
-    ])
+    medecins_group.permissions.add(
+        get_perm('users', 'Utilisateur', 'view'),
+        created_perms['can_manage_appointments']
+    )
 
-
-
+    admins_group.permissions.add(
+        get_perm('users', 'Utilisateur', 'add'),
+        get_perm('users', 'Utilisateur', 'change'),
+        get_perm('users', 'Utilisateur', 'delete'),
+        get_perm('users', 'Utilisateur', 'view'),
+        *created_perms.values()
+    )

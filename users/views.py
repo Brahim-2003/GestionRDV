@@ -448,8 +448,9 @@ def edit_user(request, user_id):
 
 @login_required(login_url='users:login')
 @permission_required('users.can_view_all_users', raise_exception=True)
+@require_POST
 def supprimer_utilisateur(request, user_id):
-    user = Utilisateur.objects.get(pk=user_id)
+    user = get_object_or_404(Utilisateur, pk=user_id)
     user.delete()
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return JsonResponse({'status':'success'})

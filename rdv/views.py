@@ -333,8 +333,9 @@ def edit_rdv(request, rdv_id):
 # Supprimer un rdv
 @login_required(login_url='users:login')
 @permission_required('users.can_manage_appointments', raise_exception=True)
+@require_POST
 def delete_rdv(request, rdv_id):
-    rdv = RendezVous.objects.get(pk=rdv_id)
+    rdv = get_object_or_404(RendezVous, pk=rdv_id)
     rdv.delete()
     messages.success(request, f'Le Rendez-vous a été supprimé avec succès!')
     return redirect('/rdv/rdvs')
@@ -342,6 +343,7 @@ def delete_rdv(request, rdv_id):
 
 # Les vues pour l'historique des RDV
 @login_required
+@permission_required('users.can_manage_appointments', raise_exception=True)
 def rdv_history_list(request):
     """
     Vue principale pour afficher l'historique des rendez-vous.
@@ -450,13 +452,17 @@ def rdv_detail_history(request, rdv_id):
     """
     Vue pour afficher l'historique complet d'un rendez-vous spécifique.
     Utile pour voir toutes les modifications d'un RDV particulier.
+    Accès réservé au patient concerné, au médecin concerné, ou à un admin.
     """
     try:
         rdv = RendezVous.objects.get(id=rdv_id)
     except RendezVous.DoesNotExist:
         from django.http import HttpResponseNotFound
         return HttpResponseNotFound("Rendez-vous non trouvé")
-    
+
+    if not user_can_manage_rdv(request.user, rdv):
+        return HttpResponseForbidden("Accès refusé")
+
     # Récupère tout l'historique de ce RDV
     history_list = RdvHistory.objects.filter(rdv=rdv).select_related(
         'performed_by'
@@ -478,6 +484,7 @@ def rdv_detail_history(request, rdv_id):
 # Les vues pour le rapport
 
 @login_required
+@permission_required('users.can_view_statistics', raise_exception=True)
 def dashboard_stats(request):
     """Vue principale du dashboard (template page rapports)."""
     try:
@@ -510,6 +517,7 @@ def dashboard_stats(request):
 # API: Overview (général)
 # ----------------------
 @login_required
+@permission_required('users.can_view_statistics', raise_exception=True)
 def stats_api_overview(request):
     """
     Renvoie un JSON regroupant :
@@ -611,6 +619,7 @@ def stats_api_overview(request):
 # API: RDV (timeline / annulation / par statut)
 # ----------------------
 @login_required
+@permission_required('users.can_view_statistics', raise_exception=True)
 def stats_api_rdv(request):
     """
     Paramètre GET:
@@ -709,6 +718,7 @@ def stats_api_rdv(request):
 # API: Patients
 # ----------------------
 @login_required
+@permission_required('users.can_view_statistics', raise_exception=True)
 def stats_api_patients(request):
     """
     Renvoie:
@@ -792,6 +802,7 @@ def stats_api_patients(request):
 # API: Médecins
 # ----------------------
 @login_required
+@permission_required('users.can_view_statistics', raise_exception=True)
 def stats_api_medecins(request):
     """
     Renvoie:
@@ -864,6 +875,7 @@ def stats_api_medecins(request):
 # Export CSV simple (général)
 # ----------------------
 @login_required
+@permission_required('users.can_export_data', raise_exception=True)
 def export_stats(request):
     """Génère un CSV téléchargeable des principales métriques."""
     try:

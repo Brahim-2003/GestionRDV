@@ -305,6 +305,45 @@ class UserManagementTest(TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertTrue(Utilisateur.objects.filter(email='created@test.com').exists())
 
+    def test_supprimer_utilisateur_rejects_get(self):
+        """La suppression d'un utilisateur n'est plus déclenchable en GET"""
+        target = Utilisateur.objects.create_user(
+            email='target@test.com',
+            nom='Target',
+            prenom='User',
+            date_naissance=date(1990, 1, 1),
+            role='patient',
+            mot_de_passe='target123'
+        )
+        response = self.client.get(reverse('users:supprimer_utilisateur', kwargs={'user_id': target.id}))
+        self.assertEqual(response.status_code, 405)
+        self.assertTrue(Utilisateur.objects.filter(pk=target.id).exists())
+
+    def test_supprimer_utilisateur_forbidden_for_patient(self):
+        """Un patient ne peut pas supprimer un utilisateur"""
+        target = Utilisateur.objects.create_user(
+            email='target2@test.com',
+            nom='Target',
+            prenom='Two',
+            date_naissance=date(1990, 1, 1),
+            role='patient',
+            mot_de_passe='target123'
+        )
+        patient = Utilisateur.objects.create_user(
+            email='patient2@test.com',
+            nom='Patient',
+            prenom='Two',
+            date_naissance=date(1990, 1, 1),
+            role='patient',
+            mot_de_passe='patient123'
+        )
+        self.client.logout()
+        self.client.login(email='patient2@test.com', password='patient123')
+
+        response = self.client.post(reverse('users:supprimer_utilisateur', kwargs={'user_id': target.id}))
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Utilisateur.objects.filter(pk=target.id).exists())
+
 
 class PasswordChangeTest(TestCase):
     """Tests de changement de mot de passe"""

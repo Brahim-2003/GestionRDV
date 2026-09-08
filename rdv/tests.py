@@ -1077,5 +1077,122 @@ class PerformanceTest(TestCase):
         self.assertEqual(RendezVous.objects.count(), 100)
 
 
+class AccessControlSecurityTest(TestCase):
+    """
+    Vérifie qu'un utilisateur non autorisé reçoit un refus d'accès sur :
+    - l'historique médical des RDV (liste globale + détail d'un RDV),
+    - les statistiques globales,
+    - la suppression d'un RDV (méthode + permission).
+    """
+
+    def setUp(self):
+        self.client = Client()
+
+        self.admin = Utilisateur.objects.create_superuser(
+            email='admin@test.com',
+            nom='Admin',
+            prenom='Test',
+            date_naissance=date(1980, 1, 1),
+            mot_de_passe='admin123'
+        )
+
+        # Médecin et patient concernés par le RDV
+        self.medecin_user = Utilisateur.objects.create_user(
+            email='medecin@test.com',
+            nom='Medecin',
+            prenom='Test',
+            date_naissance=date(1980, 1, 1),
+            role='medecin',
+            mot_de_passe='medecin123'
+        )
+        self.medecin = self.medecin_user.profil_medecin
+
+        self.patient_user = Utilisateur.objects.create_user(
+            email='patient@test.com',
+            nom='Patient',
+            prenom='Test',
+            date_naissance=date(1990, 1, 1),
+            role='patient',
+            mot_de_passe='patient123'
+        )
+        self.patient = self.patient_user.profil_patient
+
+        # Patient tiers, non lié au RDV
+        self.autre_patient_user = Utilisateur.objects.create_user(
+            email='autre_patient@test.com',
+            nom='Autre',
+            prenom='Patient',
+            date_naissance=date(1990, 1, 1),
+            role='patient',
+            mot_de_passe='autre123'
+        )
+
+        self.rdv = RendezVous.objects.create(
+            patient=self.patient,
+            medecin=self.medecin,
+            date_heure_rdv=timezone.now() + timedelta(days=3),
+            statut='programme',
+            motif='Test'
+        )
+
+    def test_history_list_forbidden_for_unrelated_patient(self):
+        """La liste globale de l'historique est réservée médecin/admin."""
+        self.client.login(email='autre_patient@test.com', password='autre123')
+        response = self.client.get(reverse('rdv:history_list'))
+        self.assertEqual(response.status_code, 403)
+
+    def test_history_detail_forbidden_for_unrelated_patient(self):
+        """Un patient non concerné ne peut pas voir l'historique d'un RDV d'autrui."""
+        self.client.login(email='autre_patient@test.com', password='autre123')
+        response = self.client.get(reverse('rdv:history_detail', kwargs={'rdv_id': self.rdv.id}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_history_detail_allowed_for_owner_patient(self):
+        """Le patient propriétaire du RDV n'est pas bloqué par le contrôle d'accès.
+
+        Note : on vérifie ici uniquement que le contrôle d'accès (l'objet de ce
+        chantier) ne renvoie pas 403, sans exiger un rendu complet à 200 : le
+        template 'rdv/admin/history/rdv_history_detail.html' est manquant du
+        projet, un bug préexistant et distinct, hors du périmètre de cette
+        session (voir le rapport de session).
+        """
+        client = Client(raise_request_exception=False)
+        client.login(email='patient@test.com', password='patient123')
+        response = client.get(reverse('rdv:history_detail', kwargs={'rdv_id': self.rdv.id}))
+        self.assertNotEqual(response.status_code, 403)
+
+    def test_stats_forbidden_for_patient(self):
+        """Les statistiques globales sont réservées aux utilisateurs autorisés."""
+        self.client.login(email='patient@test.com', password='patient123')
+        response = self.client.get(reverse('rdv:api_overview'))
+        self.assertEqual(response.status_code, 403)
+
+    def test_stats_allowed_for_admin(self):
+        """Un admin peut consulter les statistiques globales."""
+        self.client.login(email='admin@test.com', password='admin123')
+        response = self.client.get(reverse('rdv:api_overview'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_export_stats_forbidden_for_medecin(self):
+        """L'export CSV requiert la permission dédiée can_export_data."""
+        self.client.login(email='medecin@test.com', password='medecin123')
+        response = self.client.get(reverse('rdv:export_stats'))
+        self.assertEqual(response.status_code, 403)
+
+    def test_delete_rdv_rejects_get(self):
+        """La suppression d'un RDV n'est plus déclenchable en GET."""
+        self.client.login(email='admin@test.com', password='admin123')
+        response = self.client.get(reverse('rdv:supprimer_rendez_vous', kwargs={'rdv_id': self.rdv.id}))
+        self.assertEqual(response.status_code, 405)
+        self.assertTrue(RendezVous.objects.filter(pk=self.rdv.id).exists())
+
+    def test_delete_rdv_forbidden_without_permission(self):
+        """Un utilisateur sans la permission ne peut pas supprimer un RDV, même en POST."""
+        self.client.login(email='patient@test.com', password='patient123')
+        response = self.client.post(reverse('rdv:supprimer_rendez_vous', kwargs={'rdv_id': self.rdv.id}))
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(RendezVous.objects.filter(pk=self.rdv.id).exists())
+
+
 
 

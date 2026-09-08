@@ -1,1 +1,31 @@
+# Secrets et configuration locale
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+
+# Django
+db.sqlite3
+db.sqlite3-journal
+media/
+
+# Fichiers statiques collectés (générés par collectstatic)
+staticfiles/
+
+# Logs
+logs/
+*.log
+
+# Sauvegardes de données
+backups/*.json
+
+# Divers
 git_logs.txt
+.DS_Store

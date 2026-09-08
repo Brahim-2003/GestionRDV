@@ -11,28 +11,32 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
-import os
-from urllib.parse import urlparse
 
-
-from dotenv import load_dotenv
-
-load_dotenv()
+import environ
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# ==========================================================================
+# Environnement
+# ==========================================================================
+# Toute la configuration sensible (secrets, hôtes autorisés, base de
+# données) est chargée depuis l'environnement (fichier .env en local,
+# variables d'environnement réelles en production) — aucune valeur
+# sensible n'est codée en dur dans ce fichier.
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
+env = environ.Env(
+    DEBUG=(bool, False),
+)
+environ.Env.read_env(BASE_DIR / ".env")
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-!7x30&4+0#i!tm@t%vl7f1k(vssc43+f2p7f0x!fuh0n!4&=m4"
+SECRET_KEY = env("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = env.bool("DEBUG")
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=[])
 
 
 # Application definition
@@ -82,32 +86,14 @@ WSGI_APPLICATION = "GestionRDV.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-# Database via DATABASE_URL env (ex: postgres://user:pass@host:port/dbname)
+# Chargée depuis DATABASE_URL (ex: postgres://user:pass@host:port/dbname).
+# En son absence (développement local sans Postgres), on retombe sur SQLite.
+_default_sqlite_url = f"sqlite:///{(BASE_DIR / 'db.sqlite3').as_posix()}"
+_database_url = env("DATABASE_URL", default="")
 
-
-database_url = os.environ.get('DATABASE_URL')
-
-if database_url:
-    url = urlparse(database_url)
-
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "NAME": url.path[1:],
-            "USER": url.username,
-            "PASSWORD": url.password,
-            "HOST": url.hostname,
-            "PORT": url.port or "5432",
-        }
-    }
-else:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
-        }
-    }
-
+DATABASES = {
+    "default": env.db_url_config(_database_url or _default_sqlite_url),
+}
 
 
 # Password validation
@@ -164,10 +150,27 @@ EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 DEFAULT_FROM_EMAIL = 'no-reply@localhost'
 
 
-CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/1')
+CELERY_BROKER_URL = env("CELERY_BROKER_URL", default='redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default='redis://localhost:6379/1')
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
 CELERY_ENABLE_UTC = True
+
+
+# ==========================================================================
+# Durcissement production
+# ==========================================================================
+# Ces réglages ne s'activent qu'en dehors du mode DEBUG (donc en
+# production, où DEBUG doit toujours valoir False). Ils sont eux aussi
+# ajustables via l'environnement pour s'adapter à l'infrastructure réelle
+# (ex: terminaison TLS faite par un reverse proxy en amont).
+if not DEBUG:
+    SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=True)
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = env.int("SECURE_HSTS_SECONDS", default=31536000)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True

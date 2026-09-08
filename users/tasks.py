@@ -71,9 +71,10 @@ def track_failed_login_attempt(self, email, ip_address, user_agent=None):
     cache.set(cache_key, attempts, 3600)
     
     logger.warning(f"Tentative connexion échouée #{attempts} pour {email} depuis {ip_address}")
-    
-    # Alerter admins si >= 5 tentatives
+
+    # Bloquer l'IP et alerter les admins si >= 5 tentatives
     if attempts >= 5:
+        cache.set(f"blocked_ip_{ip_address}", True, 3600)
         from rdv.tasks import notify_admins_failed_login
         notify_admins_failed_login.delay(email, ip_address, attempts)
     

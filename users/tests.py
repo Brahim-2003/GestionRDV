@@ -426,6 +426,77 @@ class ProfileViewTest(TestCase):
         self.assertEqual(self.patient.prenom, 'Name')
 
 
+class BruteForceProtectionTest(TestCase):
+    """
+    Vérifie que la protection anti-bruteforce (chantier 4) est réellement
+    active de bout en bout : middleware enregistré, signal user_login_failed
+    connecté, compteur d'échecs, et blocage effectif de l'IP après 5 échecs.
+    """
+
+    def setUp(self):
+        from django.core.cache import cache
+        from GestionRDV.celery import app as celery_app
+
+        self.cache = cache
+        self.cache.clear()
+
+        self.celery_app = celery_app
+        self._previous_eager = celery_app.conf.task_always_eager
+        self._previous_propagates = celery_app.conf.task_eager_propagates
+        celery_app.conf.task_always_eager = True
+        celery_app.conf.task_eager_propagates = True
+
+        self.victim = Utilisateur.objects.create_user(
+            email='victim@test.com',
+            nom='Victim',
+            prenom='Test',
+            date_naissance=date(1990, 1, 1),
+            role='patient',
+            mot_de_passe='correct-password'
+        )
+
+    def tearDown(self):
+        self.celery_app.conf.task_always_eager = self._previous_eager
+        self.celery_app.conf.task_eager_propagates = self._previous_propagates
+        self.cache.clear()
+
+    def test_ip_blocked_after_five_failed_logins(self):
+        """5 échecs de connexion depuis la même IP bloquent les tentatives suivantes."""
+        client = Client(REMOTE_ADDR='203.0.113.42')
+
+        with self.captureOnCommitCallbacks(execute=True):
+            for _ in range(5):
+                response = client.post(reverse('users:login'), {
+                    'email': 'victim@test.com',
+                    'password': 'mauvais-mot-de-passe',
+                })
+                self.assertEqual(response.status_code, 200)  # formulaire réaffiché
+
+        # Même avec les bons identifiants, l'IP est désormais bloquée.
+        response = client.post(reverse('users:login'), {
+            'email': 'victim@test.com',
+            'password': 'correct-password',
+        })
+        self.assertEqual(response.status_code, 403)
+
+    def test_ip_not_blocked_before_threshold(self):
+        """Moins de 5 échecs ne bloque pas l'IP."""
+        client = Client(REMOTE_ADDR='203.0.113.99')
+
+        with self.captureOnCommitCallbacks(execute=True):
+            for _ in range(4):
+                client.post(reverse('users:login'), {
+                    'email': 'victim@test.com',
+                    'password': 'mauvais-mot-de-passe',
+                })
+
+        response = client.post(reverse('users:login'), {
+            'email': 'victim@test.com',
+            'password': 'correct-password',
+        })
+        self.assertEqual(response.status_code, 302)  # connexion acceptée, redirection
+
+
 
 
 

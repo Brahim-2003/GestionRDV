@@ -497,6 +497,34 @@ class BruteForceProtectionTest(TestCase):
         self.assertEqual(response.status_code, 302)  # connexion acceptée, redirection
 
 
+class ProfilUserViewTest(TestCase):
+    """Vérifie que profil_user() ne plante plus sur la comparaison us.ROLE (corrigée en us.role)."""
+
+    def setUp(self):
+        self.client = Client()
+        self.admin = Utilisateur.objects.create_superuser(
+            email='admin@test.com',
+            nom='Admin',
+            prenom='Test',
+            date_naissance=date(1980, 1, 1),
+            mot_de_passe='admin123'
+        )
+        self.patient = Utilisateur.objects.create_user(
+            email='patient@test.com',
+            nom='Patient',
+            prenom='Test',
+            date_naissance=date(1990, 1, 1),
+            role='patient',
+            mot_de_passe='patient123'
+        )
+        self.client.login(email='admin@test.com', password='admin123')
+
+    def test_profil_user_for_patient_role(self):
+        """Consultation par un admin du profil d'un utilisateur avec le rôle patient."""
+        response = self.client.get(reverse('users:profil', kwargs={'user_id': self.patient.id}))
+        self.assertEqual(response.status_code, 200)
+
+
 
 
 

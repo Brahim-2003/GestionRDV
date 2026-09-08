@@ -168,10 +168,14 @@ class DisponibiliteHebdoEditForm(DisponibiliteBaseForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # rendre le champ jour statique
+        # Champ 'jour' non modifiable : disabled=True (attribut Django, pas
+        # seulement l'attribut HTML) pour que Django conserve la valeur
+        # initiale au clean() au lieu d'une valeur vide — un <select disabled>
+        # n'est jamais soumis par le navigateur, donc sans ce flag le
+        # formulaire échoue systématiquement à la validation XOR jour/date
+        # du modèle (Disponibilite.clean()).
         if 'jour' in self.fields:
-            self.fields['jour'].widget.attrs['readonly'] = True
-            self.fields['jour'].widget.attrs['disabled'] = True  # désactive la modification
+            self.fields['jour'].disabled = True
         # cacher date_specific
         if 'date_specific' in self.fields:
             self.fields['date_specific'].widget = forms.HiddenInput()
@@ -234,38 +238,6 @@ class DisponibiliteHebdoCreateForm(DisponibiliteBaseForm):
             self.add_error('date_specific', "Ne pas spécifier de date pour une disponibilité hebdomadaire.")
 
         return cleaned
-
-# --- Formulaire de base pour l'édition hebdo ---
-class DisponibiliteHebdoEditForm(forms.ModelForm):
-    class Meta:
-        model = Disponibilite
-        fields = ['heure_debut', 'heure_fin']
-        widgets = {
-            'heure_debut': forms.TimeInput(format='%H:%M', attrs={'type': 'time'}),
-            'heure_fin': forms.TimeInput(format='%H:%M', attrs={'type': 'time'}),
-        }
-        labels = {
-            'heure_debut': _('Heure de début'),
-            'heure_fin': _('Heure de fin'),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # rendre les champs obligatoires
-        self.fields['heure_debut'].required = True
-        self.fields['heure_fin'].required = True
-
-    def clean(self):
-        cleaned = super().clean()
-        debut = cleaned.get('heure_debut')
-        fin = cleaned.get('heure_fin')
-
-        if debut and fin and debut >= fin:
-            self.add_error('heure_fin', _("L'heure de fin doit être après l'heure de début."))
-
-        return cleaned
-
-
 
 class DisponibiliteSpecifiqueCreateForm(DisponibiliteBaseForm):
     class Meta:

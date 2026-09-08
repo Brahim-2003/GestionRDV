@@ -810,9 +810,53 @@ class GestionDisponibilitesViewTest(TestCase):
         )
         
         self.assertEqual(response.status_code, 200)
-        
+
         dispo.refresh_from_db()
         self.assertFalse(dispo.is_active)
+
+    def test_edit_disponibilite_hebdo(self):
+        """Modification des horaires d'un créneau hebdomadaire (chantier 5 : formulaire dédupliqué)"""
+        dispo = Disponibilite.objects.create(
+            medecin=self.medecin,
+            jour='mon',
+            heure_debut=time(9, 0),
+            heure_fin=time(12, 0),
+        )
+
+        response = self.client.post(
+            reverse('rdv:disponibilite_hebdo_edit', kwargs={'pk': dispo.id}),
+            {'heure_debut': '10:00', 'heure_fin': '13:00'},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        dispo.refresh_from_db()
+        self.assertEqual(dispo.heure_debut, time(10, 0))
+        self.assertEqual(dispo.heure_fin, time(13, 0))
+
+    def test_edit_disponibilite_hebdo_rejects_overlap(self):
+        """Le formulaire d'édition hebdo détecte à nouveau le chevauchement (medecin= câblé)."""
+        Disponibilite.objects.create(
+            medecin=self.medecin,
+            jour='mon',
+            heure_debut=time(14, 0),
+            heure_fin=time(16, 0),
+        )
+        dispo_a_modifier = Disponibilite.objects.create(
+            medecin=self.medecin,
+            jour='mon',
+            heure_debut=time(9, 0),
+            heure_fin=time(12, 0),
+        )
+
+        response = self.client.post(
+            reverse('rdv:disponibilite_hebdo_edit', kwargs={'pk': dispo_a_modifier.id}),
+            {'heure_debut': '15:00', 'heure_fin': '17:00'},
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        dispo_a_modifier.refresh_from_db()
+        self.assertEqual(dispo_a_modifier.heure_debut, time(9, 0))
 
 
 class GestionRdvMedecinViewTest(TestCase):
@@ -887,7 +931,7 @@ class GestionRdvMedecinViewTest(TestCase):
         
         response = self.client.post(
             reverse('rdv:annuler_rdv', kwargs={'rdv_id': self.rdv.id}),
-            data={'description': 'Urgence médicale'},
+            data={'raison': 'Urgence médicale'},
             content_type='application/json'
         )
         
@@ -1208,6 +1252,32 @@ class AccessControlSecurityTest(TestCase):
         response = self.client.post(reverse('rdv:supprimer_rendez_vous', kwargs={'rdv_id': self.rdv.id}))
         self.assertEqual(response.status_code, 403)
         self.assertTrue(RendezVous.objects.filter(pk=self.rdv.id).exists())
+
+    def test_patient_can_cancel_own_rdv(self):
+        """Le patient propriétaire du RDV peut désormais l'annuler lui-même (chantier 5)."""
+        self.client.login(email='patient@test.com', password='patient123')
+        response = self.client.post(
+            reverse('rdv:annuler_rdv', kwargs={'rdv_id': self.rdv.id}),
+            data={'raison': 'Empêchement personnel'},
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+
+        self.rdv.refresh_from_db()
+        self.assertEqual(self.rdv.statut, 'annule')
+        self.assertEqual(self.rdv.raison_annulation, 'Empêchement personnel')
+
+    def test_annuler_rdv_forbidden_for_unrelated_patient(self):
+        """Un patient non concerné ne peut toujours pas annuler le RDV d'un autre."""
+        self.client.login(email='autre_patient@test.com', password='autre123')
+        response = self.client.post(
+            reverse('rdv:annuler_rdv', kwargs={'rdv_id': self.rdv.id}),
+            data={'raison': 'Tentative non autorisée'},
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 403)
+        self.rdv.refresh_from_db()
+        self.assertEqual(self.rdv.statut, 'programme')
 
 
 class CeleryIntegrationTest(TestCase):

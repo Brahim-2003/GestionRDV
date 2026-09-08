@@ -9,7 +9,7 @@ from django.http import JsonResponse, HttpResponseForbidden, HttpResponseBadRequ
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.utils.dateparse import parse_datetime
-from django.utils.timezone import now
+from django.utils import timezone
 from django.views.decorators.http import require_POST, require_http_methods
 
 
@@ -153,9 +153,9 @@ def deconnecter(request):
 @login_required(login_url='users:login')
 def profil_user(request, user_id):
     us = Utilisateur.objects.get(pk=user_id)
-    if us.ROLE=='patient':  
+    if us.role=='patient':
         us_profil = Utilisateur.objects.filter(pk=user_id)
-    elif us.ROLE=='medecin':
+    elif us.role=='medecin':
         us_profil = Utilisateur.objects.filter(pk=user_id)
     else:
         us_profil = us

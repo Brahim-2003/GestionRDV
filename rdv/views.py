@@ -1070,17 +1070,25 @@ def confirmer_rdv(request, rdv_id):
 @require_http_methods(["GET", "POST"])
 def annuler_rdv(request, rdv_id):
     medecin = getattr(request.user, 'profil_medecin', None)
-    if medecin is None:
+    patient = getattr(request.user, 'profil_patient', None)
+    is_admin_user = request.user.is_staff or request.user.is_superuser
+
+    if medecin is None and patient is None and not is_admin_user:
         return HttpResponseForbidden("Accès refusé")
 
     try:
-        rdv = RendezVous.objects.get(id=rdv_id, medecin=medecin)
+        if medecin is not None:
+            rdv = RendezVous.objects.get(id=rdv_id, medecin=medecin)
+        elif patient is not None:
+            rdv = RendezVous.objects.get(id=rdv_id, patient=patient)
+        else:
+            rdv = RendezVous.objects.get(id=rdv_id)
     except RendezVous.DoesNotExist:
         return HttpResponseForbidden("Rendez-vous introuvable")
 
     # --- GET ---
     if request.method == 'GET':
-        form = AnnulerRdvForm(initial={'description': rdv.raison_annulation or ''})
+        form = AnnulerRdvForm(initial={'raison': rdv.raison_annulation or ''})
         return render(
             request,
             'rdv/doctor/composants/rdvs/rdv_cancel_form.html',
@@ -1101,7 +1109,7 @@ def annuler_rdv(request, rdv_id):
     if not form.is_valid():
         return JsonResponse({'success': False, 'errors': form.errors}, status=400)
 
-    description = form.cleaned_data.get('description', '').strip()[:1000]
+    description = form.cleaned_data.get('raison', '').strip()[:1000]
 
     try:
         with transaction.atomic():
@@ -1560,14 +1568,14 @@ def disponibilite_hebdo_edit(request, pk):
     dispo = get_object_or_404(Disponibilite, pk=pk, medecin=medecin)
 
     if request.method == "GET":
-        form = DisponibiliteHebdoEditForm(instance=dispo)
+        form = DisponibiliteHebdoEditForm(instance=dispo, medecin=medecin)
         return render(request, 'rdv/doctor/composants/dispo/dispo_hebdo_edit_form.html', {
             'form': form,
             'disponibilite': dispo
         })
 
     # POST
-    form = DisponibiliteHebdoEditForm(request.POST, instance=dispo)
+    form = DisponibiliteHebdoEditForm(request.POST, instance=dispo, medecin=medecin)
     if form.is_valid():
         form.save()
         if _is_ajax(request):

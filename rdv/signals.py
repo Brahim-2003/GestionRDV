@@ -61,109 +61,16 @@ def rdv_status_change_notification(sender, instance, created, **kwargs):
 def safe_delay(task_name, *args):
     """
     Appel Celery sécurisé (évite crash si broker down).
+    Les tâches elles-mêmes vivent dans rdv.tasks (source unique de vérité,
+    y compris pour les tâches déclenchées par ces signaux).
     """
     try:
-        from django.apps import apps
+        from rdv import tasks as rdv_tasks
 
-        task = apps.get_app_config("rdv").module.__dict__.get(task_name)
+        task = getattr(rdv_tasks, task_name, None)
         if task:
             task.delay(*args)
+        else:
+            logger.error(f"Tâche Celery inconnue dans rdv.tasks : {task_name}")
     except Exception as e:
         logger.exception(f"Erreur Celery ({task_name}): {e}")
-
-
-# ==========================
-# 🧠 TASKS CELERY
-# ==========================
-from celery import shared_task
-
-
-@shared_task(bind=True, max_retries=3, autoretry_for=(Exception,), retry_backoff=60)
-def notify_medecin_new_rdv(self, rdv_id):
-    """
-    Notifie le médecin d'un nouveau RDV.
-    """
-    try:
-        from django.utils import timezone
-        from rdv.models import RendezVous
-        from rdv.utils import create_and_send_notification
-
-        rdv = RendezVous.objects.select_related(
-            "patient__user", "medecin__user"
-        ).get(id=rdv_id)
-
-        create_and_send_notification(
-            rdv.medecin.user,
-            "Nouveau rendez-vous programmé",
-            f"Nouveau RDV avec {rdv.patient.user.nom_complet()} le "
-            f"{timezone.localtime(rdv.date_heure_rdv).strftime('%d/%m/%Y à %H:%M')}",
-            notif_type="info",
-            category="appointment",
-            rdv=rdv,
-        )
-
-        logger.info(f"Notification médecin envoyée (RDV #{rdv_id})")
-        return True
-
-    except RendezVous.DoesNotExist:
-        logger.warning(f"RDV #{rdv_id} introuvable")
-        return False
-
-
-@shared_task(bind=True, max_retries=3, autoretry_for=(Exception,), retry_backoff=60)
-def handle_status_change(self, rdv_id, old_status, new_status):
-    """
-    Gère les notifications selon le changement de statut.
-    """
-    try:
-        from django.utils import timezone
-        from rdv.models import RendezVous
-        from rdv.utils import create_and_send_notification
-
-        rdv = RendezVous.objects.select_related(
-            "patient__user", "medecin__user"
-        ).get(id=rdv_id)
-
-        notifications_map = {
-            ("programme", "confirme"): (
-                rdv.patient.user,
-                "Rendez-vous confirmé",
-                f"Votre RDV du {timezone.localtime(rdv.date_heure_rdv).strftime('%d/%m/%Y à %H:%M')} est confirmé",
-                "success",
-            ),
-            ("confirme", "annule"): (
-                rdv.patient.user,
-                "Rendez-vous annulé",
-                f"RDV annulé. Raison : {rdv.raison_annulation or 'Non précisée'}",
-                "warning",
-            ),
-            ("en_cours", "termine"): (
-                rdv.patient.user,
-                "Rendez-vous terminé",
-                "Votre consultation est terminée",
-                "success",
-            ),
-        }
-
-        data = notifications_map.get((old_status, new_status))
-
-        if not data:
-            return False
-
-        user, subject, message, notif_type = data
-
-        create_and_send_notification(
-            user,
-            subject,
-            message,
-            notif_type=notif_type,
-            category="appointment",
-            rdv=rdv,
-        )
-
-        logger.info(f"Notification statut envoyée ({old_status} → {new_status})")
-        return True
-
-    except RendezVous.DoesNotExist:
-        logger.warning(f"RDV #{rdv_id} introuvable")
-        return False

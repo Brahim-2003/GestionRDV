@@ -127,15 +127,16 @@ def send_manual_notification(user, subject, message, rdv=None, by_user=None):
     - user : destinataire (instance de User)
     - subject : sujet du message
     - message : contenu texte brut
-    - rdv : rendez-vous lié (optionnel)
+    - rdv : rendez-vous lié (optionnel, utilisé uniquement pour l'historique ci-dessous :
+      le modèle Notification n'a pas de champ 'subject' ni 'rdv', le sujet est donc
+      intégré au message et 'type' utilise une valeur valide de Notification.TYPE_CHOICES)
     - by_user : utilisateur qui a initié l'envoi (optionnel, pour audit)
     """
+    full_message = f"{subject}\n\n{message}" if subject else message
     notif = Notification.objects.create(
         user=user,
-        subject=subject,
-        message=message,
-        rdv=rdv,
-        type='manual',
+        message=full_message,
+        type='info',
         category='appointment',
     )
 

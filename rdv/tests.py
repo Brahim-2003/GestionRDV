@@ -1023,6 +1023,22 @@ class UtilsFunctionTest(TestCase):
             ).exists()
         )
 
+    def test_send_manual_notification(self):
+        """send_manual_notification ne doit plus planter (subject/rdv/type invalides corrigés)"""
+        from rdv.utils import send_manual_notification
+
+        notif = send_manual_notification(
+            self.user,
+            'Sujet du message',
+            'Contenu du message manuel',
+        )
+
+        self.assertIsNotNone(notif)
+        self.assertEqual(notif.type, 'info')
+        self.assertEqual(notif.category, 'appointment')
+        self.assertIn('Sujet du message', notif.message)
+        self.assertIn('Contenu du message manuel', notif.message)
+
 
 # Tests de performance et d'intégration
 
@@ -1192,6 +1208,88 @@ class AccessControlSecurityTest(TestCase):
         response = self.client.post(reverse('rdv:supprimer_rendez_vous', kwargs={'rdv_id': self.rdv.id}))
         self.assertEqual(response.status_code, 403)
         self.assertTrue(RendezVous.objects.filter(pk=self.rdv.id).exists())
+
+
+class CeleryIntegrationTest(TestCase):
+    """
+    Vérifie que la chaîne signal -> Celery -> notification fonctionne
+    réellement de bout en bout (pipeline réparé au chantier 3), en exécutant
+    les tâches en mode 'eager' (synchrone, sans broker) pour ne pas dépendre
+    d'un worker/Redis réels pendant les tests.
+    """
+
+    def setUp(self):
+        from GestionRDV.celery import app as celery_app
+        self.celery_app = celery_app
+        self._previous_eager = celery_app.conf.task_always_eager
+        self._previous_propagates = celery_app.conf.task_eager_propagates
+        celery_app.conf.task_always_eager = True
+        celery_app.conf.task_eager_propagates = True
+
+        self.patient_user = Utilisateur.objects.create_user(
+            email='patient@test.com',
+            nom='Patient',
+            prenom='Test',
+            date_naissance=date(1990, 1, 1),
+            role='patient',
+            mot_de_passe='test123'
+        )
+        self.patient = self.patient_user.profil_patient
+
+        self.medecin_user = Utilisateur.objects.create_user(
+            email='medecin@test.com',
+            nom='Medecin',
+            prenom='Test',
+            date_naissance=date(1980, 1, 1),
+            role='medecin',
+            mot_de_passe='test123'
+        )
+        self.medecin = self.medecin_user.profil_medecin
+
+    def tearDown(self):
+        self.celery_app.conf.task_always_eager = self._previous_eager
+        self.celery_app.conf.task_eager_propagates = self._previous_propagates
+
+    def test_new_rdv_triggers_medecin_notification_via_celery(self):
+        """La création d'un RDV déclenche rdv.tasks.notify_medecin_new_rdv."""
+        # Le signal utilise transaction.on_commit() : sous TestCase, la
+        # transaction du test est annulée (rollback) sans jamais "commit" —
+        # captureOnCommitCallbacks force leur exécution comme en production.
+        with self.captureOnCommitCallbacks(execute=True):
+            RendezVous.objects.create(
+                patient=self.patient,
+                medecin=self.medecin,
+                date_heure_rdv=timezone.now() + timedelta(days=3),
+                statut='programme',
+                motif='Test intégration Celery'
+            )
+
+        notif = Notification.objects.filter(
+            user=self.medecin_user, category='appointment'
+        ).order_by('-date_envoi').first()
+        self.assertIsNotNone(notif)
+        self.assertIn('rendez-vous', notif.message.lower())
+
+    def test_status_change_triggers_patient_notification_via_celery(self):
+        """Un changement de statut programme -> confirme déclenche rdv.tasks.handle_status_change."""
+        rdv = RendezVous.objects.create(
+            patient=self.patient,
+            medecin=self.medecin,
+            date_heure_rdv=timezone.now() + timedelta(days=3),
+            statut='programme',
+            motif='Test'
+        )
+        Notification.objects.filter(user=self.patient_user).delete()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            rdv.statut = 'confirme'
+            rdv.save()
+
+        notif = Notification.objects.filter(
+            user=self.patient_user, category='appointment'
+        ).order_by('-date_envoi').first()
+        self.assertIsNotNone(notif)
+        self.assertIn('confirmé', notif.message.lower())
 
 
 

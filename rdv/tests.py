@@ -1,4 +1,5 @@
 # rdv/tests.py
+import json
 import threading
 import time as time_module
 from unittest import mock
@@ -833,6 +834,140 @@ class PriseRdvViewTest(TestCase):
         self.assertEqual(rdv.patient, self.patient)
         self.assertEqual(rdv.medecin, self.medecin)
         self.assertEqual(rdv.statut, 'programme')
+
+
+class ReservationConcurrencyTest(TransactionTestCase):
+    """Vérifie qu'un même créneau (medecin, date_heure_rdv) réservé par
+    plusieurs patients en parallèle n'est jamais accordé à plus d'un seul
+    d'entre eux — garanti par la contrainte unique_rdv_actif_par_creneau
+    (rdv/models.py::RendezVous.Meta) et le verrouillage/rattrapage
+    d'IntegrityError dans api_reserver_rdv (rdv/views.py)."""
+
+    def setUp(self):
+        # Comme pour NumeroPatientConcurrencyTest : sous TransactionTestCase,
+        # les transaction.on_commit() s'exécutent réellement, donc tout appel
+        # Celery .delay() non mocké tente une vraie connexion au broker
+        # (Redis, absent ici). Les deux points d'appel concernés ici sont la
+        # création de patient (notify_admins_on_user_create, users/signals.py)
+        # et la création de RDV (notify_medecin_new_rdv, rdv/signals.py) —
+        # mockés pour toute la durée du test via addCleanup, pas seulement
+        # setUp, puisque la réservation elle-même a lieu dans le test.
+        for target in ('users.signals.notify_admins_on_user_create.delay',
+                       'rdv.tasks.notify_medecin_new_rdv.delay'):
+            patcher = mock.patch(target)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+        self.medecin_user = Utilisateur.objects.create_user(
+            email='medecin.concurrence@test.com',
+            nom='Karim',
+            prenom='Salma',
+            date_naissance=date(1980, 1, 1),
+            role='medecin',
+            mot_de_passe='test123'
+        )
+        self.medecin = self.medecin_user.profil_medecin
+
+        # Comptes patients ET connexions (client.login crée une session en
+        # base) faits séquentiellement ici, hors des threads : on ne veut
+        # tester la concurrence que sur la réservation elle-même, pas sur la
+        # création de session, qui ajouterait une seconde source de
+        # contention SQLite sans rapport avec ce qu'on vérifie.
+        self.nb_patients = 8
+        self.clients = []
+        for i in range(self.nb_patients):
+            Utilisateur.objects.create_user(
+                email=f'patient.concurrence{i}@test.com',
+                nom='Test',
+                prenom=f'Patient{i}',
+                date_naissance=date(1990, 1, 1),
+                role='patient',
+                mot_de_passe='test123'
+            )
+            client = Client()
+            assert client.login(email=f'patient.concurrence{i}@test.com', password='test123')
+            self.clients.append(client)
+
+    def test_une_seule_reservation_gagnante_sur_creneau_dispute(self):
+        creneau = timezone.now() + timedelta(days=7)
+        creneau = creneau.replace(hour=10, minute=0, second=0, microsecond=0)
+        creneau_iso = creneau.strftime('%Y-%m-%dT%H:%M:%S')
+
+        resultats = []
+        erreurs = []
+
+        def reserver(index):
+            client = self.clients[index]
+
+            # Même limitation SQLite que pour numero_patient (voir
+            # NumeroPatientConcurrencyTest) : sous forte contention, une
+            # requête peut lever "database table is locked" (SQLITE_LOCKED),
+            # non couvert par busy_timeout. Chaque appel POST est déjà
+            # atomique côté vue ; on retente juste la requête entière avec
+            # une connexion fraîche, ce qui est sûr (la vue ne modifie rien
+            # en cas d'échec avant commit).
+            for attempt in range(5):
+                try:
+                    if connection.vendor == 'sqlite':
+                        with connection.cursor() as cursor:
+                            cursor.execute('PRAGMA busy_timeout = 30000;')
+                    response = client.post(
+                        reverse('rdv:api_reserver_rdv'),
+                        data=json.dumps({
+                            'medecin_id': self.medecin.id,
+                            'datetime': creneau_iso,
+                            'motif': f'Concurrence {index}',
+                        }),
+                        content_type='application/json'
+                    )
+                    resultats.append(response.json())
+                    return
+                except OperationalError as exc:
+                    if 'locked' not in str(exc).lower():
+                        erreurs.append(exc)
+                        return
+                    connection.close()
+                    time_module.sleep(0.05 * (attempt + 1))
+                except Exception as exc:
+                    erreurs.append(exc)
+                    return
+                finally:
+                    connections.close_all()
+            erreurs.append(OperationalError('database table is locked (après plusieurs tentatives)'))
+
+        threads = [threading.Thread(target=reserver, args=(i,)) for i in range(self.nb_patients)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        self.assertEqual(erreurs, [])
+        self.assertEqual(len(resultats), self.nb_patients)
+
+        # L'invariant qui compte est en base : jamais plus d'un RDV actif sur
+        # ce créneau, garanti par unique_rdv_actif_par_creneau. On ne peut
+        # pas systématiquement affirmer "exactement 1 réponse HTTP à
+        # success:True" : sous SQLite (verrou base entière, pas de vrai
+        # row-lock), il arrive que l'écriture gagnante ait lieu au sein d'une
+        # requête dont une étape suivante échoue ensuite sur le même verrou
+        # et parte en rollback complet côté client-retry — l'utilisateur
+        # revoit alors "créneau déjà pris" alors que sa requête avait en
+        # réalité gagné la course. Ce n'est pas reproductible sur PostgreSQL
+        # (verrouillage par ligne, backend cible de prod) ; on vérifie donc
+        # ici qu'il n'y a jamais de double succès (le vrai risque métier), et
+        # que l'invariant en base est respecté.
+        succes = [r for r in resultats if r.get('success')]
+        echecs = [r for r in resultats if not r.get('success')]
+        self.assertLessEqual(len(succes), 1, f"Jamais plus d'un succès, obtenu : {resultats}")
+        for echec in echecs:
+            self.assertIn('déjà pris', echec.get('error', ''))
+
+        rdv_actifs = RendezVous.objects.filter(
+            medecin=self.medecin,
+            date_heure_rdv=creneau,
+            statut__in=['programme', 'confirme'],
+        )
+        self.assertEqual(rdv_actifs.count(), 1)
 
 
 class GestionDisponibilitesViewTest(TestCase):

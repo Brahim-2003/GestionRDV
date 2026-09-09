@@ -54,6 +54,12 @@ def rdv_status_change_notification(sender, instance, created, **kwargs):
         lambda: safe_delay("handle_status_change", instance.id, old_status, new_status)
     )
 
+    # Créneau libéré : notifier la liste d'attente (rdv/tasks.py::notify_waitlist_on_cancellation)
+    if new_status == 'annule':
+        transaction.on_commit(
+            lambda: safe_delay("notify_waitlist_on_cancellation", instance.id)
+        )
+
 
 # ==========================
 # 🔒 SAFE CELERY CALL

@@ -108,6 +108,60 @@ def handle_status_change(self, rdv_id, old_status, new_status):
         logger.exception(f"Erreur handle_status_change RDV #{rdv_id}: {e}")
         raise self.retry(exc=e, countdown=60)
 
+
+@shared_task(bind=True, max_retries=3)
+def notify_waitlist_on_cancellation(self, rdv_id):
+    """
+    Notifie tous les patients en attente sur ce créneau précis (même
+    medecin, même date_heure_souhaitee) lorsqu'un RDV est annulé.
+    Premier arrivé, premier servi : tous les inscrits en_attente sont
+    notifiés en même temps (pas de délai individuel), et repassent à
+    notifie. La première réservation effective sur ce créneau (via
+    api_reserver_rdv, protégé par unique_rdv_actif_par_creneau) gagne ;
+    voir la vue pour le passage à honore/expire des inscriptions
+    restantes.
+    """
+    try:
+        from .models import RendezVous, ListeAttenteCreneau
+        from .utils import create_and_send_notification
+
+        rdv = RendezVous.objects.select_related('medecin__user').get(id=rdv_id)
+
+        inscriptions = list(
+            ListeAttenteCreneau.objects.filter(
+                medecin=rdv.medecin,
+                date_heure_souhaitee=rdv.date_heure_rdv,
+                statut='en_attente',
+            ).select_related('patient__user')
+        )
+
+        if not inscriptions:
+            return f"Aucune inscription en attente pour RDV #{rdv_id}"
+
+        date_label = timezone.localtime(rdv.date_heure_rdv).strftime('%d/%m/%Y à %H:%M')
+        for inscription in inscriptions:
+            create_and_send_notification(
+                inscription.patient.user,
+                "Un créneau s'est libéré !",
+                f"Le créneau du {date_label} avec Dr. {rdv.medecin.user.nom_complet()} "
+                f"vient de se libérer. Il est proposé au premier arrivé, premier servi : "
+                f"réservez-le vite depuis la prise de rendez-vous.",
+                notif_type='info',
+                category='appointment',
+            )
+
+        ListeAttenteCreneau.objects.filter(
+            id__in=[i.id for i in inscriptions]
+        ).update(statut='notifie')
+
+        logger.info(f"{len(inscriptions)} inscription(s) liste d'attente notifiée(s) pour RDV #{rdv_id}")
+        return f"{len(inscriptions)} patient(s) en liste d'attente notifié(s) pour RDV #{rdv_id}"
+
+    except Exception as e:
+        logger.exception(f"Erreur notify_waitlist_on_cancellation RDV #{rdv_id}: {e}")
+        raise self.retry(exc=e, countdown=60)
+
+
 # ========================================
 # TÂCHES DE GESTION DES RENDEZ-VOUS
 # ========================================

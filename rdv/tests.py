@@ -14,8 +14,8 @@ from decimal import Decimal
 
 from users.models import Utilisateur
 from rdv.models import (
-    Patient, Medecin, Disponibilite, RendezVous, 
-    Notification, RdvHistory, FavoriMedecin
+    Patient, Medecin, Disponibilite, RendezVous,
+    Notification, RdvHistory, FavoriMedecin, ListeAttenteCreneau
 )
 
 
@@ -1613,6 +1613,67 @@ class CeleryIntegrationTest(TestCase):
         ).order_by('-date_envoi').first()
         self.assertIsNotNone(notif)
         self.assertIn('confirmé', notif.message.lower())
+
+    def test_cancellation_notifies_waitlist_via_celery(self):
+        """L'annulation d'un RDV déclenche rdv.tasks.notify_waitlist_on_cancellation
+        pour les inscriptions en_attente sur ce créneau précis (même medecin,
+        même date_heure_rdv), et fait passer leur statut à notifie."""
+        creneau = timezone.now() + timedelta(days=3)
+
+        rdv = RendezVous.objects.create(
+            patient=self.patient,
+            medecin=self.medecin,
+            date_heure_rdv=creneau,
+            statut='confirme',
+            motif='Test'
+        )
+
+        attendant_user = Utilisateur.objects.create_user(
+            email='attendant@test.com',
+            nom='Attendant',
+            prenom='Test',
+            date_naissance=date(1990, 1, 1),
+            role='patient',
+            mot_de_passe='test123'
+        )
+        inscription = ListeAttenteCreneau.objects.create(
+            patient=attendant_user.profil_patient,
+            medecin=self.medecin,
+            date_heure_souhaitee=creneau,
+        )
+
+        # Inscription non concernée (créneau différent) : ne doit pas être notifiée.
+        autre_user = Utilisateur.objects.create_user(
+            email='autre_attendant@test.com',
+            nom='Autre',
+            prenom='Attendant',
+            date_naissance=date(1990, 1, 1),
+            role='patient',
+            mot_de_passe='test123'
+        )
+        autre_inscription = ListeAttenteCreneau.objects.create(
+            patient=autre_user.profil_patient,
+            medecin=self.medecin,
+            date_heure_souhaitee=creneau + timedelta(hours=1),
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            rdv.cancel(description='Test annulation', by_user=self.medecin_user)
+
+        inscription.refresh_from_db()
+        autre_inscription.refresh_from_db()
+        self.assertEqual(inscription.statut, 'notifie')
+        self.assertEqual(autre_inscription.statut, 'en_attente')
+
+        notif = Notification.objects.filter(
+            user=attendant_user, category='appointment'
+        ).order_by('-date_envoi').first()
+        self.assertIsNotNone(notif)
+        self.assertIn('libér', notif.message.lower())
+
+        self.assertFalse(
+            Notification.objects.filter(user=autre_user, category='appointment').exists()
+        )
 
 
 

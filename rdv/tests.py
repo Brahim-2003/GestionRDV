@@ -780,7 +780,40 @@ class PriseRdvViewTest(TestCase):
         data = response.json()
         self.assertIn('medecins', data)
         self.assertEqual(len(data['medecins']), 1)
-    
+
+    def test_api_search_medecins_plusieurs_specialites(self):
+        """?specialite=x&specialite=y (recherche par symptôme) renvoie les
+        médecins des deux spécialités."""
+        dermato_user = Utilisateur.objects.create_user(
+            email='dermato@test.com', nom='Dermato', prenom='Test',
+            date_naissance=date(1980, 1, 1), role='medecin', mot_de_passe='test123'
+        )
+        dermato_user.profil_medecin.specialite = 'dermatologue'
+        dermato_user.profil_medecin.save()
+
+        response = self.client.get(
+            reverse('rdv:api_search_medecins') + '?specialite=cardiologue&specialite=dermatologue'
+        )
+        self.assertEqual(response.status_code, 200)
+        specialites = {m['specialite'] for m in response.json()['medecins']}
+        self.assertEqual(specialites, {'cardiologue', 'dermatologue'})
+
+    def test_api_symptomes(self):
+        """L'API symptômes renvoie des catégories peuplées et l'avertissement."""
+        response = self.client.get(reverse('rdv:api_symptomes'))
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn('categories', data)
+        self.assertGreater(len(data['categories']), 0)
+        self.assertIn('avertissement', data)
+        self.assertIn('urgences', data['avertissement'].lower())
+
+        douleur = next((c for c in data['categories'] if c['nom'] == 'Douleur'), None)
+        self.assertIsNotNone(douleur)
+        thorax = next((s for s in douleur['symptomes'] if s['nom'] == 'Douleur thoracique'), None)
+        self.assertIsNotNone(thorax)
+        self.assertIn('cardiologue', thorax['specialites'])
+
     def test_api_creneaux_medecin(self):
         """Récupération des créneaux d'un médecin"""
         # Calcule une date lundi prochain

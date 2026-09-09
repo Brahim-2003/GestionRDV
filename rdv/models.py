@@ -240,15 +240,68 @@ class ListeAttenteCreneau(models.Model):
         super().save(*args, **kwargs)
 
 
-# Message d'avertissement à afficher à côté de la recherche par symptôme
-# (interface non construite dans cette session — texte prêt à l'emploi pour
-# la session suivante, voir rdv/migrations/0006_seed_recherche_symptome.py
-# pour le contenu du mapping symptôme -> spécialités déjà inséré).
+# Message d'avertissement affiché à côté de la recherche par symptôme.
 AVERTISSEMENT_URGENCE_SYMPTOME = (
     "En cas de symptôme sévère ou soudain (douleur thoracique intense, "
     "difficulté à respirer...), contactez les urgences plutôt que de "
     "prendre rendez-vous ici."
 )
+
+# Regroupement par catégorie des symptômes de RechercheSymptome, pour
+# l'interface hybride (catégories cliquables -> symptômes à cocher dans la
+# catégorie choisie). Le champ RechercheSymptome.symptome n'a pas de
+# catégorie en base ; ce mapping (nom de catégorie -> libellés exacts de
+# RechercheSymptome.symptome) est le seul endroit qui recrée ce
+# regroupement. Tenu séparé du contenu figé dans la migration de données
+# 0006_seed_recherche_symptome (une migration ne doit pas dépendre d'une
+# constante de models.py susceptible de changer plus tard).
+SYMPTOME_CATEGORIES = [
+    ("Fièvre", [
+        "Fièvre persistante / grippe",
+        "Frissons et douleurs musculaires",
+    ]),
+    ("Douleur", [
+        "Douleur thoracique",
+        "Mal de dos",
+        "Douleur articulaire",
+        "Migraine / mal de tête récurrent",
+        "Douleur abdominale",
+    ]),
+    ("Peau", [
+        "Éruption cutanée / démangeaisons",
+        "Grain de beauté suspect",
+        "Acné",
+    ]),
+    ("Digestion", [
+        "Brûlures d'estomac",
+        "Nausées / vomissements",
+        "Diarrhée / constipation",
+    ]),
+    ("Respiration / ORL", [
+        "Toux persistante",
+        "Essoufflement",
+        "Mal de gorge / oreille",
+    ]),
+    ("Yeux", [
+        "Baisse de vision",
+        "Douleur oculaire",
+    ]),
+    ("Bien-être mental", [
+        "Anxiété / stress",
+        "Troubles du sommeil",
+        "Tristesse persistante",
+    ]),
+    ("Santé féminine", [
+        "Douleurs de règles",
+        "Suivi de grossesse",
+    ]),
+    ("Enfant", [
+        "Fièvre ou symptôme chez l'enfant",
+    ]),
+    ("Autre", [
+        "Je ne sais pas",
+    ]),
+]
 
 
 class RechercheSymptome(models.Model):

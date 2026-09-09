@@ -29,7 +29,11 @@ logger = logging.getLogger(__name__)
 # App imports
 from users.models import Utilisateur
 from .forms import UpdateRDVForm, DisponibiliteHebdoCreateForm, DisponibiliteHebdoEditForm, DisponibiliteSpecifiqueCreateForm, DisponibiliteSpecifiqueEditForm, AnnulerRdvForm, ReporterRdvForm, NotifierRdvForm, RendezVousForm
-from .models import RendezVous, Notification, Patient, Medecin, Disponibilite, RdvHistory, FavoriMedecin, RechercheSymptome, ListeAttenteCreneau
+from .models import (
+    RendezVous, Notification, Patient, Medecin, Disponibilite, RdvHistory,
+    FavoriMedecin, RechercheSymptome, ListeAttenteCreneau,
+    SYMPTOME_CATEGORIES, AVERTISSEMENT_URGENCE_SYMPTOME,
+)
 from . import notifications as notif_helpers
 from rdv.utils import user_can_manage_rdv, send_manual_notification
 
@@ -1913,16 +1917,51 @@ def prendre_rdv(request):
     return render(request, 'rdv/patient/prendre_rdv.html', context)
 
 @login_required
+def api_symptomes(request):
+    """Catégories de symptômes (interface hybride : catégorie cliquable ->
+    symptômes précis à cocher) et spécialités suggérées associées, sourcées
+    depuis RechercheSymptome. Le regroupement par catégorie n'existe pas en
+    base ; il est recréé ici depuis SYMPTOME_CATEGORIES (rdv/models.py)."""
+    symptomes_par_nom = {
+        s.symptome: s for s in RechercheSymptome.objects.all()
+    }
+
+    categories = []
+    for nom_categorie, noms_symptomes in SYMPTOME_CATEGORIES:
+        symptomes = []
+        for nom_symptome in noms_symptomes:
+            symptome = symptomes_par_nom.get(nom_symptome)
+            if not symptome:
+                continue
+            symptomes.append({
+                'id': symptome.id,
+                'nom': symptome.symptome,
+                'specialites': symptome.specialites_suggerees,
+            })
+        if symptomes:
+            categories.append({'nom': nom_categorie, 'symptomes': symptomes})
+
+    return JsonResponse({
+        'categories': categories,
+        'avertissement': AVERTISSEMENT_URGENCE_SYMPTOME,
+    })
+
+
+@login_required
 def api_search_medecins(request):
     """API recherche médecins avec filtres"""
-    specialite = request.GET.get('specialite')
+    # getlist gère aussi bien un seul ?specialite=x (recherche par
+    # spécialité classique) que plusieurs ?specialite=x&specialite=y
+    # (recherche par symptôme, dont le mapping suggère souvent plusieurs
+    # spécialités à la fois) sans casser les appels existants.
+    specialites = request.GET.getlist('specialite')
     search = request.GET.get('q', '')
     disponible_semaine = request.GET.get('dispo_semaine') == '1'
-    
+
     medecins = Medecin.objects.filter(accepte_nouveaux_patients=True)
-    
-    if specialite:
-        medecins = medecins.filter(specialite=specialite)
+
+    if specialites:
+        medecins = medecins.filter(specialite__in=specialites)
     
     if search:
         medecins = medecins.filter(

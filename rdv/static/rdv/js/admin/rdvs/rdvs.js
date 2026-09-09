@@ -1,8 +1,6 @@
 // static/rdv/js/admin/rdvs/rdvs_admin.js
 // Comportement aligné sur rdvs_doctor.js : filtres (search/status/date) + pagination + suppression
 
-console.log("rdvs_admin.js chargé");
-
 // ---------- utils ----------
 function getCookie(name) {
   let cookieValue = null;
@@ -46,7 +44,6 @@ function debounceFactory(delay = 300) {
 
 // ---------- Table handling (fetch + bind) ----------
 function initRdvTable() {
-  console.log('🔄 initRdvTable (admin)');
 
   const container = document.getElementById('rdv-table-container');
   if (!container) return;
@@ -227,7 +224,6 @@ function initRdvTable() {
 
 // polling (optional)
 function initRdvPolling() {
-  console.log('🔄 initRdvPolling (admin)');
 
   const container = document.getElementById('rdv-table-container');
   if (!container) return;

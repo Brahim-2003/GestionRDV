@@ -17,7 +17,6 @@
   }
 
   function initUsersTable() {
-    console.log('🔄 initUsersTable');
 
     const container = document.getElementById('users-table-container');
     const searchInput = document.getElementById('search-input');
@@ -175,7 +174,6 @@
   }
 
   function initUsersPolling() {
-    console.log('🔄 initUsersPolling');
     const container = document.getElementById('users-table-container');
     if (!container) return;
     const ajaxUrl = container.dataset.ajaxUrl;

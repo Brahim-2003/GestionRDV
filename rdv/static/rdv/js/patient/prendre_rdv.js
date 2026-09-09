@@ -994,15 +994,11 @@ if (!window.__prendre_rdv_module_defined) {
         // =============================================================================
 
         function initPrendreRdv() {
-            console.log('🔄 initPrendreRdv appelé');
 
             // Vérifier si les éléments RDV sont présents dans le DOM
             if (!hasRdvElementsInDom()) {
-                console.log('⚠️ Éléments RDV non trouvés - initialisation annulée');
                 return;
             }
-
-            console.log('✅ Initialisation du module prendre_rdv');
 
             // Injecter les styles si nécessaire
             initStylesIfNeeded();
@@ -1040,7 +1036,6 @@ if (!window.__prendre_rdv_module_defined) {
             window.Booking = Booking;
             window.Calendar = Calendar;
 
-            console.log('✅ Module prendre_rdv initialisé avec succès');
         }
 
         // =============================================================================
@@ -1048,7 +1043,6 @@ if (!window.__prendre_rdv_module_defined) {
         // =============================================================================
 
         function destroyPrendreRdv() {
-            console.log('🧹 destroyPrendreRdv - nettoyage en cours');
 
             try {
                 SpecialtySelector.destroy();
@@ -1071,7 +1065,6 @@ if (!window.__prendre_rdv_module_defined) {
                 try { delete window[name]; } catch(e) {}
             });
 
-            console.log('✅ Nettoyage terminé');
         }
 
         // =============================================================================
@@ -1086,7 +1079,6 @@ if (!window.__prendre_rdv_module_defined) {
         
         // Fonction de réinitialisation forcée
         window.reinitPrendreRdv = function() {
-            console.log('🔄 Réinitialisation forcée de prendre_rdv');
             destroyPrendreRdv();
             initPrendreRdv();
         };
@@ -1097,7 +1089,6 @@ if (!window.__prendre_rdv_module_defined) {
 
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', function() {
-                console.log('DOMContentLoaded - première initialisation prendre_rdv');
                 if (hasRdvElementsInDom()) {
                     initPrendreRdv();
                 }
@@ -1105,7 +1096,6 @@ if (!window.__prendre_rdv_module_defined) {
         } else {
             // DOM déjà chargé, initialiser si éléments présents
             if (hasRdvElementsInDom()) {
-                console.log('DOM déjà prêt - initialisation prendre_rdv');
                 setTimeout(() => initPrendreRdv(), 0);
             }
         }
@@ -1115,13 +1105,9 @@ if (!window.__prendre_rdv_module_defined) {
         // =============================================================================
 
         document.addEventListener('fragment:unloaded', function() {
-            console.log('🔌 Fragment déchargé - nettoyage prendre_rdv');
             destroyPrendreRdv();
         });
-
-        console.log('✅ prendre_rdv.js chargé et prêt (exposé window.initPrendreRdv)');
 
     })();
 }
 
-console.log('📦 Module prendre_rdv.js enregistré');

@@ -5,7 +5,6 @@
   'use strict';
 
   if (window.__history_module_defined) {
-    console.log('history.js: module déjà défini');
     return;
   }
   window.__history_module_defined = true;
@@ -309,7 +308,6 @@
     initDetailLinks();
     animateHistoryItems();
 
-    console.log('Event listeners historique initialisés');
   }
 
   // =============================================================================
@@ -377,14 +375,10 @@
   // =============================================================================
 
   function initHistoryModule() {
-    console.log('🔄 initHistoryModule appelé');
 
     if (!hasHistoryElements()) {
-      console.log('⚠️ Éléments historique non trouvés');
       return;
     }
-
-    console.log('✅ Initialisation module historique');
 
     cleanup();
     initEventListeners();
@@ -395,11 +389,9 @@
       window.addEventListener('popstate', boundHandlers.popstate);
     }
 
-    console.log('✅ Module historique initialisé');
   }
 
   function destroyHistoryModule() {
-    console.log('🧹 Nettoyage module historique');
 
     cleanup();
 
@@ -408,7 +400,6 @@
       boundHandlers.popstate = null;
     }
 
-    console.log('✅ Module historique nettoyé');
   }
 
   // =============================================================================
@@ -438,7 +429,5 @@
 
   // Événement déchargement
   document.addEventListener('fragment:unloaded', destroyHistoryModule);
-
-  console.log('✅ history.js chargé (exposé window.initHistoryModule)');
 
 })();

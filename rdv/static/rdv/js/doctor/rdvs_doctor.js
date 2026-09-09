@@ -19,7 +19,6 @@
   }
 
   function initRdvsTable() {
-    console.log('🔄 initRdvsTable');
 
     const container = document.getElementById('dispo-table-container'); // c'est le conteneur pour le tableau
     const searchInput = document.getElementById('search-input');
@@ -299,8 +298,6 @@
         });
       });
 
-
-
       // -----------------------------
       // ANNULER BUTTONS: binding (modal + AJAX submit)
       // Attendus: <button class="action-btn-cancel js-cancel-rdv" data-rdv-id="..." data-statut="..." ...>
@@ -309,7 +306,6 @@
       const modal = document.getElementById('annuler-rdv-modal');
       const modalContainer = modal ? modal.querySelector('#annuler-modal-form-container') : null;
       const modalCloseBtn = modal ? modal.querySelector('.modal-close') : null;
-
 
       // attach close handlers once (if modal present)
       if (modal && modalCloseBtn && modal.dataset.boundClose !== '1') {
@@ -657,7 +653,6 @@
       // fin reporter buttons
       // -----------------------------
 
-
       // Bind notifier buttons
       const notifyModal = document.getElementById('notifier-rdv-modal');
       const notifyContainer = document.querySelector('#notifier-modal-form-container');
@@ -762,8 +757,6 @@
         });
       });
 
-
-
     } // end bindTableEvents
 
     // Bind filter controls (search, status, date) — idempotent
@@ -817,7 +810,6 @@
   // optional polling — only if container.dataset.ajaxUrl (or data-url) supports a json endpoint;
   // it will request ?json=1 and expect {changed: true, last_count: N}
   function initRdvsPolling() {
-    console.log('🔄 initRdvsPolling');
     const container = document.getElementById('dispo-table-container');
     if (!container) return;
     if (container.dataset.pollBound === '1') return;

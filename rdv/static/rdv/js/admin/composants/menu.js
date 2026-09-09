@@ -225,5 +225,4 @@
   window.openSidebar = openSidebar;
   window.closeSidebar = closeSidebar;
 
-  console.log('menu.js: overlay control ready');
 })();

@@ -38,7 +38,6 @@ function setupEvents() {
 
 // Fonction principale d'initialisation
 function initDashboard() {
-    console.log('initDashboard');
     updateDashboard();
     setupAnimations();
     setupEvents();

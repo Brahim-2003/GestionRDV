@@ -355,5 +355,4 @@
     document.head.appendChild(style);
   }
 
-  console.log('✅ modal.js initialisé avec succès');
 })();

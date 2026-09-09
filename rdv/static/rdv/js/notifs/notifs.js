@@ -1,7 +1,6 @@
 // static/rdv/js/notifs/notifs.js
 
 function initNotifs() {
-  console.log('🔄 initNotifs');
 
   const root = document.getElementById('notif-root');
   if (!root) return;

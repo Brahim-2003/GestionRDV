@@ -8,7 +8,6 @@
   if (window.__dispo_modal_installed) return;
   window.__dispo_modal_installed = true;
   
-  console.log("dispo_modal.js: Initialisation");
 
   // =============================================================================
   // UTILITAIRES
@@ -35,7 +34,6 @@
     // Logging sécurisé
     safeLog(...args) {
       try { 
-        console.log(...args); 
       } catch (e) { 
         /* ignore */ 
       }
@@ -662,7 +660,5 @@
       event.preventDefault();
     }
   });
-
-  console.log('dispo_modal.js: Prêt et opérationnel');
 
 })();

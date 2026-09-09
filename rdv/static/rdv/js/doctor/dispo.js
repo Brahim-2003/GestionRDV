@@ -5,7 +5,6 @@
 (function () {
   'use strict';
   
-  console.log('📧 dispo.js: Chargement du module');
 
   // =============================================================================
   // UTILITAIRES
@@ -127,7 +126,6 @@
     switchTab(tabName) {
       if (this.activeTab === tabName) return;
       
-      console.log(`📄 Changement d'onglet: ${this.activeTab} → ${tabName}`);
       this.activeTab = tabName;
       this.updateUI();
       this.updateURL();
@@ -872,7 +870,6 @@
         this.poll().catch(console.warn);
       }, this.pollDelay);
 
-      console.log('Polling démarré');
     }
 
     stop() {
@@ -884,7 +881,6 @@
         this.interval = null;
       }
 
-      console.log('Polling arrêté');
     }
 
     async poll() {
@@ -909,7 +905,6 @@
         
         if (data && data.changed) {
           this.lastCount = data.last_count;
-          console.log('Changement détecté, mise à jour...');
           
           if (window.tabManager && window.tabManager.activeTab === 'ponctuel') {
             if (window.ponctuelTableManager) {
@@ -950,7 +945,6 @@
   // =============================================================================
   
   function cleanupDispoManagement() {
-    console.log('🧹 Nettoyage des instances dispo existantes');
     
     // Détruire les instances existantes
     if (window.pollingManager) {
@@ -994,11 +988,9 @@
     const container = document.getElementById('dispo-table-container');
     if (container) container.dataset.pollBound = '';
     
-    console.log('✅ Nettoyage terminé');
   }
 
   function initializeDispoManagement() {
-    console.log('🔄 Initialisation du gestionnaire de disponibilités');
 
     // Vérifier que les éléments existent
     const hasDispoElements = document.getElementById('ponctuel-content') || 
@@ -1006,7 +998,6 @@
                              document.querySelector('.tab-button[data-tab="hebdo"]');
     
     if (!hasDispoElements) {
-      console.log('⚠️ Éléments dispo non trouvés, initialisation annulée');
       return;
     }
 
@@ -1059,7 +1050,6 @@
       window.weeklyDispoManager = new WeeklyDispoManager();
       window.pollingManager = new PollingManager();
       
-      console.log('✅ Gestionnaire de disponibilités initialisé avec succès');
     } catch (e) {
       console.error('❌ Erreur lors de l\'initialisation des gestionnaires:', e);
     }
@@ -1103,7 +1093,6 @@
   
   // Fonction de réinitialisation complète (alias pour compatibilité)
   window.reinitDispoManagement = function() {
-    console.log('🔄 Réinitialisation forcée du gestionnaire de disponibilités');
     cleanupDispoManagement();
     initializeDispoManagement();
   };
@@ -1118,7 +1107,6 @@
   // Initialisation au premier chargement de la page
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() {
-      console.log('DOMContentLoaded - première initialisation dispo');
       initializeDispoManagement();
     });
   } else {
@@ -1130,7 +1118,6 @@
 
   // Événement: Disponibilité sauvegardée
   document.addEventListener('dispo:saved', function(event) {
-    console.log('✅ Disponibilité sauvegardée');
     
     // Fermer les modaux
     document.querySelectorAll('#create-dispo-modal, #edit-dispo-modal').forEach(modal => {
@@ -1151,7 +1138,6 @@
 
   // Événement: Disponibilité supprimée
   document.addEventListener('dispo:deleted', function(event) {
-    console.log('🗑️ Disponibilité supprimée:', event.detail);
     
     // Rafraîchir l'onglet actif
     setTimeout(() => {
@@ -1168,15 +1154,11 @@
 
   // Événement: Toggle de disponibilité
   document.addEventListener('dispo:toggled', function(event) {
-    console.log('🔄 Disponibilité toggle:', event.detail);
   });
 
   // Événement: Fragment déchargé (pour navigation AJAX)
   document.addEventListener('fragment:unloaded', function() {
-    console.log('🔌 Fragment déchargé - nettoyage dispo');
     cleanupDispoManagement();
   });
-
-  console.log('✅ dispo.js chargé et prêt (exposé window.initDispoManagement)');
 
 })();

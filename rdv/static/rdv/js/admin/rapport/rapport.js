@@ -5,7 +5,6 @@
 
   // Protection contre redéfinition du module
   if (window.__rdv_rapport_module_defined) {
-    console.log('rapport.js: module déjà défini');
     return;
   }
   window.__rdv_rapport_module_defined = true;
@@ -105,7 +104,6 @@
     }
 
     async init() {
-      console.log('📊 Initialisation StatsDashboard');
       
       this.setupChartDefaults();
       this.setupEventListeners();
@@ -115,7 +113,6 @@
       this.startPeriodicUpdate();
       this.setupIntersectionObserver();
       
-      console.log('✅ StatsDashboard initialisé');
     }
 
     handlePeriodChange(event) {
@@ -767,7 +764,6 @@
     }
 
     destroy() {
-      console.log('🧹 Destruction StatsDashboard');
       
       // Stop periodic updates
       if (this.updateInterval) {
@@ -799,7 +795,6 @@
       const loading = document.querySelector('.global-loading');
       if (loading) loading.remove();
 
-      console.log('✅ StatsDashboard détruit');
     }
   }
 
@@ -818,11 +813,9 @@
   }
 
   function initReportDashboard() {
-    console.log('🔄 initReportDashboard appelé');
 
     // Vérifier si les éléments du rapport sont présents
     if (!hasReportFragmentOnPage()) {
-      console.log('⚠️ Éléments rapport non trouvés - initialisation annulée');
       return;
     }
 
@@ -831,8 +824,6 @@
       console.error('❌ Chart.js non disponible');
       return;
     }
-
-    console.log('✅ Initialisation du dashboard de rapport');
 
     // Détruire l'instance précédente si elle existe
     if (dashboardInstance) {
@@ -849,7 +840,6 @@
       dashboardInstance = new StatsDashboard();
       dashboardInstance.init();
       window.reportDashboard = dashboardInstance;
-      console.log('✅ Dashboard de rapport initialisé avec succès');
     } catch (error) {
       console.error('❌ Erreur lors de l\'initialisation du dashboard:', error);
       dashboardInstance = null;
@@ -858,7 +848,6 @@
   }
 
   function destroyReportDashboard() {
-    console.log('🧹 destroyReportDashboard - nettoyage en cours');
 
     if (dashboardInstance) {
       try {
@@ -873,7 +862,6 @@
       window.reportDashboard = null;
     }
 
-    console.log('✅ Dashboard de rapport détruit');
   }
 
   // =============================================================================
@@ -888,7 +876,6 @@
 
   // Fonction de réinitialisation forcée
   window.reinitReportDashboard = function() {
-    console.log('🔄 Réinitialisation forcée du dashboard');
     destroyReportDashboard();
     initReportDashboard();
   };
@@ -902,7 +889,6 @@
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', function() {
-      console.log('DOMContentLoaded - première initialisation rapport');
       if (hasReportFragmentOnPage()) {
         initReportDashboard();
       }
@@ -910,7 +896,6 @@
   } else {
     // DOM déjà chargé, initialiser si éléments présents
     if (hasReportFragmentOnPage()) {
-      console.log('DOM déjà prêt - initialisation rapport');
       setTimeout(() => initReportDashboard(), 0);
     }
   }
@@ -920,10 +905,7 @@
   // =============================================================================
 
   document.addEventListener('fragment:unloaded', function() {
-    console.log('🔌 Fragment déchargé - nettoyage rapport');
     destroyReportDashboard();
   });
-
-  console.log('✅ rapport.js chargé et prêt (exposé window.initReportDashboard)');
 
 })();

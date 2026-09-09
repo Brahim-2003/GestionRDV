@@ -1,8 +1,10 @@
 # rdv/tests.py
-from django.test import TestCase, Client
+import threading
+from django.test import TestCase, TransactionTestCase, Client
 from django.urls import reverse
 from django.utils import timezone
 from django.core.exceptions import ValidationError
+from django.db import connections
 from datetime import datetime, date, time, timedelta
 from decimal import Decimal
 
@@ -54,6 +56,72 @@ class PatientModelTest(TestCase):
         patient2 = user2.profil_patient
         
         self.assertNotEqual(patient1.numero_patient, patient2.numero_patient)
+
+    def test_numero_patient_incremental(self):
+        """Des créations successives produisent des numéros strictement
+        incrémentaux (PAT-000001, PAT-000002, PAT-000003, ...), conformément
+        au compteur unique de rdv/models.py::generate_next_numero_patient."""
+        self.assertEqual(self.user.profil_patient.numero_patient, 'PAT-000001')
+
+        user2 = Utilisateur.objects.create_user(
+            email='patient2@test.com',
+            nom='Martin',
+            prenom='Pierre',
+            date_naissance=date(1985, 3, 20),
+            role='patient',
+            mot_de_passe='test123'
+        )
+        user3 = Utilisateur.objects.create_user(
+            email='patient3@test.com',
+            nom='Durand',
+            prenom='Alice',
+            date_naissance=date(1992, 7, 1),
+            role='patient',
+            mot_de_passe='test123'
+        )
+
+        self.assertEqual(user2.profil_patient.numero_patient, 'PAT-000002')
+        self.assertEqual(user3.profil_patient.numero_patient, 'PAT-000003')
+
+
+class NumeroPatientConcurrencyTest(TransactionTestCase):
+    """Vérifie que des créations de patients lancées en parallèle (threads,
+    donc connexions DB distinctes) ne produisent jamais de doublon de
+    numero_patient, grâce au verrou de ligne (select_for_update) posé dans
+    rdv/models.py::generate_next_numero_patient. Utilise TransactionTestCase
+    (et non TestCase) car chaque thread a besoin de voir les commits des
+    autres threads, ce qu'une TestCase enveloppée dans une seule transaction
+    ne permet pas."""
+
+    def test_creations_concurrentes_sans_doublon(self):
+        nb_threads = 8
+        erreurs = []
+
+        def creer_patient(index):
+            try:
+                Utilisateur.objects.create_user(
+                    email=f'concurrent{index}@test.com',
+                    nom='Test',
+                    prenom=f'Patient{index}',
+                    date_naissance=date(1990, 1, 1),
+                    role='patient',
+                    mot_de_passe='test123',
+                )
+            except Exception as exc:
+                erreurs.append(exc)
+            finally:
+                connections.close_all()
+
+        threads = [threading.Thread(target=creer_patient, args=(i,)) for i in range(nb_threads)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        self.assertEqual(erreurs, [])
+        numeros = list(Patient.objects.values_list('numero_patient', flat=True))
+        self.assertEqual(len(numeros), nb_threads)
+        self.assertEqual(len(numeros), len(set(numeros)))
 
 
 class MedecinModelTest(TestCase):

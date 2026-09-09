@@ -66,9 +66,18 @@ def generate_next_numero_patient():
     sérialise les créations concurrentes au niveau de la base de données
     plutôt que de risquer que deux transactions lisent le même "dernier
     numéro" et produisent la même valeur.
+
+    get_or_create (plutôt que get) : la ligne singleton est normalement
+    garantie par la migration 0003, mais un flush de TransactionTestCase
+    (utilisé pour tester la concurrence) vide les tables sans rejouer les
+    données de migration — sans ce filet, tout TransactionTestCase créant
+    un patient après un premier flush échouerait avec NumeroPatientCounter
+    introuvable.
     """
     with transaction.atomic():
-        counter = NumeroPatientCounter.objects.select_for_update().get(pk=1)
+        counter, _ = NumeroPatientCounter.objects.select_for_update().get_or_create(
+            pk=1, defaults={'last_number': 0}
+        )
         counter.last_number += 1
         counter.save(update_fields=['last_number'])
         return f"PAT-{counter.last_number:06d}"

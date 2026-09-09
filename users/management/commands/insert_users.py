@@ -9,26 +9,26 @@ class Command(BaseCommand):
     def handle(self, *args, **kwargs):
         # Données des patients
         patients_data = [
-            {"email": "aminata.idriss@tchad.td", "nom": "Idriss", "prenom": "Aminata", "telephone": "235650000001", "role": "patient", "date_naissance": "1988-03-10", "sexe": "F", "adresse": "N'Djamena, Quartier Diguel Est", "numero_patient": "PAT000001", "password": "Dk8!fLm2Px#"},
-            {"email": "fatima.brahim@tchad.td", "nom": "Brahim", "prenom": "Fatima", "telephone": "235650000002", "role": "patient", "date_naissance": "1979-11-23", "sexe": "F", "adresse": "N'Djamena, Rue principale", "numero_patient": "PAT000002", "password": "Mx7$BvQ8jw"},
-            {"email": "salma.karim@tchad.td", "nom": "Karim", "prenom": "Salma", "telephone": "235650000003", "role": "patient", "date_naissance": "1985-05-19", "sexe": "F", "adresse": "N'Djamena, Zone 4", "numero_patient": "PAT000003", "password": "H9cWyVz4Lp"},
-            {"email": "zahra.hassan@tchad.td", "nom": "Hassan", "prenom": "Zahra", "telephone": "235650000004", "role": "patient", "date_naissance": "1998-09-08", "sexe": "F", "adresse": "N'Djamena, Centre-ville", "numero_patient": "PAT000004", "password": "R3$SkLz7Bq"},
-            {"email": "amina.fall@tchad.td", "nom": "Fall", "prenom": "Amina", "telephone": "235650000005", "role": "patient", "date_naissance": "1987-06-25", "sexe": "F", "adresse": "N'Djamena, Quartier Ndjari", "numero_patient": "PAT000005", "password": "Gx1!NzHpK2"},
-            {"email": "rania.djado@tchad.td", "nom": "Djado", "prenom": "Rania", "telephone": "235650000006", "role": "patient", "date_naissance": "2001-08-28", "sexe": "F", "adresse": "N'Djamena, Quartier Argouboua", "numero_patient": "PAT000006", "password": "Yt6&WfjLpZ"},
-            {"email": "aicha.douba@tchad.td", "nom": "Douba", "prenom": "Aicha", "telephone": "235650000007", "role": "patient", "date_naissance": "1982-07-13", "sexe": "F", "adresse": "N'Djamena, Farcha", "numero_patient": "PAT000007", "password": "V$edP2CmjN"},
-            {"email": "miriam.galid@tchad.td", "nom": "Galid", "prenom": "Miriam", "telephone": "235650000008", "role": "patient", "date_naissance": "1989-03-16", "sexe": "F", "adresse": "N'Djamena, Zone 3", "numero_patient": "PAT000008", "password": "Lf74!QwcXp"},
-            {"email": "sana.youssouf@tchad.td", "nom": "Youssouf", "prenom": "Sana", "telephone": "235650000009", "role": "patient", "date_naissance": "1996-06-07", "sexe": "F", "adresse": "N'Djamena, Quartier Bebedjia", "numero_patient": "PAT000009", "password": "Tx#Wp3MvZk"},
-            {"email": "halima.baba@tchad.td", "nom": "Baba", "prenom": "Halima", "telephone": "235650000010", "role": "patient", "date_naissance": "1991-09-03", "sexe": "F", "adresse": "N'Djamena, Quartier Kim", "numero_patient": "PAT000010", "password": "Aq8$DsJvMz"},
-            {"email": "aminata.kone@tchad.td", "nom": "Koné", "prenom": "Aminata", "telephone": "235650000011", "role": "patient", "date_naissance": "1983-04-11", "sexe": "F", "adresse": "N'Djamena, Quartier Cité de l'Air", "numero_patient": "PAT000011", "password": "Bd6!XrmCtP"},
-            {"email": "mariam.kalamat@tchad.td", "nom": "Kalamat", "prenom": "Mariam", "telephone": "235650000012", "role": "patient", "date_naissance": "1990-11-20", "sexe": "F", "adresse": "N'Djamena, Secteur 5", "numero_patient": "PAT000012", "password": "C9$nVzYwLp"},
-            {"email": "fatouma.bakari@tchad.td", "nom": "Bakari", "prenom": "Fatouma", "telephone": "235650000013", "role": "patient", "date_naissance": "1986-08-02", "sexe": "F", "adresse": "N'Djamena, Quartier Komé", "numero_patient": "PAT000013", "password": "Hw7!TqXvpL"},
-            {"email": "chadia.ali@tchad.td", "nom": "Ali", "prenom": "Chadia", "telephone": "235650000014", "role": "patient", "date_naissance": "1997-05-25", "sexe": "F", "adresse": "N'Djamena, Quartier Kabalaye", "numero_patient": "PAT000014", "password": "Mv3$NpLWtx"},
-            {"email": "assia.tamim@tchad.td", "nom": "Tamim", "prenom": "Assia", "telephone": "235650000015", "role": "patient", "date_naissance": "1995-12-30", "sexe": "F", "adresse": "N'Djamena, Quartier Mkolo", "numero_patient": "PAT000015", "password": "Xj9!DsJbwL"},
-            {"email": "laila.djimadoum@tchad.td", "nom": "Djimadoum", "prenom": "Laila", "telephone": "235650000016", "role": "patient", "date_naissance": "2000-07-17", "sexe": "F", "adresse": "N'Djamena, Quartier Habena", "numero_patient": "PAT000016", "password": "Pw4$MvCXkt"},
-            {"email": "imane.alim@tchad.td", "nom": "Alim", "prenom": "Imane", "telephone": "235650000017", "role": "patient", "date_naissance": "1988-02-23", "sexe": "F", "adresse": "N'Djamena, Quartier Moursal", "numero_patient": "PAT000017", "password": "Vx5!BpnMcz"},
-            {"email": "khadidja.karim@tchad.td", "nom": "Karim", "prenom": "Khadidja", "telephone": "235650000018", "role": "patient", "date_naissance": "1992-06-14", "sexe": "F", "adresse": "N'Djamena, Quartier Kasra", "numero_patient": "PAT000018", "password": "Lt2$WvjXpM"},
-            {"email": "asma.djibrine@tchad.td", "nom": "Djibrine", "prenom": "Asma", "telephone": "235650000019", "role": "patient", "date_naissance": "1994-10-29", "sexe": "F", "adresse": "N'Djamena, Quartier Raisman", "numero_patient": "PAT000019", "password": "Rz7!FpnYxL"},
-            {"email": "sabrina.hassane@tchad.td", "nom": "Hassane", "prenom": "Sabrina", "telephone": "235650000020", "role": "patient", "date_naissance": "1987-09-07", "sexe": "F", "adresse": "N'Djamena, Quartier Ngueli", "numero_patient": "PAT000020", "password": "Nk3$VtzLpW"},
+            {"email": "aminata.idriss@tchad.td", "nom": "Idriss", "prenom": "Aminata", "telephone": "235650000001", "role": "patient", "date_naissance": "1988-03-10", "sexe": "F", "adresse": "N'Djamena, Quartier Diguel Est", "password": "Dk8!fLm2Px#"},
+            {"email": "fatima.brahim@tchad.td", "nom": "Brahim", "prenom": "Fatima", "telephone": "235650000002", "role": "patient", "date_naissance": "1979-11-23", "sexe": "F", "adresse": "N'Djamena, Rue principale", "password": "Mx7$BvQ8jw"},
+            {"email": "salma.karim@tchad.td", "nom": "Karim", "prenom": "Salma", "telephone": "235650000003", "role": "patient", "date_naissance": "1985-05-19", "sexe": "F", "adresse": "N'Djamena, Zone 4", "password": "H9cWyVz4Lp"},
+            {"email": "zahra.hassan@tchad.td", "nom": "Hassan", "prenom": "Zahra", "telephone": "235650000004", "role": "patient", "date_naissance": "1998-09-08", "sexe": "F", "adresse": "N'Djamena, Centre-ville", "password": "R3$SkLz7Bq"},
+            {"email": "amina.fall@tchad.td", "nom": "Fall", "prenom": "Amina", "telephone": "235650000005", "role": "patient", "date_naissance": "1987-06-25", "sexe": "F", "adresse": "N'Djamena, Quartier Ndjari", "password": "Gx1!NzHpK2"},
+            {"email": "rania.djado@tchad.td", "nom": "Djado", "prenom": "Rania", "telephone": "235650000006", "role": "patient", "date_naissance": "2001-08-28", "sexe": "F", "adresse": "N'Djamena, Quartier Argouboua", "password": "Yt6&WfjLpZ"},
+            {"email": "aicha.douba@tchad.td", "nom": "Douba", "prenom": "Aicha", "telephone": "235650000007", "role": "patient", "date_naissance": "1982-07-13", "sexe": "F", "adresse": "N'Djamena, Farcha", "password": "V$edP2CmjN"},
+            {"email": "miriam.galid@tchad.td", "nom": "Galid", "prenom": "Miriam", "telephone": "235650000008", "role": "patient", "date_naissance": "1989-03-16", "sexe": "F", "adresse": "N'Djamena, Zone 3", "password": "Lf74!QwcXp"},
+            {"email": "sana.youssouf@tchad.td", "nom": "Youssouf", "prenom": "Sana", "telephone": "235650000009", "role": "patient", "date_naissance": "1996-06-07", "sexe": "F", "adresse": "N'Djamena, Quartier Bebedjia", "password": "Tx#Wp3MvZk"},
+            {"email": "halima.baba@tchad.td", "nom": "Baba", "prenom": "Halima", "telephone": "235650000010", "role": "patient", "date_naissance": "1991-09-03", "sexe": "F", "adresse": "N'Djamena, Quartier Kim", "password": "Aq8$DsJvMz"},
+            {"email": "aminata.kone@tchad.td", "nom": "Koné", "prenom": "Aminata", "telephone": "235650000011", "role": "patient", "date_naissance": "1983-04-11", "sexe": "F", "adresse": "N'Djamena, Quartier Cité de l'Air", "password": "Bd6!XrmCtP"},
+            {"email": "mariam.kalamat@tchad.td", "nom": "Kalamat", "prenom": "Mariam", "telephone": "235650000012", "role": "patient", "date_naissance": "1990-11-20", "sexe": "F", "adresse": "N'Djamena, Secteur 5", "password": "C9$nVzYwLp"},
+            {"email": "fatouma.bakari@tchad.td", "nom": "Bakari", "prenom": "Fatouma", "telephone": "235650000013", "role": "patient", "date_naissance": "1986-08-02", "sexe": "F", "adresse": "N'Djamena, Quartier Komé", "password": "Hw7!TqXvpL"},
+            {"email": "chadia.ali@tchad.td", "nom": "Ali", "prenom": "Chadia", "telephone": "235650000014", "role": "patient", "date_naissance": "1997-05-25", "sexe": "F", "adresse": "N'Djamena, Quartier Kabalaye", "password": "Mv3$NpLWtx"},
+            {"email": "assia.tamim@tchad.td", "nom": "Tamim", "prenom": "Assia", "telephone": "235650000015", "role": "patient", "date_naissance": "1995-12-30", "sexe": "F", "adresse": "N'Djamena, Quartier Mkolo", "password": "Xj9!DsJbwL"},
+            {"email": "laila.djimadoum@tchad.td", "nom": "Djimadoum", "prenom": "Laila", "telephone": "235650000016", "role": "patient", "date_naissance": "2000-07-17", "sexe": "F", "adresse": "N'Djamena, Quartier Habena", "password": "Pw4$MvCXkt"},
+            {"email": "imane.alim@tchad.td", "nom": "Alim", "prenom": "Imane", "telephone": "235650000017", "role": "patient", "date_naissance": "1988-02-23", "sexe": "F", "adresse": "N'Djamena, Quartier Moursal", "password": "Vx5!BpnMcz"},
+            {"email": "khadidja.karim@tchad.td", "nom": "Karim", "prenom": "Khadidja", "telephone": "235650000018", "role": "patient", "date_naissance": "1992-06-14", "sexe": "F", "adresse": "N'Djamena, Quartier Kasra", "password": "Lt2$WvjXpM"},
+            {"email": "asma.djibrine@tchad.td", "nom": "Djibrine", "prenom": "Asma", "telephone": "235650000019", "role": "patient", "date_naissance": "1994-10-29", "sexe": "F", "adresse": "N'Djamena, Quartier Raisman", "password": "Rz7!FpnYxL"},
+            {"email": "sabrina.hassane@tchad.td", "nom": "Hassane", "prenom": "Sabrina", "telephone": "235650000020", "role": "patient", "date_naissance": "1987-09-07", "sexe": "F", "adresse": "N'Djamena, Quartier Ngueli", "password": "Nk3$VtzLpW"},
         ]
 
         # Données des médecins
@@ -71,15 +71,17 @@ class Command(BaseCommand):
                     is_actif=True
                 )
 
-                # Mettre à jour le profil Patient créé par le signal
+                # Mettre à jour le profil Patient créé par le signal.
+                # numero_patient n'est pas touché ici : il a déjà été généré
+                # par le point unique Patient.save() (voir rdv/models.py::
+                # generate_next_numero_patient) au moment de sa création.
                 patient_profile = Patient.objects.get(user=user)
-                patient_profile.numero_patient = patient_data['numero_patient']
                 patient_profile.adresse = patient_data['adresse']
                 patient_profile.sexe = patient_data['sexe']
                 patient_profile.save()
 
                 patients_created += 1
-                self.stdout.write(self.style.SUCCESS(f"  ✓ Patient créé: {patient_data['prenom']} {patient_data['nom']} ({patient_data['numero_patient']})"))
+                self.stdout.write(self.style.SUCCESS(f"  ✓ Patient créé: {patient_data['prenom']} {patient_data['nom']} ({patient_profile.numero_patient})"))
 
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f"  ✗ Erreur pour {patient_data['email']}: {str(e)}"))

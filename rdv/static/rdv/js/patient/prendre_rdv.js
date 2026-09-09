@@ -124,7 +124,8 @@ if (!window.__prendre_rdv_module_defined) {
             searchDoctors: '/rdv/api/search/medecins/',
             getSlots: '/rdv/api/creneaux/medecins/',
             bookAppointment: '/rdv/api/reserver/rdv/',
-            toggleFavorite: '/rdv/api/toggle/favori/'
+            toggleFavorite: '/rdv/api/toggle/favori/',
+            getSymptomes: '/rdv/api/symptomes/'
         };
 
         // =============================================================================
@@ -158,11 +159,19 @@ if (!window.__prendre_rdv_module_defined) {
 
             async searchDoctors(specialty, filters = {}) {
                 const url = new URL(API_ENDPOINTS.searchDoctors, window.location.origin);
-                if (specialty) url.searchParams.append('specialite', specialty);
+                // specialty : une chaîne (sélection classique) ou un tableau
+                // (suggestions issues de la recherche par symptôme).
+                const specialties = Array.isArray(specialty) ? specialty : (specialty ? [specialty] : []);
+                specialties.forEach(s => url.searchParams.append('specialite', s));
                 if (filters.search) url.searchParams.append('q', filters.search);
                 if (filters.disponibleSemaine) url.searchParams.append('dispo_semaine', '1');
                 const response = await this.request(url);
                 return Array.isArray(response) ? response : (response.medecins || []);
+            },
+
+            async getSymptomes() {
+                const response = await this.request(new URL(API_ENDPOINTS.getSymptomes, window.location.origin));
+                return response || { categories: [], avertissement: '' };
             },
 
             async getDoctorSlots(doctorId, dateDebut, dateFin) {
@@ -272,8 +281,146 @@ if (!window.__prendre_rdv_module_defined) {
                 });
             },
 
-            destroy() { 
-                this.cleanup(); 
+            destroy() {
+                this.cleanup();
+            }
+        };
+
+        // =============================================================================
+        // SYMPTOM SELECTOR (interface hybride : catégorie -> symptômes précis)
+        // =============================================================================
+
+        const SymptomSelector = {
+            categories: [],
+            boundHandlers: new Map(),
+
+            async init() {
+                this.cleanup();
+
+                const toggle = document.getElementById('symptom-search-toggle');
+                const panel = document.getElementById('symptom-search-panel');
+                if (!toggle || !panel) return;
+
+                const toggleHandler = () => {
+                    const expanded = toggle.getAttribute('aria-expanded') === 'true';
+                    toggle.setAttribute('aria-expanded', String(!expanded));
+                    panel.classList.toggle('hidden', expanded);
+                    if (!expanded && this.categories.length === 0) {
+                        this.load();
+                    }
+                };
+                toggle.addEventListener('click', toggleHandler);
+                this.boundHandlers.set(toggle, { event: 'click', handler: toggleHandler });
+
+                const validerBtn = document.getElementById('symptom-search-valider');
+                if (validerBtn) {
+                    const validerHandler = () => this.applySuggestions();
+                    validerBtn.addEventListener('click', validerHandler);
+                    this.boundHandlers.set(validerBtn, { event: 'click', handler: validerHandler });
+                }
+            },
+
+            async load() {
+                const warningEl = document.getElementById('symptom-search-warning');
+                const categoriesEl = document.getElementById('symptom-categories');
+                if (!categoriesEl) return;
+
+                try {
+                    const data = await API.getSymptomes();
+                    this.categories = data.categories || [];
+                    if (warningEl) warningEl.textContent = data.avertissement || '';
+
+                    categoriesEl.innerHTML = '';
+                    this.categories.forEach(categorie => {
+                        const chip = document.createElement('button');
+                        chip.type = 'button';
+                        chip.className = 'filter-chip symptom-category-chip';
+                        chip.textContent = categorie.nom;
+                        chip.dataset.categorie = categorie.nom;
+
+                        const handler = () => this.selectCategory(categorie.nom, chip);
+                        chip.addEventListener('click', handler);
+                        this.boundHandlers.set(chip, { event: 'click', handler });
+
+                        categoriesEl.appendChild(chip);
+                    });
+                } catch (error) {
+                    console.error('Erreur chargement symptômes:', error);
+                    if (categoriesEl) categoriesEl.innerHTML = '<p>Impossible de charger les catégories de symptômes.</p>';
+                }
+            },
+
+            selectCategory(nom, chipEl) {
+                document.querySelectorAll('.symptom-category-chip').forEach(c => c.classList.remove('active'));
+                chipEl.classList.add('active');
+
+                const listEl = document.getElementById('symptom-list');
+                if (!listEl) return;
+
+                const categorie = this.categories.find(c => c.nom === nom);
+                listEl.innerHTML = '';
+                listEl.classList.remove('hidden');
+
+                (categorie?.symptomes || []).forEach(symptome => {
+                    const label = document.createElement('label');
+                    label.className = 'symptom-checkbox-label';
+
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.value = symptome.id;
+                    checkbox.dataset.specialites = JSON.stringify(symptome.specialites || []);
+
+                    const handler = () => this.updateValiderState();
+                    checkbox.addEventListener('change', handler);
+                    this.boundHandlers.set(checkbox, { event: 'change', handler });
+
+                    label.appendChild(checkbox);
+                    label.append(` ${symptome.nom}`);
+                    listEl.appendChild(label);
+                });
+
+                this.updateValiderState();
+            },
+
+            updateValiderState() {
+                const validerBtn = document.getElementById('symptom-search-valider');
+                if (!validerBtn) return;
+                const cochés = document.querySelectorAll('#symptom-list input[type="checkbox"]:checked');
+                validerBtn.disabled = cochés.length === 0;
+            },
+
+            applySuggestions() {
+                const cochés = document.querySelectorAll('#symptom-list input[type="checkbox"]:checked');
+                const specialitesSuggerees = new Set();
+                cochés.forEach(checkbox => {
+                    try {
+                        JSON.parse(checkbox.dataset.specialites || '[]').forEach(s => specialitesSuggerees.add(s));
+                    } catch (e) { /* ignore */ }
+                });
+
+                let premiere = null;
+                document.querySelectorAll('.speciality-card').forEach(card => {
+                    const suggested = specialitesSuggerees.has(card.dataset.speciality);
+                    card.classList.toggle('suggested', suggested);
+                    if (suggested && !premiere) premiere = card;
+                });
+
+                if (premiere) {
+                    premiere.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    Utils.showNotification('Spécialités suggérées mises en avant ci-dessous.', 'info');
+                } else {
+                    Utils.showNotification('Aucune spécialité suggérée pour cette sélection.', 'info');
+                }
+            },
+
+            cleanup() {
+                this.boundHandlers.forEach(({ event, handler }, el) => el.removeEventListener(event, handler));
+                this.boundHandlers.clear();
+            },
+
+            destroy() {
+                this.cleanup();
+                this.categories = [];
             }
         };
 
@@ -1087,16 +1234,18 @@ if (!window.__prendre_rdv_module_defined) {
             // Nettoyer les anciennes instances
             try {
                 SpecialtySelector.destroy();
+                SymptomSelector.destroy();
                 DoctorList.destroy();
                 Calendar.destroy();
                 TimeSlots.destroy();
-            } catch (e) { 
-                console.warn('Nettoyage ancien module:', e); 
+            } catch (e) {
+                console.warn('Nettoyage ancien module:', e);
             }
 
             // Initialiser les controllers
             Navigation.init();
             SpecialtySelector.init();
+            SymptomSelector.init();
 
             // Exposer globalement les modules
             window.DoctorList = DoctorList;
@@ -1114,6 +1263,7 @@ if (!window.__prendre_rdv_module_defined) {
 
             try {
                 SpecialtySelector.destroy();
+                SymptomSelector.destroy();
                 DoctorList.destroy();
                 Calendar.destroy();
                 TimeSlots.destroy();

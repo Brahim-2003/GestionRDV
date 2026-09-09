@@ -28,7 +28,24 @@
                 <i class="bx bx-search search-icon-speciality"></i>
                 <input type="text" class="search-input-speciality" placeholder="Rechercher par spécialité..." id="specialty-search">
             </div>
-            
+
+            <div class="symptom-search-container" id="symptom-search-container">
+                <button type="button" class="symptom-search-toggle" id="symptom-search-toggle" aria-expanded="false" aria-controls="symptom-search-panel">
+                    <i class="bx bx-help-circle"></i>
+                    Je ne sais pas quelle spécialité choisir — chercher par symptôme
+                </button>
+                <div class="symptom-search-panel hidden" id="symptom-search-panel">
+                    <p class="symptom-search-warning" id="symptom-search-warning" role="note"></p>
+                    <div class="symptom-categories" id="symptom-categories"></div>
+                    <div class="symptom-list hidden" id="symptom-list"></div>
+                    <div class="button-group">
+                        <button type="button" class="btn btn-primary" id="symptom-search-valider" disabled>
+                            Voir les spécialités suggérées
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <div class="filters">
                 <div class="filter-chip" data-filter="disponible">
                     <i class="bx bx-time"></i>

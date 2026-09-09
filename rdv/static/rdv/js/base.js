@@ -81,43 +81,46 @@ function cleanupBeforeLoad() {
  * Charge un fragment via AJAX et l’injecte dans #ajax-content.
  * Puis gère pushState, active nav et init.
  */
-function loadContent(url, push = true) {
+async function loadContent(url, push = true) {
   const container = document.getElementById('ajax-content');
   if (!container) return;
 
   cleanupBeforeLoad(); // ✅ AJOUT ICI
 
-  container.innerHTML = '<p>Chargement…</p>';
-  fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-    .then(r => r.ok ? r.text() : Promise.reject(`HTTP ${r.status}`))
-    .then(html => {
-      // si le serveur renvoie une page complète contenant #ajax-content,
-      // on tente d'extraire le fragment pour éviter de mettre toute la page
-      let fragment = html;
-      if (html.includes('<html') || html.includes('<body') || html.includes('id="ajax-content"')) {
-        const tmp = document.createElement('div');
-        tmp.innerHTML = html;
-        const extracted = tmp.querySelector('#ajax-content');
-        if (extracted) fragment = extracted.innerHTML;
-        else {
-          const body = tmp.querySelector('body');
-          fragment = body ? body.innerHTML : html;
-        }
+  container.setAttribute('aria-busy', 'true');
+  container.innerHTML = '<p role="status" aria-live="polite">Chargement…</p>';
+
+  try {
+    const res = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const html = await res.text();
+
+    // si le serveur renvoie une page complète contenant #ajax-content,
+    // on tente d'extraire le fragment pour éviter de mettre toute la page
+    let fragment = html;
+    if (html.includes('<html') || html.includes('<body') || html.includes('id="ajax-content"')) {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      const extracted = tmp.querySelector('#ajax-content');
+      if (extracted) fragment = extracted.innerHTML;
+      else {
+        const body = tmp.querySelector('body');
+        fragment = body ? body.innerHTML : html;
       }
+    }
 
+    container.innerHTML = fragment;
+    await injectAndExecuteScripts(container);
 
-      container.innerHTML = fragment;
-      return injectAndExecuteScripts(container);
-    })
-    .then(() => {
-      if (push) history.pushState({ url }, '', url);
-      highlightActiveNav(url);
-      runAllInits();
-    })
-    .catch(err => {
-      console.error('Erreur AJAX loadContent:', err);
-      container.innerHTML = '<p>Erreur lors du chargement.</p>';
-    });
+    if (push) history.pushState({ url }, '', url);
+    highlightActiveNav(url);
+    runAllInits();
+  } catch (err) {
+    console.error('Erreur AJAX loadContent:', err);
+    container.innerHTML = '<p role="alert">Impossible de charger le contenu. Vérifiez votre connexion et réessayez.</p>';
+  } finally {
+    container.removeAttribute('aria-busy');
+  }
 }
 
 /**

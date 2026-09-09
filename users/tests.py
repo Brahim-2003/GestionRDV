@@ -301,7 +301,10 @@ class UserManagementTest(TestCase):
             'password1': 'Pass123!',
             'password2': 'Pass123!'
         })
-        print(response.context['form'].errors)
+        # Debug oublié : `response.context` est None sur une redirection
+        # (la création réussit bien, cf. les deux assertions ci-dessous),
+        # donc `response.context['form']` levait TypeError avant même
+        # d'atteindre ces assertions.
         self.assertEqual(response.status_code, 302)
         self.assertTrue(Utilisateur.objects.filter(email='created@test.com').exists())
 

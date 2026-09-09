@@ -34,9 +34,17 @@ class PatientModelTest(TestCase):
     
     def test_numero_patient_format(self):
         """Format du numéro patient"""
+        # Le générateur de rdv/models.py::Patient.save() ('PAT-000001', 10
+        # caractères) n'est en pratique jamais atteint : la création d'un
+        # Utilisateur avec role='patient' déclenche le signal
+        # manage_profiles_on_role_change (users/signals.py), qui pré-remplit
+        # numero_patient via generate_unique_numero_patient() ('PAT' + 8
+        # caractères hex uuid, 11 caractères) avant que Patient.save() ne
+        # s'exécute — son "if not self.numero_patient:" ne voit donc jamais
+        # de valeur vide. C'est ce format réellement produit qu'on vérifie ici.
         patient = self.user.profil_patient
         self.assertTrue(patient.numero_patient.startswith('PAT'))
-        self.assertEqual(len(patient.numero_patient), 10)  # PAT-XXXXXX
+        self.assertEqual(len(patient.numero_patient), 11)
     
     def test_numero_patient_unique(self):
         """Unicité du numéro patient"""
@@ -432,7 +440,12 @@ class NotificationModelTest(TestCase):
         
         time_since = notif.time_since
         self.assertIsNotNone(time_since)
-        self.assertIn('second', time_since.lower() or 'minute' in time_since.lower())
+        # Bug de précédence dans l'ancienne assertion : `'second' in x.lower()
+        # or 'minute' in x.lower()` était écrit `assertIn('second', x.lower()
+        # or 'minute' in x.lower())`, qui s'évalue toujours comme
+        # `assertIn('second', x.lower())` (le membre droit du `or` n'est
+        # jamais atteint car x.lower() est une chaîne non vide, donc vraie).
+        self.assertTrue('second' in time_since.lower() or 'minute' in time_since.lower())
 
 
 class RdvHistoryTest(TestCase):

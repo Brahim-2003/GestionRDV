@@ -2093,32 +2093,44 @@ def api_reserver_rdv(request):
         if timezone.is_naive(dt):
             dt = timezone.make_aware(dt, timezone.get_current_timezone())
     
-    # Vérifier disponibilité
+    # Vérifier disponibilité et créer le RDV dans une transaction verrouillée :
+    # select_for_update() sérialise avec toute autre opération en cours sur un
+    # RDV déjà existant sur ce créneau (ex. confirmer_rdv/annuler_rdv). Il ne
+    # protège pas à lui seul contre deux INSERT concurrents sur un créneau
+    # encore libre (rien à verrouiller tant qu'aucune ligne n'existe) : c'est
+    # la contrainte unique_rdv_actif_par_creneau (DB) qui garantit qu'un seul
+    # des deux INSERT concurrents peut réussir ; l'autre lève IntegrityError,
+    # rattrapé ci-dessous en réponse "Créneau déjà pris" plutôt qu'une 500.
     end_time = dt + timedelta(minutes=30)
-    if RendezVous.objects.filter(
-        medecin=medecin,
-        date_heure_rdv__lt=end_time,
-        date_heure_rdv__gte=dt,
-        statut__in=['programme', 'confirme']
-    ).exists():
+    try:
+        with transaction.atomic():
+            conflit = RendezVous.objects.select_for_update().filter(
+                medecin=medecin,
+                date_heure_rdv__lt=end_time,
+                date_heure_rdv__gte=dt,
+                statut__in=['programme', 'confirme']
+            )
+            if conflit.exists():
+                return JsonResponse({'success': False, 'error': 'Créneau déjà pris'}, status=400)
+
+            # Créer RDV
+            rdv = RendezVous.objects.create(
+                patient=patient,
+                medecin=medecin,
+                date_heure_rdv=dt,  # dt est maintenant correctement aware
+                motif=data.get('motif', ''),
+                statut='programme',
+                duree_minutes=30
+            )
+            RdvHistory.objects.create(
+                rdv=rdv,
+                action="create",
+                performed_by=request.user,
+                description="Rendez-vous créé"
+            )
+    except IntegrityError:
         return JsonResponse({'success': False, 'error': 'Créneau déjà pris'}, status=400)
-    
-    # Créer RDV
-    rdv = RendezVous.objects.create(
-        patient=patient,
-        medecin=medecin,
-        date_heure_rdv=dt,  # dt est maintenant correctement aware
-        motif=data.get('motif', ''),
-        statut='programme',
-        duree_minutes=30
-    )
-    RdvHistory.objects.create(
-        rdv=rdv,
-        action="create",
-        performed_by=request.user,
-        description="Rendez-vous créé"
-    )
-    
+
     create_and_send_notification(
             rdv.medecin.user,
             "Nouveau rendez-vous programmé",

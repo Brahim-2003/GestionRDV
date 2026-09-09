@@ -365,6 +365,17 @@ class RendezVous(models.Model):
     class Meta:
         verbose_name = "Rendez-Vous"
         verbose_name_plural = "Rendez-Vous"
+        constraints = [
+            # Empêche deux RDV actifs (programme/confirme) sur le même
+            # créneau du même médecin. Les statuts terminaux (annule,
+            # termine, reporte) ne sont pas concernés : un créneau annulé
+            # ou reporté peut être repris par un autre patient.
+            UniqueConstraint(
+                fields=['medecin', 'date_heure_rdv'],
+                condition=Q(statut__in=['programme', 'confirme']),
+                name='unique_rdv_actif_par_creneau',
+            ),
+        ]
 
     def __str__(self):
         return f"RDV {self.patient.user.nom_complet()} - Dr. {self.medecin.user.nom_complet()} - {self.date_heure_rdv.strftime('%d/%m/%Y %H:%M')}"

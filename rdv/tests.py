@@ -1676,5 +1676,46 @@ class CeleryIntegrationTest(TestCase):
         )
 
 
+class WaitlistExpirationTaskTest(TestCase):
+    """Vérifie rdv.tasks.expire_old_waitlist_entries (job périodique)."""
 
+    def setUp(self):
+        self.medecin_user = Utilisateur.objects.create_user(
+            email='medecin@test.com', nom='Medecin', prenom='Test',
+            date_naissance=date(1980, 1, 1), role='medecin', mot_de_passe='test123'
+        )
+        self.medecin = self.medecin_user.profil_medecin
+
+    def _patient(self, email):
+        user = Utilisateur.objects.create_user(
+            email=email, nom='Patient', prenom='Test',
+            date_naissance=date(1990, 1, 1), role='patient', mot_de_passe='test123'
+        )
+        return user.profil_patient
+
+    def test_expire_old_waitlist_entries(self):
+        from rdv.tasks import expire_old_waitlist_entries
+
+        expiree = ListeAttenteCreneau.objects.create(
+            patient=self._patient('attente1@test.com'), medecin=self.medecin,
+            date_heure_souhaitee=timezone.now() - timedelta(days=1),
+        )
+        active = ListeAttenteCreneau.objects.create(
+            patient=self._patient('attente2@test.com'), medecin=self.medecin,
+            date_heure_souhaitee=timezone.now() + timedelta(days=1),
+        )
+        honoree = ListeAttenteCreneau.objects.create(
+            patient=self._patient('attente3@test.com'), medecin=self.medecin,
+            date_heure_souhaitee=timezone.now() - timedelta(days=1),
+            statut='honore',
+        )
+
+        expire_old_waitlist_entries()
+
+        expiree.refresh_from_db()
+        active.refresh_from_db()
+        honoree.refresh_from_db()
+        self.assertEqual(expiree.statut, 'expire')
+        self.assertEqual(active.statut, 'en_attente')
+        self.assertEqual(honoree.statut, 'honore')
 

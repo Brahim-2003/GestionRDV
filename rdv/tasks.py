@@ -664,6 +664,31 @@ def cleanup_old_notifications(self):
 
 
 @shared_task(bind=True)
+def expire_old_waitlist_entries(self):
+    """
+    Marque comme 'expire' les inscriptions de liste d'attente (en_attente
+    ou notifie) dont date_expiration est dépassée sans avoir été honorées.
+    Par défaut, date_expiration = date_heure_souhaitee (le créneau souhaité
+    lui-même) — voir ListeAttenteCreneau.save().
+
+    Tâche périodique, sur le même modèle que auto_cancel_expired_rdv :
+    comme les autres tâches "auto_*"/"cleanup_*" de ce fichier, elle n'est
+    pas encore câblée à un planning Celery Beat (aucun CELERY_BEAT_SCHEDULE
+    dans ce projet) — à faire au niveau infra/déploiement, hors périmètre
+    de cette session.
+    """
+    from .models import ListeAttenteCreneau
+
+    total_expired = ListeAttenteCreneau.objects.filter(
+        statut__in=['en_attente', 'notifie'],
+        date_expiration__lt=timezone.now(),
+    ).update(statut='expire')
+
+    logger.info(f"{total_expired} inscription(s) liste d'attente expirée(s)")
+    return f"{total_expired} inscription(s) liste d'attente expirée(s)"
+
+
+@shared_task(bind=True)
 def generate_daily_stats_report(self):
     """
     Génère un rapport quotidien des statistiques.

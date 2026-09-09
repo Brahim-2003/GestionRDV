@@ -802,7 +802,7 @@ class PriseRdvViewTest(TestCase):
         data = response.json()
         self.assertIn('creneaux', data)
         self.assertGreater(len(data['creneaux']), 0)
-    
+
     def test_api_reserver_rdv(self):
         """Réservation d'un RDV via API"""
         # Date lundi prochain 10h
@@ -834,6 +834,130 @@ class PriseRdvViewTest(TestCase):
         self.assertEqual(rdv.patient, self.patient)
         self.assertEqual(rdv.medecin, self.medecin)
         self.assertEqual(rdv.statut, 'programme')
+
+    def test_api_reserver_rdv_honore_inscription_et_expire_les_concurrentes(self):
+        """Réserver un créneau honore l'inscription du réservataire sur ce
+        créneau (si elle existe) et fait expirer celles des autres patients
+        en attente sur le même (medecin, date_heure_souhaitee)."""
+        today = date.today()
+        days_ahead = 0 - today.weekday()
+        if days_ahead <= 0:
+            days_ahead += 7
+        next_monday = today + timedelta(days=days_ahead)
+        rdv_datetime = timezone.make_aware(datetime.combine(next_monday, time(10, 0)))
+
+        inscription_gagnante = ListeAttenteCreneau.objects.create(
+            patient=self.patient, medecin=self.medecin,
+            date_heure_souhaitee=rdv_datetime,
+        )
+
+        autre_patient_user = Utilisateur.objects.create_user(
+            email='autre_patient@test.com', nom='Autre', prenom='Patient',
+            date_naissance=date(1990, 1, 1), role='patient', mot_de_passe='test123'
+        )
+        inscription_concurrente = ListeAttenteCreneau.objects.create(
+            patient=autre_patient_user.profil_patient, medecin=self.medecin,
+            date_heure_souhaitee=rdv_datetime,
+        )
+
+        response = self.client.post(
+            reverse('rdv:api_reserver_rdv'),
+            data={
+                'medecin_id': self.medecin.id,
+                'datetime': rdv_datetime.isoformat(),
+                'motif': 'Consultation',
+            },
+            content_type='application/json'
+        )
+        self.assertTrue(response.json()['success'])
+        rdv = RendezVous.objects.get(id=response.json()['rdv_id'])
+
+        inscription_gagnante.refresh_from_db()
+        inscription_concurrente.refresh_from_db()
+        self.assertEqual(inscription_gagnante.statut, 'honore')
+        self.assertEqual(inscription_gagnante.rdv_propose, rdv)
+        self.assertEqual(inscription_concurrente.statut, 'expire')
+
+    def test_inscrire_liste_attente_success(self):
+        """Inscription réussie en liste d'attente sur un créneau précis."""
+        rdv_datetime = timezone.now() + timedelta(days=7)
+        response = self.client.post(
+            reverse('rdv:inscrire_liste_attente'),
+            data=json.dumps({
+                'medecin_id': self.medecin.id,
+                'datetime': rdv_datetime.isoformat(),
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data['success'])
+        inscription = ListeAttenteCreneau.objects.get(id=data['inscription_id'])
+        self.assertEqual(inscription.patient, self.patient)
+        self.assertEqual(inscription.medecin, self.medecin)
+        self.assertEqual(inscription.statut, 'en_attente')
+
+    def test_inscrire_liste_attente_refuse_si_deja_inscrit_meme_medecin(self):
+        """Une seule inscription active à la fois par (patient, médecin)."""
+        rdv_datetime = timezone.now() + timedelta(days=7)
+        ListeAttenteCreneau.objects.create(
+            patient=self.patient, medecin=self.medecin,
+            date_heure_souhaitee=rdv_datetime,
+        )
+
+        response = self.client.post(
+            reverse('rdv:inscrire_liste_attente'),
+            data=json.dumps({
+                'medecin_id': self.medecin.id,
+                'datetime': (rdv_datetime + timedelta(hours=1)).isoformat(),
+            }),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertFalse(data['success'])
+        self.assertIn('déjà', data['error'])
+        self.assertEqual(ListeAttenteCreneau.objects.filter(patient=self.patient).count(), 1)
+
+    def test_desinscrire_liste_attente(self):
+        """Le patient peut annuler sa propre inscription."""
+        inscription = ListeAttenteCreneau.objects.create(
+            patient=self.patient, medecin=self.medecin,
+            date_heure_souhaitee=timezone.now() + timedelta(days=7),
+        )
+        response = self.client.post(
+            reverse('rdv:desinscrire_liste_attente', kwargs={'inscription_id': inscription.id})
+        )
+        self.assertEqual(response.status_code, 200)
+        inscription.refresh_from_db()
+        self.assertEqual(inscription.statut, 'annule')
+
+    def test_desinscrire_liste_attente_refuse_pour_autre_patient(self):
+        """Un patient ne peut pas annuler l'inscription d'un autre."""
+        autre_patient_user = Utilisateur.objects.create_user(
+            email='autre_patient@test.com', nom='Autre', prenom='Patient',
+            date_naissance=date(1990, 1, 1), role='patient', mot_de_passe='test123'
+        )
+        inscription = ListeAttenteCreneau.objects.create(
+            patient=autre_patient_user.profil_patient, medecin=self.medecin,
+            date_heure_souhaitee=timezone.now() + timedelta(days=7),
+        )
+        response = self.client.post(
+            reverse('rdv:desinscrire_liste_attente', kwargs={'inscription_id': inscription.id})
+        )
+        self.assertEqual(response.status_code, 404)
+        inscription.refresh_from_db()
+        self.assertEqual(inscription.statut, 'en_attente')
+
+    def test_mes_inscriptions_liste_attente_page(self):
+        """La page liste les inscriptions du patient connecté."""
+        ListeAttenteCreneau.objects.create(
+            patient=self.patient, medecin=self.medecin,
+            date_heure_souhaitee=timezone.now() + timedelta(days=7),
+        )
+        response = self.client.get(reverse('rdv:mes_inscriptions_liste_attente'))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context['inscriptions']), 1)
 
 
 class ReservationConcurrencyTest(TransactionTestCase):

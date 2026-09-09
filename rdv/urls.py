@@ -55,6 +55,10 @@ urlpatterns=[
     path("api/reserver/rdv/", views.api_reserver_rdv, name="api_reserver_rdv"),
     path("api/api_toggle_favori/<int:medecin_id>/", views.api_toggle_favori, name="api_toggle_favori"),
 
+    path('liste_attente/', views.mes_inscriptions_liste_attente, name='mes_inscriptions_liste_attente'),
+    path('api/liste_attente/inscrire/', views.inscrire_liste_attente, name='inscrire_liste_attente'),
+    path('api/liste_attente/<int:inscription_id>/desinscrire/', views.desinscrire_liste_attente, name='desinscrire_liste_attente'),
+
     path('notifs/', views.list_notif, name='notifs'),
     path('notifications/mark-read/<int:notification_id>/', views.mark_as_read, name='mark_read'),
     path('notifications/mark-all-read/', views.mark_all_as_read, name='mark_all_read'),

@@ -1,0 +1,48 @@
+{% load static %}
+
+<div class="section-header">
+    <div>
+        <h2>Ma liste d'attente</h2>
+        <p>Créneaux pour lesquels vous serez averti(e) en cas de désistement</p>
+    </div>
+</div>
+
+<div id="liste-attente-root">
+    {% if inscriptions %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Médecin</th>
+                <th>Créneau souhaité</th>
+                <th>Statut</th>
+                <th class="col-actions">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for inscription in inscriptions %}
+            <tr data-inscription-id="{{ inscription.id }}">
+                <td>Dr. {{ inscription.medecin.user.nom_complet }}</td>
+                <td>{{ inscription.date_heure_souhaitee|date:"d/m/Y H:i" }}</td>
+                <td><span class="badge badge-info">{{ inscription.get_statut_display }}</span></td>
+                <td class="col-actions">
+                    {% if inscription.statut == 'en_attente' or inscription.statut == 'notifie' %}
+                    <button type="button" class="btn-sm btn-secondary js-desinscrire-liste-attente"
+                            data-desinscrire-url="{% url 'rdv:desinscrire_liste_attente' inscription.id %}"
+                            aria-label="Se désinscrire de la liste d'attente pour Dr. {{ inscription.medecin.user.nom_complet }}">
+                        <i class='bx bx-x'></i> Se désinscrire
+                    </button>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <i class="bx bx-time-five"></i>
+        <p>Vous n'êtes inscrit(e) sur aucune liste d'attente.</p>
+    </div>
+    {% endif %}
+</div>
+
+<script defer src="{% static 'rdv/js/patient/liste_attente.js' %}"></script>

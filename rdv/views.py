@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 # App imports
 from users.models import Utilisateur
 from .forms import UpdateRDVForm, DisponibiliteHebdoCreateForm, DisponibiliteHebdoEditForm, DisponibiliteSpecifiqueCreateForm, DisponibiliteSpecifiqueEditForm, AnnulerRdvForm, ReporterRdvForm, NotifierRdvForm, RendezVousForm
-from .models import RendezVous, Notification, Patient, Medecin, Disponibilite, RdvHistory, FavoriMedecin, RechercheSymptome
+from .models import RendezVous, Notification, Patient, Medecin, Disponibilite, RdvHistory, FavoriMedecin, RechercheSymptome, ListeAttenteCreneau
 from . import notifications as notif_helpers
 from rdv.utils import user_can_manage_rdv, send_manual_notification
 
@@ -2068,6 +2068,18 @@ def api_creneaux_medecin(request, medecin_id):
         'creneaux': creneaux
     })
 
+def _parse_client_datetime(dt_str):
+    """Parse un datetime envoyé par le front (ISO local ou avec 'Z') et le
+    rend aware dans le fuseau courant s'il ne l'est pas déjà."""
+    if 'T' in dt_str:
+        dt = datetime.fromisoformat(dt_str.replace('Z', '+00:00'))
+    else:
+        dt = datetime.fromisoformat(dt_str)
+    if timezone.is_naive(dt):
+        dt = timezone.make_aware(dt, timezone.get_current_timezone())
+    return dt
+
+
 @login_required
 @require_POST
 def api_reserver_rdv(request):
@@ -2075,24 +2087,9 @@ def api_reserver_rdv(request):
     data = json.loads(request.body)
     patient = get_object_or_404(Patient, user=request.user)
     medecin = get_object_or_404(Medecin, id=data['medecin_id'])
-    
-    # Parser datetime - CORRECTION ICI
-    dt_str = data['datetime']
-    
-    # Si le format contient 'T', c'est un ISO local
-    if 'T' in dt_str:
-        # Parser la date locale (sans timezone)
-        dt = datetime.fromisoformat(dt_str.replace('Z', '+00:00'))
-        
-        # Si elle est naive (pas de timezone), la rendre aware avec la timezone locale
-        if timezone.is_naive(dt):
-            dt = timezone.make_aware(dt, timezone.get_current_timezone())
-    else:
-        # Fallback pour autres formats
-        dt = datetime.fromisoformat(dt_str)
-        if timezone.is_naive(dt):
-            dt = timezone.make_aware(dt, timezone.get_current_timezone())
-    
+
+    dt = _parse_client_datetime(data['datetime'])
+
     # Vérifier disponibilité et créer le RDV dans une transaction verrouillée :
     # select_for_update() sérialise avec toute autre opération en cours sur un
     # RDV déjà existant sur ce créneau (ex. confirmer_rdv/annuler_rdv). Il ne
@@ -2128,6 +2125,21 @@ def api_reserver_rdv(request):
                 performed_by=request.user,
                 description="Rendez-vous créé"
             )
+
+            # Liste d'attente : le patient qui vient de réserver ce créneau
+            # honore sa propre inscription (s'il en avait une), et toute
+            # autre inscription concurrente sur ce même créneau expire —
+            # premier arrivé premier servi, tranché ici par la contrainte
+            # unique_rdv_actif_par_creneau qui vient de faire gagner CE rdv.
+            ListeAttenteCreneau.objects.filter(
+                patient=patient, medecin=medecin, date_heure_souhaitee=dt,
+                statut__in=['en_attente', 'notifie'],
+            ).update(statut='honore', rdv_propose=rdv)
+
+            ListeAttenteCreneau.objects.filter(
+                medecin=medecin, date_heure_souhaitee=dt,
+                statut__in=['en_attente', 'notifie'],
+            ).exclude(patient=patient).update(statut='expire')
     except IntegrityError:
         return JsonResponse({'success': False, 'error': 'Créneau déjà pris'}, status=400)
 
@@ -2150,7 +2162,79 @@ def api_reserver_rdv(request):
 
 
 @login_required
-@require_POST  
+@require_POST
+def inscrire_liste_attente(request):
+    """Inscrit le patient en liste d'attente sur un créneau précis
+    (medecin, datetime). Une seule inscription en_attente à la fois par
+    (patient, medecin) — voir ListeAttenteCreneau.Meta.constraints."""
+    try:
+        patient = request.user.profil_patient
+    except Patient.DoesNotExist:
+        return HttpResponseForbidden("Vous n'êtes pas autorisé à effectuer cette action.")
+
+    data = json.loads(request.body)
+    medecin = get_object_or_404(Medecin, id=data.get('medecin_id'))
+    dt = _parse_client_datetime(data['datetime'])
+
+    deja_inscrit_msg = "Vous avez déjà une inscription en attente chez ce médecin."
+    try:
+        with transaction.atomic():
+            if ListeAttenteCreneau.objects.select_for_update().filter(
+                patient=patient, medecin=medecin, statut='en_attente'
+            ).exists():
+                return JsonResponse({'success': False, 'error': deja_inscrit_msg}, status=400)
+
+            inscription = ListeAttenteCreneau.objects.create(
+                patient=patient, medecin=medecin, date_heure_souhaitee=dt,
+            )
+    except IntegrityError:
+        return JsonResponse({'success': False, 'error': deja_inscrit_msg}, status=400)
+
+    return JsonResponse({
+        'success': True,
+        'inscription_id': inscription.id,
+        'message': "Inscription en liste d'attente confirmée.",
+    })
+
+
+@login_required
+@require_POST
+def desinscrire_liste_attente(request, inscription_id):
+    """Annule une inscription en liste d'attente appartenant au patient connecté."""
+    try:
+        patient = request.user.profil_patient
+    except Patient.DoesNotExist:
+        return HttpResponseForbidden("Vous n'êtes pas autorisé à effectuer cette action.")
+
+    inscription = get_object_or_404(ListeAttenteCreneau, id=inscription_id, patient=patient)
+    if inscription.statut in ('en_attente', 'notifie'):
+        inscription.statut = 'annule'
+        inscription.save(update_fields=['statut'])
+
+    return JsonResponse({'success': True, 'statut': inscription.statut})
+
+
+@login_required
+def mes_inscriptions_liste_attente(request):
+    """Liste des inscriptions en liste d'attente du patient connecté."""
+    try:
+        patient = request.user.profil_patient
+    except Patient.DoesNotExist:
+        return HttpResponseForbidden("Vous n'êtes pas autorisé à accéder à cette page.")
+
+    inscriptions = ListeAttenteCreneau.objects.filter(
+        patient=patient
+    ).select_related('medecin__user').order_by('-date_creation')
+
+    context = {'inscriptions': inscriptions}
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return render(request, 'rdv/patient/composants/liste_attente/liste_attente_content.html', context)
+    return render(request, 'rdv/patient/liste_attente.html', context)
+
+
+@login_required
+@require_POST
 def api_toggle_favori(request, medecin_id):
     """Ajouter/retirer médecin des favoris"""
     patient = get_object_or_404(Patient, user=request.user)

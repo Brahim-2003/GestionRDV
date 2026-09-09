@@ -1,0 +1,11 @@
+{% extends 'rdv/patient/base_patient.html' %}
+
+{% block title %}Ma liste d'attente{% endblock %}
+
+{% block menu_block %}
+    {% include 'rdv/patient/composants/menu_patient.html' %}
+{% endblock %}
+
+{% block content %}
+    {% include 'rdv/patient/composants/liste_attente/liste_attente_content.html' %}
+{% endblock %}

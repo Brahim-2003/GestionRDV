@@ -240,11 +240,22 @@ class ListeAttenteCreneau(models.Model):
         super().save(*args, **kwargs)
 
 
+# Message d'avertissement à afficher à côté de la recherche par symptôme
+# (interface non construite dans cette session — texte prêt à l'emploi pour
+# la session suivante, voir rdv/migrations/0006_seed_recherche_symptome.py
+# pour le contenu du mapping symptôme -> spécialités déjà inséré).
+AVERTISSEMENT_URGENCE_SYMPTOME = (
+    "En cas de symptôme sévère ou soudain (douleur thoracique intense, "
+    "difficulté à respirer...), contactez les urgences plutôt que de "
+    "prendre rendez-vous ici."
+)
+
+
 class RechercheSymptome(models.Model):
     """Mapping symptômes -> spécialités suggérées"""
     symptome = models.CharField(max_length=100)
     specialites_suggerees = models.JSONField(default=list)  # ['cardiologue', 'generaliste']
-    
+
     class Meta:
         indexes = [
             models.Index(fields=['symptome']),

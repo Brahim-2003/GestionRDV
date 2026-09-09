@@ -1,10 +1,13 @@
 # rdv/tests.py
 import threading
+import time as time_module
+from unittest import mock
 from django.test import TestCase, TransactionTestCase, Client
 from django.urls import reverse
 from django.utils import timezone
 from django.core.exceptions import ValidationError
-from django.db import connections
+from django.db import connection, connections, transaction
+from django.db.utils import OperationalError
 from datetime import datetime, date, time, timedelta
 from decimal import Decimal
 
@@ -93,24 +96,53 @@ class NumeroPatientConcurrencyTest(TransactionTestCase):
     autres threads, ce qu'une TestCase enveloppée dans une seule transaction
     ne permet pas."""
 
-    def test_creations_concurrentes_sans_doublon(self):
+    @mock.patch('users.signals.notify_admins_on_user_create.delay')
+    def test_creations_concurrentes_sans_doublon(self, mock_notify_delay):
+        """La notification admin (Celery/Redis) est mockée : ce test cible
+        exclusivement l'absence de doublon de numero_patient sous
+        concurrence, pas la disponibilité d'un broker Celery réel, qui
+        n'existe pas dans cet environnement de test."""
         nb_threads = 8
         erreurs = []
 
         def creer_patient(index):
-            try:
-                Utilisateur.objects.create_user(
-                    email=f'concurrent{index}@test.com',
-                    nom='Test',
-                    prenom=f'Patient{index}',
-                    date_naissance=date(1990, 1, 1),
-                    role='patient',
-                    mot_de_passe='test123',
-                )
-            except Exception as exc:
-                erreurs.append(exc)
-            finally:
-                connections.close_all()
+            # SQLite n'a pas de vrai verrou par ligne : sous 8 écritures
+            # concurrentes, il peut lever "database table is locked" (SQLITE_LOCKED),
+            # une erreur que busy_timeout ne couvre pas (il ne couvre que
+            # SQLITE_BUSY). Ce n'est qu'une limitation de SQLite en tant que
+            # backend de test (PostgreSQL, backend cible, gère de vrais verrous
+            # de ligne) : on retente donc quelques fois avant d'abandonner. La
+            # création est enveloppée dans un atomic() explicite pour que
+            # l'échec (même après l'INSERT Utilisateur, déclenché par le
+            # signal post_save) soit intégralement annulé et la retentative
+            # avec le même e-mail reste sûre (pas de doublon partiel).
+            for attempt in range(5):
+                try:
+                    if connection.vendor == 'sqlite':
+                        with connection.cursor() as cursor:
+                            cursor.execute('PRAGMA busy_timeout = 30000;')
+                    with transaction.atomic():
+                        Utilisateur.objects.create_user(
+                            email=f'concurrent{index}@test.com',
+                            nom='Test',
+                            prenom=f'Patient{index}',
+                            date_naissance=date(1990, 1, 1),
+                            role='patient',
+                            mot_de_passe='test123',
+                        )
+                    return
+                except OperationalError as exc:
+                    if 'locked' not in str(exc).lower():
+                        erreurs.append(exc)
+                        return
+                    connection.close()
+                    time_module.sleep(0.05 * (attempt + 1))
+                except Exception as exc:
+                    erreurs.append(exc)
+                    return
+                finally:
+                    connections.close_all()
+            erreurs.append(OperationalError('database table is locked (après plusieurs tentatives)'))
 
         threads = [threading.Thread(target=creer_patient, args=(i,)) for i in range(nb_threads)]
         for t in threads:

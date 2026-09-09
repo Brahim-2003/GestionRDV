@@ -3,6 +3,7 @@ import json
 import threading
 import time as time_module
 from unittest import mock
+from django.conf import settings
 from django.test import TestCase, TransactionTestCase, Client
 from django.urls import reverse
 from django.utils import timezone
@@ -1905,4 +1906,29 @@ class WaitlistExpirationTaskTest(TestCase):
         self.assertEqual(expiree.statut, 'expire')
         self.assertEqual(active.statut, 'en_attente')
         self.assertEqual(honoree.statut, 'honore')
+
+
+class CeleryBeatScheduleTest(TestCase):
+    """Vérifie que les tâches périodiques connues sont bien programmées
+    dans CELERY_BEAT_SCHEDULE. Une tâche @shared_task correcte mais jamais
+    ajoutée au planning ne s'exécute jamais en production (piège déjà
+    rencontré avec expire_old_waitlist_entries) ; ce test échoue si l'une
+    de ces quatre tâches disparaît du planning."""
+
+    def test_taches_periodiques_enregistrees(self):
+        taches_attendues = {
+            'rdv.tasks.send_rdv_reminder_24h',
+            'rdv.tasks.auto_cancel_expired_rdv',
+            'rdv.tasks.auto_start_rdv',
+            'rdv.tasks.expire_old_waitlist_entries',
+        }
+
+        schedule = getattr(settings, 'CELERY_BEAT_SCHEDULE', {})
+        taches_planifiees = {entry.get('task') for entry in schedule.values()}
+
+        manquantes = taches_attendues - taches_planifiees
+        self.assertEqual(
+            manquantes, set(),
+            f"Tâches périodiques absentes de CELERY_BEAT_SCHEDULE : {manquantes}"
+        )
 

@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+from datetime import timedelta
 from pathlib import Path
 
 import environ
@@ -158,6 +159,61 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
 CELERY_ENABLE_UTC = True
+
+# Planning des tâches périodiques (rdv/tasks.py). Le service "beat" de
+# docker-compose.yml tourne déjà avec --scheduler
+# django_celery_beat.schedulers:DatabaseScheduler ; ce scheduler relit
+# CELERY_BEAT_SCHEDULE à chaque démarrage (DatabaseScheduler.setup_schedule
+# -> update_from_dict) et synchronise automatiquement les entrées dans la
+# base (table PeriodicTask) — aucune modification de docker-compose.yml
+# n'est nécessaire pour que ce planning prenne effet.
+#
+# La fréquence de chaque tâche est dictée par la fenêtre de temps qu'elle
+# interroge : une tâche à fenêtre étroite ET sans rattrapage (elle ne
+# revérifie jamais le passé) doit tourner au moins aussi souvent que sa
+# fenêtre est large, sous peine de rater définitivement des cas tombés
+# entre deux exécutions. Une tâche à seuil ouvert (elle traite tout ce qui
+# est "avant maintenant", sans limite basse) ne rate jamais rien : espacer
+# ses exécutions ne fait qu'ajouter du délai, pas de perte.
+CELERY_BEAT_SCHEDULE = {
+    # Fenêtre étroite et sans rattrapage : auto_start_rdv ne regarde que
+    # [maintenant, maintenant+5min[. Au-delà de 5 min entre deux exécutions,
+    # un RDV confirmé pourrait traverser toute la fenêtre sans qu'aucune
+    # exécution ne le voie (la requête suivante a un "maintenant" déjà
+    # passé cette date, donc `date_heure_rdv__gte=now` l'exclut pour
+    # toujours). 2 min laisse une marge de sécurité contre la latence
+    # d'exécution des tâches précédentes.
+    'auto-start-rdv': {
+        'task': 'rdv.tasks.auto_start_rdv',
+        'schedule': timedelta(minutes=2),
+    },
+    # Fenêtre étroite et sans rattrapage : send_rdv_reminder_24h ne regarde
+    # que [demain-15min, demain+15min] (30 min de large). Toutes les
+    # 15 min, les fenêtres successives se touchent sans laisser de trou
+    # (l'une finit exactement où la suivante commence), garantissant
+    # qu'aucun RDV ne traverse la fenêtre entre deux exécutions.
+    'send-rdv-reminder-24h': {
+        'task': 'rdv.tasks.send_rdv_reminder_24h',
+        'schedule': timedelta(minutes=15),
+    },
+    # Seuil ouvert, pas de fenêtre à couvrir : auto_cancel_expired_rdv
+    # traite tout RDV programmé/reporté de plus de 2h (sans limite basse),
+    # donc jamais raté, seulement traité plus tard si l'espacement est
+    # grand. 30 min borne le délai d'annulation automatique sans solliciter
+    # la base plus souvent que nécessaire pour une tâche non urgente.
+    'auto-cancel-expired-rdv': {
+        'task': 'rdv.tasks.auto_cancel_expired_rdv',
+        'schedule': timedelta(minutes=30),
+    },
+    # Seuil ouvert, même raisonnement : expire_old_waitlist_entries traite
+    # toute inscription dont date_expiration est passée, sans limite basse.
+    # Une cadence horaire suffit, une liste d'attente n'étant pas aussi
+    # chronosensible qu'un rappel de rendez-vous.
+    'expire-old-waitlist-entries': {
+        'task': 'rdv.tasks.expire_old_waitlist_entries',
+        'schedule': timedelta(hours=1),
+    },
+}
 
 
 # ==========================================================================

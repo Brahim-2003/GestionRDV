@@ -529,6 +529,17 @@
             background: #f8f9fa;
         }
 
+        .time-slot-taken-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            align-items: stretch;
+        }
+
+        .time-slot-taken-wrapper .time-slot {
+            cursor: default;
+        }
+
         /* === BUTTONS === */
         .button-group {
             display: flex;

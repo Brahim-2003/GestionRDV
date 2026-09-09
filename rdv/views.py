@@ -2020,13 +2020,12 @@ def api_creneaux_medecin(request, medecin_id):
                         date_heure_rdv__gte=new_start,
                         statut__in=['programme', 'confirme', 'en_cours']
                     ).exists()
-                    if not conflict:
-                        creneaux_jour.append({
-                            'datetime': new_start.isoformat(),
-                            'date': current.isoformat(),
-                            'heure': heure.strftime('%H:%M'),
-                            'disponible': True
-                        })
+                    creneaux_jour.append({
+                        'datetime': new_start.isoformat(),
+                        'date': current.isoformat(),
+                        'heure': heure.strftime('%H:%M'),
+                        'disponible': not conflict
+                    })
                     heure = (datetime.combine(current, heure) + timedelta(minutes=30)).time()
 
         elif not has_negative_exception:
@@ -2050,13 +2049,12 @@ def api_creneaux_medecin(request, medecin_id):
                         date_heure_rdv__gte=new_start,
                         statut__in=['programme', 'confirme', 'en_cours']
                     ).exists()
-                    if not conflict:
-                        creneaux_jour.append({
-                            'datetime': new_start.isoformat(),
-                            'date': current.isoformat(),
-                            'heure': heure.strftime('%H:%M'),
-                            'disponible': True
-                        })
+                    creneaux_jour.append({
+                        'datetime': new_start.isoformat(),
+                        'date': current.isoformat(),
+                        'heure': heure.strftime('%H:%M'),
+                        'disponible': not conflict
+                    })
                     heure = (datetime.combine(current, heure) + timedelta(minutes=30)).time()
 
         # Ajouter les créneaux du jour

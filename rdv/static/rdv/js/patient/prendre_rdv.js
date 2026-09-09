@@ -496,12 +496,17 @@ if (!window.__prendre_rdv_module_defined) {
 
                 const isoDate = Utils.formatDateISO(date);
                 const slots = APP_STATE.slotsByDate[isoDate] || [];
+                // Le badge du jour ne compte que les créneaux réellement
+                // disponibles ; les créneaux complets (disponible: false,
+                // affichés avec un bouton "M'avertir" dans TimeSlots.render)
+                // ne doivent pas laisser croire qu'un jour plein a de la place.
+                const slotsDisponibles = slots.filter(slot => slot.disponible !== false);
 
-                if (slots.length > 0 && date >= today) {
+                if (slotsDisponibles.length > 0 && date >= today) {
                     dayDiv.classList.add('has-slots');
                     const slotsIndicator = document.createElement('div');
                     slotsIndicator.className = 'slots-indicator';
-                    slotsIndicator.textContent = `${slots.length}`;
+                    slotsIndicator.textContent = `${slotsDisponibles.length}`;
                     dayDiv.appendChild(slotsIndicator);
                 }
 
@@ -627,6 +632,10 @@ if (!window.__prendre_rdv_module_defined) {
             },
 
             createSlotButton(slot) {
+                if (slot.disponible === false) {
+                    return this.createTakenSlot(slot);
+                }
+
                 const button = document.createElement('button');
                 button.type = 'button';
                 button.className = 'time-slot-btn';
@@ -644,6 +653,65 @@ if (!window.__prendre_rdv_module_defined) {
                 button.addEventListener('click', handler);
                 this.boundSlotHandlers.set(button, handler);
                 return button;
+            },
+
+            createTakenSlot(slot) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'time-slot-taken-wrapper';
+
+                const label = document.createElement('span');
+                label.className = 'time-slot unavailable';
+                label.setAttribute('aria-disabled', 'true');
+                label.textContent = `${slot.heure || '--:--'} (complet)`;
+
+                const notifyBtn = document.createElement('button');
+                notifyBtn.type = 'button';
+                notifyBtn.className = 'btn-sm btn-secondary js-notifier-creneau';
+                notifyBtn.textContent = "M'avertir";
+                notifyBtn.setAttribute('aria-label', `M'avertir si le créneau de ${slot.heure || '--:--'} se libère`);
+
+                const handler = () => this.inscrireListeAttente(slot, notifyBtn);
+                notifyBtn.addEventListener('click', handler);
+                this.boundSlotHandlers.set(notifyBtn, handler);
+
+                wrapper.appendChild(label);
+                wrapper.appendChild(notifyBtn);
+                return wrapper;
+            },
+
+            async inscrireListeAttente(slot, btn) {
+                if (!APP_STATE.selectedDoctor || btn.disabled) return;
+                btn.disabled = true;
+                const originalText = btn.textContent;
+                btn.textContent = '...';
+
+                try {
+                    const response = await fetch('/rdv/api/liste_attente/inscrire/', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': getCookie('csrftoken')
+                        },
+                        body: JSON.stringify({
+                            medecin_id: APP_STATE.selectedDoctor.id,
+                            datetime: slot.datetime
+                        })
+                    }).then(r => r.json());
+
+                    if (response.success) {
+                        Utils.showNotification(response.message || "Inscription en liste d'attente confirmée.", 'success');
+                        btn.textContent = 'Inscrit(e)';
+                    } else {
+                        Utils.showNotification(response.error || "Erreur lors de l'inscription", 'error');
+                        btn.disabled = false;
+                        btn.textContent = originalText;
+                    }
+                } catch (err) {
+                    console.error("Erreur inscription liste d'attente:", err);
+                    Utils.showNotification("Erreur lors de l'inscription", 'error');
+                    btn.disabled = false;
+                    btn.textContent = originalText;
+                }
             },
 
             destroy() { 

@@ -803,6 +803,36 @@ class PriseRdvViewTest(TestCase):
         self.assertIn('creneaux', data)
         self.assertGreater(len(data['creneaux']), 0)
 
+    def test_api_creneaux_medecin_inclut_les_creneaux_pris(self):
+        """Un créneau déjà réservé apparaît avec disponible=False (au lieu
+        d'être simplement omis), pour permettre le bouton "M'avertir"."""
+        today = date.today()
+        days_ahead = 0 - today.weekday()
+        if days_ahead <= 0:
+            days_ahead += 7
+        next_monday = today + timedelta(days=days_ahead)
+        rdv_datetime = timezone.make_aware(datetime.combine(next_monday, time(10, 0)))
+
+        RendezVous.objects.create(
+            patient=self.patient, medecin=self.medecin,
+            date_heure_rdv=rdv_datetime, statut='confirme',
+        )
+
+        response = self.client.get(
+            reverse('rdv:api_creneaux_medecin', kwargs={'medecin_id': self.medecin.id}),
+            {
+                'date_debut': next_monday.isoformat(),
+                'date_fin': (next_monday + timedelta(days=1)).isoformat()
+            }
+        )
+        data = response.json()
+        creneau_pris = next(
+            (c for c in data['creneaux'] if c['heure'] == '10:00'), None
+        )
+        self.assertIsNotNone(creneau_pris)
+        self.assertFalse(creneau_pris['disponible'])
+        self.assertTrue(any(c['disponible'] for c in data['creneaux']))
+
     def test_api_reserver_rdv(self):
         """Réservation d'un RDV via API"""
         # Date lundi prochain 10h

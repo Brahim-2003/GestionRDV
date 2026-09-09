@@ -1,7 +1,7 @@
 
 # rdv/admin.py
 from django.contrib import admin
-from .models import Patient, Medecin, RendezVous, Disponibilite, Notification, RdvHistory
+from .models import Patient, Medecin, RendezVous, Disponibilite, Notification, RdvHistory, ListeAttenteCreneau
 
 @admin.register(Patient)
 class PatientAdmin(admin.ModelAdmin):
@@ -92,6 +92,15 @@ class NotificationAdmin(admin.ModelAdmin):
             'fields': ['date_envoi']
         }),
     )
+
+
+@admin.register(ListeAttenteCreneau)
+class ListeAttenteCreneauAdmin(admin.ModelAdmin):
+    list_display = ('patient', 'medecin', 'date_heure_souhaitee', 'statut', 'date_creation', 'date_expiration')
+    search_fields = ['patient__user__nom', 'patient__user__prenom', 'medecin__user__nom', 'medecin__user__prenom']
+    list_filter = ['statut', 'date_creation']
+    date_hierarchy = 'date_heure_souhaitee'
+    readonly_fields = ('date_creation',)
 
 
 @admin.register(RdvHistory)

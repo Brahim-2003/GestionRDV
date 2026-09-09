@@ -187,6 +187,59 @@ class FavoriMedecin(models.Model):
     class Meta:
         unique_together = ['patient', 'medecin']
 
+class ListeAttenteCreneau(models.Model):
+    """
+    Inscription d'un patient en liste d'attente sur un créneau précis
+    (medecin, date_heure_souhaitee) déjà complet. Notification groupée à
+    l'annulation d'un RDV sur ce créneau (premier arrivé, premier servi) :
+    voir rdv/tasks.py::notify_waitlist_on_cancellation.
+    """
+    STATUT_CHOICES = [
+        ('en_attente', 'En attente'),
+        ('notifie', 'Notifié'),
+        ('expire', 'Expiré'),
+        ('annule', 'Annulé'),
+        ('honore', 'Honoré'),
+    ]
+
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='inscriptions_liste_attente')
+    medecin = models.ForeignKey(Medecin, on_delete=models.CASCADE, related_name='liste_attente')
+    date_heure_souhaitee = models.DateTimeField()
+    statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='en_attente')
+    date_creation = models.DateTimeField(auto_now_add=True)
+    date_expiration = models.DateTimeField(
+        help_text="Passé ce moment sans avoir été honorée, l'inscription expire automatiquement."
+    )
+    rdv_propose = models.ForeignKey(
+        'RendezVous', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='inscriptions_liste_attente_honorees'
+    )
+
+    class Meta:
+        verbose_name = "Inscription liste d'attente"
+        verbose_name_plural = "Inscriptions liste d'attente"
+        ordering = ['date_creation']
+        constraints = [
+            # "Une seule inscription active à la fois" = une seule ligne
+            # en_attente par (patient, medecin). Une ancienne inscription
+            # expirée/honorée/annulée n'empêche pas une nouvelle inscription.
+            UniqueConstraint(
+                fields=['patient', 'medecin'],
+                condition=Q(statut='en_attente'),
+                name='unique_inscription_active_par_patient_medecin',
+            ),
+        ]
+
+    def __str__(self):
+        return (f"{self.patient} en attente chez {self.medecin} pour le "
+                f"{self.date_heure_souhaitee:%d/%m/%Y %H:%M} ({self.get_statut_display()})")
+
+    def save(self, *args, **kwargs):
+        if not self.date_expiration:
+            self.date_expiration = self.date_heure_souhaitee
+        super().save(*args, **kwargs)
+
+
 class RechercheSymptome(models.Model):
     """Mapping symptômes -> spécialités suggérées"""
     symptome = models.CharField(max_length=100)

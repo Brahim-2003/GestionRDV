@@ -652,6 +652,73 @@ if (!window.__prendre_rdv_module_defined) {
         };
 
         // =============================================================================
+        // FOCUS TRAP (accessibilité modale)
+        // =============================================================================
+
+        const FocusTrap = {
+            active: false,
+            modalEl: null,
+            previouslyFocused: null,
+            keydownHandler: null,
+
+            getFocusable(modal) {
+                return Array.from(modal.querySelectorAll(
+                    'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+                )).filter(el => el.offsetParent !== null);
+            },
+
+            activate(modal) {
+                this.modalEl = modal;
+                this.previouslyFocused = document.activeElement;
+                this.active = true;
+
+                const focusables = this.getFocusable(modal);
+                (focusables[0] || modal).focus();
+
+                this.keydownHandler = (e) => {
+                    if (e.key === 'Escape') {
+                        e.preventDefault();
+                        Booking.closeModal();
+                        return;
+                    }
+                    if (e.key !== 'Tab') return;
+
+                    const items = this.getFocusable(this.modalEl);
+                    if (items.length === 0) {
+                        e.preventDefault();
+                        return;
+                    }
+                    const first = items[0];
+                    const last = items[items.length - 1];
+
+                    if (e.shiftKey && document.activeElement === first) {
+                        e.preventDefault();
+                        last.focus();
+                    } else if (!e.shiftKey && document.activeElement === last) {
+                        e.preventDefault();
+                        first.focus();
+                    }
+                };
+
+                document.addEventListener('keydown', this.keydownHandler, true);
+            },
+
+            deactivate() {
+                if (!this.active) return;
+                this.active = false;
+                if (this.keydownHandler) {
+                    document.removeEventListener('keydown', this.keydownHandler, true);
+                    this.keydownHandler = null;
+                }
+                if (this.previouslyFocused && typeof this.previouslyFocused.focus === 'function') {
+                    this.previouslyFocused.focus();
+                }
+                this.previouslyFocused = null;
+                this.modalEl = null;
+            }
+        };
+
+        // =============================================================================
         // BOOKING
         // =============================================================================
 
@@ -663,7 +730,7 @@ if (!window.__prendre_rdv_module_defined) {
                 }
                 this.openModal();
             },
-            
+
             openModal() {
                 const modal = document.getElementById('confirmation-modal');
                 if (!modal) return;
@@ -675,11 +742,13 @@ if (!window.__prendre_rdv_module_defined) {
                 const motifField = document.getElementById('motif');
                 if (motifField) motifField.value = '';
                 modal.classList.remove('hidden');
+                FocusTrap.activate(modal);
             },
-            
+
             closeModal() {
                 const modal = document.getElementById('confirmation-modal');
                 if (modal) modal.classList.add('hidden');
+                FocusTrap.deactivate();
             },
             
             async submitAppointment() {
@@ -986,8 +1055,9 @@ if (!window.__prendre_rdv_module_defined) {
                 DoctorList.destroy();
                 Calendar.destroy();
                 TimeSlots.destroy();
-            } catch (e) { 
-                console.warn('Erreur destroy modules:', e); 
+                FocusTrap.deactivate();
+            } catch (e) {
+                console.warn('Erreur destroy modules:', e);
             }
 
             // Supprimer les helpers globaux

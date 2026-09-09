@@ -416,14 +416,21 @@ class ProfileViewTest(TestCase):
     
     def test_edit_user_info(self):
         """Modification des informations utilisateur"""
+        # UserEditForm.Meta.fields = ["nom", "prenom", "email", "telephone"] :
+        # 'email' est un champ requis du modèle (EmailField sans blank=True).
+        # Sans lui, form.is_valid() est False, la vue retombe sur son rendu
+        # de formulaire (200 aussi) sans jamais appeler .save() — d'où
+        # l'échec silencieux. On soumet ici le jeu de champs réellement requis.
         response = self.client.post(reverse('users:edit_user'), {
             'nom': 'Updated',
             'prenom': 'Name',
+            'email': self.patient.email,
             'telephone': '+33612345678'
         }, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
-        
+
         self.assertEqual(response.status_code, 200)
-        
+        self.assertTrue(response.json().get('success'))
+
         self.patient.refresh_from_db()
         self.assertEqual(self.patient.nom, 'Updated')
         self.assertEqual(self.patient.prenom, 'Name')

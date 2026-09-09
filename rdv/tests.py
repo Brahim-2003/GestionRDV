@@ -944,7 +944,19 @@ class GestionRdvMedecinViewTest(TestCase):
     def test_reporter_rdv(self):
         """Report d'un RDV"""
         new_date = (timezone.now() + timedelta(days=7)).replace(hour=14, minute=0)
-        
+
+        # reporter_rdv exige que le médecin ait une disponibilité couvrant le
+        # nouveau créneau (rdv/views.py) : sans cette disponibilité, la vue
+        # renvoie à juste titre 400 "pas disponible à ce créneau", ce n'est
+        # pas un bug de la vue mais un fixture manquant dans ce test.
+        weekday_map = {0: "mon", 1: "tue", 2: "wed", 3: "thu", 4: "fri", 5: "sat", 6: "sun"}
+        Disponibilite.objects.create(
+            medecin=self.medecin,
+            jour=weekday_map[new_date.weekday()],
+            heure_debut=time(9, 0),
+            heure_fin=time(18, 0),
+        )
+
         response = self.client.post(
             reverse('rdv:reporter_rdv', kwargs={'rdv_id': self.rdv.id}),
             data={

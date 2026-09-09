@@ -10,6 +10,7 @@
         <link rel="stylesheet" href="{% static 'rdv/css/boxicons.min.css' %}">
         <link rel="stylesheet" href="{% static 'rdv/css/animations.css' %}">
         <link rel="stylesheet" href="{% static 'rdv/css/transformations.css' %}">
+        <link rel="stylesheet" href="{% static 'rdv/css/notifs/notifs.css' %}">
     </head>
     <body>
         <div class="auth-container">
@@ -25,7 +26,7 @@
             <div class="contenu">
 
                 {% for message in messages %}
-                    <p>{{ message }}</p>
+                    <div class="alert alert-{{ message.tags }}" role="alert">{{ message }}</div>
                 {% endfor %}
 
                 <form method="post">

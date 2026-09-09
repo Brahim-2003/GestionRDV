@@ -84,7 +84,7 @@ def mark_as_read(request, notification_id):
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return JsonResponse({'status': 'success'})
     
-    return redirect('list_notif')
+    return redirect('rdv:notifs')
 
 @login_required(login_url='users:login')
 @require_POST
@@ -99,7 +99,7 @@ def mark_all_as_read(request):
         return JsonResponse({'status': 'success', 'message': 'Toutes les notifications ont été marquées comme lues'})
     
     messages.success(request, 'Toutes les notifications ont été marquées comme lues.')
-    return redirect('list_notif')
+    return redirect('rdv:notifs')
 
 @login_required(login_url='users:login')
 @require_POST
@@ -111,7 +111,7 @@ def delete_notification(request, notification_id):
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return JsonResponse({'status': 'success'})
     
-    return redirect('list_notif')
+    return redirect('rdv:notifs')
 
 @login_required(login_url='users:login')
 @require_POST
@@ -123,7 +123,7 @@ def delete_all_notifications(request):
         return JsonResponse({'status': 'success', 'message': 'Toutes les notifications ont été supprimées'})
     
     messages.success(request, 'Toutes les notifications ont été supprimées.')
-    return redirect('list_notif')
+    return redirect('rdv:notifs')
 
 @login_required(login_url='users:login')
 def get_notification_count(request):

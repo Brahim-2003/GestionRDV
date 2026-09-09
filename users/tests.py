@@ -366,9 +366,12 @@ class PasswordChangeTest(TestCase):
             'new_password1': 'NewSecurePass123!',
             'new_password2': 'NewSecurePass123!'
         })
-        
-        self.assertEqual(response.status_code, 200)
-        
+
+        # Requête non-AJAX réussie : la vue redirige (PRG), elle ne rend pas
+        # de page directement (comportement identique à test_login_success).
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse('users:mon_profil'))
+
         # Vérifie que le mot de passe a changé
         self.user.refresh_from_db()
         self.assertTrue(self.user.check_password('NewSecurePass123!'))

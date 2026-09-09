@@ -777,7 +777,7 @@ class GestionDisponibilitesViewTest(TestCase):
         future_date = (date.today() + timedelta(days=10)).isoformat()
         
         response = self.client.post(
-            reverse('rdv:disponibilite_specifique_add'),
+            reverse('rdv:disponibilite_add'),
             {
                 'date_specific': future_date,
                 'heure_debut': '14:00',
@@ -988,44 +988,44 @@ class NotificationViewTest(TestCase):
     
     def test_list_notif(self):
         """Affichage de la liste des notifications"""
-        response = self.client.get(reverse('rdv:list_notif'))
-        
+        response = self.client.get(reverse('rdv:notifs'))
+
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Notification')
-    
+
     def test_mark_as_read(self):
         """Marquer une notification comme lue"""
         notif = Notification.objects.filter(user=self.user, is_read=False).first()
-        
+
         response = self.client.post(
-            reverse('rdv:mark_as_read', kwargs={'notification_id': notif.id})
+            reverse('rdv:mark_read', kwargs={'notification_id': notif.id})
         )
-        
+
         notif.refresh_from_db()
         self.assertTrue(notif.is_read)
-    
+
     def test_mark_all_as_read(self):
         """Marquer toutes les notifications comme lues"""
-        response = self.client.post(reverse('rdv:mark_all_as_read'))
-        
+        response = self.client.post(reverse('rdv:mark_all_read'))
+
         unread_count = Notification.objects.filter(user=self.user, is_read=False).count()
         self.assertEqual(unread_count, 0)
-    
+
     def test_delete_notification(self):
         """Supprimer une notification"""
         notif = Notification.objects.filter(user=self.user).first()
         notif_id = notif.id
-        
+
         response = self.client.post(
-            reverse('rdv:delete_notification', kwargs={'notification_id': notif_id})
+            reverse('rdv:delete', kwargs={'notification_id': notif_id})
         )
-        
+
         self.assertFalse(Notification.objects.filter(id=notif_id).exists())
-    
+
     def test_get_notification_count(self):
         """Récupération du compteur de notifications"""
-        response = self.client.get(reverse('rdv:get_notification_count'))
-        
+        response = self.client.get(reverse('rdv:count'))
+
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertIn('unread_count', data)

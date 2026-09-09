@@ -276,7 +276,7 @@ def edit_password(request):
                 return JsonResponse({"success": True})
 
             # fallback classique
-            return redirect("users:profile")
+            return redirect("users:mon_profil")
         else:
             # si POST avec erreurs → AJAX renvoie fragment, sinon page complète
             if request.headers.get("x-requested-with") == "XMLHttpRequest":

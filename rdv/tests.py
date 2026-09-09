@@ -33,18 +33,11 @@ class PatientModelTest(TestCase):
         self.assertIsNotNone(patient.numero_patient)
     
     def test_numero_patient_format(self):
-        """Format du numéro patient"""
-        # Le générateur de rdv/models.py::Patient.save() ('PAT-000001', 10
-        # caractères) n'est en pratique jamais atteint : la création d'un
-        # Utilisateur avec role='patient' déclenche le signal
-        # manage_profiles_on_role_change (users/signals.py), qui pré-remplit
-        # numero_patient via generate_unique_numero_patient() ('PAT' + 8
-        # caractères hex uuid, 11 caractères) avant que Patient.save() ne
-        # s'exécute — son "if not self.numero_patient:" ne voit donc jamais
-        # de valeur vide. C'est ce format réellement produit qu'on vérifie ici.
+        """Format du numéro patient (PAT-000001, généré par le point unique
+        rdv/models.py::generate_next_numero_patient, appelé depuis
+        Patient.save())"""
         patient = self.user.profil_patient
-        self.assertTrue(patient.numero_patient.startswith('PAT'))
-        self.assertEqual(len(patient.numero_patient), 11)
+        self.assertEqual(patient.numero_patient, 'PAT-000001')
     
     def test_numero_patient_unique(self):
         """Unicité du numéro patient"""

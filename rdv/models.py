@@ -42,6 +42,38 @@ class RdvHistory(models.Model):
 
 
 
+class NumeroPatientCounter(models.Model):
+    """
+    Compteur global et unique (une seule ligne, pk=1 — garantie créée par la
+    migration 0003) utilisé pour générer numero_patient de façon atomique.
+    Remplace la lecture non verrouillée du dernier Patient (race condition
+    possible sous création concurrente) par un verrou de ligne dédié.
+    """
+    last_number = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name = "Compteur numéro patient"
+        verbose_name_plural = "Compteur numéro patient"
+
+    def __str__(self):
+        return f"Compteur numéro patient (dernier: {self.last_number})"
+
+
+def generate_next_numero_patient():
+    """
+    Point unique de génération de numero_patient, thread-safe : verrouille
+    la ligne du compteur (select_for_update) avant de l'incrémenter, ce qui
+    sérialise les créations concurrentes au niveau de la base de données
+    plutôt que de risquer que deux transactions lisent le même "dernier
+    numéro" et produisent la même valeur.
+    """
+    with transaction.atomic():
+        counter = NumeroPatientCounter.objects.select_for_update().get(pk=1)
+        counter.last_number += 1
+        counter.save(update_fields=['last_number'])
+        return f"PAT-{counter.last_number:06d}"
+
+
 class Patient(models.Model):
     user =  models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='profil_patient')
     numero_patient = models.CharField(max_length=20, unique=True, blank=True)
@@ -65,13 +97,7 @@ class Patient(models.Model):
     
     def save(self, *args, **kwargs):
         if not self.numero_patient:
-            # Générer un numéro de patient automatique
-            last_patient = Patient.objects.order_by('-id').first()
-            if last_patient:
-                last_num = int(last_patient.numero_patient.split('-')[-1])
-                self.numero_patient = f"PAT-{last_num + 1:06d}"
-            else:
-                self.numero_patient = "PAT-000001"
+            self.numero_patient = generate_next_numero_patient()
         super().save(*args, **kwargs)
 
     

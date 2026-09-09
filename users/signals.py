@@ -6,7 +6,6 @@ from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
 from django.apps import apps
 from django.utils.translation import gettext_lazy
-import uuid
 from django.db import transaction
 
 from rdv.models import Patient, Medecin
@@ -14,26 +13,19 @@ from users.models import Utilisateur
 from users.tasks import notify_admins_on_user_create
 
 
-def generate_unique_numero_patient():
-    """Génère un numéro unique pour un patient."""
-    while True:
-        numero = f'PAT{uuid.uuid4().hex[:8].upper()}'
-        if not Patient.objects.filter(numero_patient=numero).exists():
-            return numero
-
-
-
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
 def manage_profiles_on_role_change(sender, instance, created, **kwargs):
     role = getattr(instance, 'role', None)
 
     if role == 'patient':
+        # numero_patient n'est pas fourni ici : Patient.save() est l'unique
+        # point de génération (rdv/models.py::generate_next_numero_patient),
+        # déclenché par son propre "if not self.numero_patient:".
         Patient.objects.get_or_create(
             user=instance,
             defaults={
                 'date_naissance': instance.date_naissance,
                 'tel': instance.telephone,
-                'numero_patient': generate_unique_numero_patient()
             }
         )
         Medecin.objects.filter(user=instance).delete()

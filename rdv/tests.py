@@ -3,7 +3,6 @@ import json
 import threading
 import time as time_module
 from unittest import mock
-from django.conf import settings
 from django.test import TestCase, TransactionTestCase, Client
 from django.urls import reverse
 from django.utils import timezone
@@ -1908,27 +1907,49 @@ class WaitlistExpirationTaskTest(TestCase):
         self.assertEqual(honoree.statut, 'honore')
 
 
-class CeleryBeatScheduleTest(TestCase):
-    """Vérifie que les tâches périodiques connues sont bien programmées
-    dans CELERY_BEAT_SCHEDULE. Une tâche @shared_task correcte mais jamais
-    ajoutée au planning ne s'exécute jamais en production (piège déjà
+class PeriodicTasksInitTest(TestCase):
+    """Vérifie que la commande init_periodic_tasks (appelée par
+    entrypoint.sh/entrypoint.bat à chaque démarrage de conteneur — c'est le
+    seul mécanisme de planification de ce projet, django_celery_beat étant
+    utilisé avec DatabaseScheduler) programme réellement en base les
+    tâches périodiques critiques. Une @shared_task correcte mais jamais
+    ajoutée à cette commande ne s'exécute jamais en production (piège déjà
     rencontré avec expire_old_waitlist_entries) ; ce test échoue si l'une
-    de ces quatre tâches disparaît du planning."""
+    de ces quatre tâches disparaît du planning ou se retrouve désactivée."""
 
-    def test_taches_periodiques_enregistrees(self):
+    def test_taches_periodiques_critiques_programmees(self):
+        from django.core.management import call_command
+        from django_celery_beat.models import PeriodicTask
+
+        call_command('init_periodic_tasks')
+
         taches_attendues = {
             'rdv.tasks.send_rdv_reminder_24h',
             'rdv.tasks.auto_cancel_expired_rdv',
             'rdv.tasks.auto_start_rdv',
             'rdv.tasks.expire_old_waitlist_entries',
         }
-
-        schedule = getattr(settings, 'CELERY_BEAT_SCHEDULE', {})
-        taches_planifiees = {entry.get('task') for entry in schedule.values()}
-
+        taches_planifiees = set(
+            PeriodicTask.objects.filter(enabled=True).values_list('task', flat=True)
+        )
         manquantes = taches_attendues - taches_planifiees
         self.assertEqual(
             manquantes, set(),
-            f"Tâches périodiques absentes de CELERY_BEAT_SCHEDULE : {manquantes}"
+            f"Tâches périodiques absentes ou désactivées : {manquantes}"
         )
+
+    def test_send_rdv_reminder_24h_intervalle_couvre_sa_fenetre(self):
+        """send_rdv_reminder_24h n'interroge qu'une fenêtre de 30 min
+        (demain ± 15 min, rdv/tasks.py) sans jamais revérifier le passé :
+        un intervalle > 30 min laisserait un RDV traverser toute la
+        fenêtre sans recevoir de rappel."""
+        from django.core.management import call_command
+        from django_celery_beat.models import PeriodicTask, IntervalSchedule
+
+        call_command('init_periodic_tasks')
+
+        tache = PeriodicTask.objects.get(task='rdv.tasks.send_rdv_reminder_24h')
+        self.assertIsNotNone(tache.interval)
+        self.assertEqual(tache.interval.period, IntervalSchedule.MINUTES)
+        self.assertLessEqual(tache.interval.every, 30)
 

@@ -43,6 +43,7 @@ class Command(BaseCommand):
 
         # Créer les intervals
         schedule_2min = self.ensure_single_interval(every=2, period=IntervalSchedule.MINUTES)
+        schedule_15min = self.ensure_single_interval(every=15, period=IntervalSchedule.MINUTES)
         schedule_10min = self.ensure_single_interval(every=10, period=IntervalSchedule.MINUTES)
         schedule_30min = self.ensure_single_interval(every=30, period=IntervalSchedule.MINUTES)
         schedule_1hour = self.ensure_single_interval(every=1, period=IntervalSchedule.HOURS)
@@ -76,8 +77,25 @@ class Command(BaseCommand):
             {
                 'name': 'send-rdv-reminder-24h',
                 'task': 'rdv.tasks.send_rdv_reminder_24h',
-                'interval': schedule_1hour,  # ← Reste à 1h (OK)
-                'description': "Envoie des rappels 24h avant les RDV",
+                # 15 min et non 1h : la tâche ne regarde qu'une fenêtre de
+                # 30 min (demain ± 15 min) sans jamais revérifier le passé.
+                # À 1h d'intervalle, un RDV pouvait traverser toute la
+                # fenêtre entre deux exécutions et ne recevoir aucun rappel.
+                # Toutes les 15 min, les fenêtres successives se touchent
+                # sans laisser de trou.
+                'interval': schedule_15min,
+                'description': "Envoie des rappels 24h avant les RDV (toutes les 15 min : fenêtre de 30 min à couvrir sans trou)",
+            },
+            {
+                'name': 'expire-old-waitlist-entries',
+                'task': 'rdv.tasks.expire_old_waitlist_entries',
+                # Seuil ouvert (date_expiration < maintenant, sans limite
+                # basse) : une inscription expirée n'est jamais ratée,
+                # seulement traitée plus tard si l'espacement est grand.
+                # 1h suffit, une liste d'attente n'étant pas aussi
+                # chronosensible qu'un rappel de rendez-vous.
+                'interval': schedule_1hour,
+                'description': "Expire les inscriptions de liste d'attente dont le créneau souhaité est passé (toutes les heures)",
             },
         ]
         # Tâches avec crontab - CORRECTION: Utiliser le timezone de Celery

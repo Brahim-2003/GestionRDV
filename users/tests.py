@@ -1,4 +1,5 @@
 # users/tests.py
+from unittest import mock
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
@@ -508,6 +509,28 @@ class BruteForceProtectionTest(TestCase):
             'password': 'correct-password',
         })
         self.assertEqual(response.status_code, 302)  # connexion acceptée, redirection
+
+    def test_login_failure_survives_broker_unavailable(self):
+        """
+        Régression : si Redis/Celery est indisponible, .delay() lève une erreur
+        de connexion. Un simple mot de passe mal tapé par un utilisateur légitime
+        ne doit jamais se traduire par une 500 (safe_delay doit absorber l'échec).
+        """
+        client = Client(REMOTE_ADDR='203.0.113.7')
+
+        with mock.patch(
+            'users.middleware.track_failed_login_attempt.delay',
+            side_effect=ConnectionError("Broker Redis indisponible"),
+        ):
+            with self.captureOnCommitCallbacks(execute=True):
+                response = client.post(reverse('users:login'), {
+                    'email': 'victim@test.com',
+                    'password': 'mauvais-mot-de-passe',
+                })
+
+        # La page de connexion reste fonctionnelle : formulaire réaffiché, pas de 500.
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'form', status_code=200)
 
 
 class ProfilUserViewTest(TestCase):

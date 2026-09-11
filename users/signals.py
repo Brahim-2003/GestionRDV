@@ -1,4 +1,3 @@
-from asyncio.log import logger
 from django.conf import settings
 from django.db.models.signals import post_save, post_migrate
 from django.dispatch import receiver
@@ -9,6 +8,7 @@ from django.utils.translation import gettext_lazy
 from django.db import transaction
 
 from rdv.models import Patient, Medecin
+from rdv.utils import safe_delay
 from users.models import Utilisateur
 from users.tasks import notify_admins_on_user_create
 
@@ -58,13 +58,11 @@ def manage_profiles_on_role_change(sender, instance, created, **kwargs):
         instance.groups.add(group)
 
     if created and instance.role == 'patient':
-        try:
-            transaction.on_commit(
-            lambda: notify_admins_on_user_create.delay(instance.id)
-            )
-        except Exception as exc:
-            # ne pas laisser une erreur de broker casser la requête utilisateur
-            logger.exception("Impossible de planifier notify_admins_on_user_create: %s", exc)
+        # safe_delay protège l'appel réel au broker, exécuté après commit (le try/except
+        # ne suffirait pas ici : transaction.on_commit ne lève rien lui-même)
+        transaction.on_commit(
+            lambda: safe_delay(notify_admins_on_user_create, instance.id)
+        )
 
         
 @receiver(post_migrate)

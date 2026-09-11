@@ -6,6 +6,7 @@ from django.db import transaction
 import logging
 
 from users.tasks import track_failed_login_attempt
+from rdv.utils import safe_delay
 
 logger = logging.getLogger(__name__)
 
@@ -29,9 +30,10 @@ def failed_login_callback(sender, credentials, request, **kwargs):
     ip_address = get_client_ip(request)
     user_agent = request.META.get('HTTP_USER_AGENT', '')[:200]
     
-    # Lancer la tâche asynchrone pour tracker
+    # Lancer la tâche asynchrone pour tracker (ne doit jamais faire planter la vue de connexion
+    # si le broker Celery/Redis est indisponible)
     transaction.on_commit(
-        lambda: track_failed_login_attempt.delay(email, ip_address, user_agent)
+        lambda: safe_delay(track_failed_login_attempt, email, ip_address, user_agent)
     )
     
     logger.warning(f"Échec connexion: {email} depuis {ip_address}")

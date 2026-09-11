@@ -12,6 +12,33 @@ logger = logging.getLogger(__name__)
 ALLOWED_TYPES = {'info', 'success', 'warning', 'error'}
 ALLOWED_CATEGORIES = {'appointment', 'system', 'profile', 'reminder'}
 
+
+def safe_delay(task, *args, **kwargs):
+    """
+    Appel Celery sécurisé (évite un crash de la vue si le broker est indisponible).
+
+    Partagé entre les apps (rdv, users, ...) pour que tout déclenchement de tâche
+    asynchrone depuis un signal/middleware passe par le même filet de sécurité.
+
+    `task` peut être :
+    - une tâche Celery (objet avec `.delay`), utilisable par n'importe quelle app ;
+    - un nom de tâche (str) à résoudre dans rdv.tasks, pour compatibilité avec les
+      appels historiques de rdv/signals.py.
+    """
+    try:
+        if isinstance(task, str):
+            from rdv import tasks as rdv_tasks
+
+            resolved = getattr(rdv_tasks, task, None)
+            if not resolved:
+                logger.error(f"Tâche Celery inconnue dans rdv.tasks : {task}")
+                return
+            task = resolved
+
+        task.delay(*args, **kwargs)
+    except Exception as e:
+        logger.exception(f"Erreur Celery ({getattr(task, 'name', task)}): {e}")
+
 def _safe_choice(value, allowed, default):
     if not value:
         return default

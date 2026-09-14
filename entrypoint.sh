@@ -15,19 +15,5 @@ until python -c "import redis; r = redis.Redis(host='redis', port=6379, db=0); r
 done
 echo "✅ Redis is up and running"
 
-echo "📦 Running database migrations..."
-python manage.py makemigrations --noinput
-python manage.py migrate --noinput
-
-echo "👤 Creating superuser if needed..."
-python manage.py createsuperuser --noinput 2>/dev/null || echo "ℹ️  Superuser already exists or skipped"
-
-echo "📊 Collecting static files..."
-python manage.py collectstatic --noinput --clear
-
-echo "🎯 Initializing periodic tasks..."
-python manage.py init_periodic_tasks || echo "⚠️  Periodic tasks initialization failed or already done"
-
-echo "✨ Setup complete! Starting application..."
 exec "$@"
 

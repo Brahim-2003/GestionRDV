@@ -29,6 +29,18 @@ services:
       timeout: 5s
       retries: 5
 
+  migrate:
+    build: .
+    container_name: gestionrdv_migrate
+    command: ["/app/migrate.sh"]
+    volumes:
+      - .:/app:rw
+    env_file: .env
+    depends_on:
+      - redis
+      - db
+    restart: "no"
+
   web:
     build: .
     container_name: gestionrdv_web
@@ -39,8 +51,12 @@ services:
     ports:
       - '8000:8000'
     depends_on:
-      - redis
-      - db
+      redis:
+        condition: service_started
+      db:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   worker:
@@ -51,8 +67,12 @@ services:
       - .:/app:rw
     env_file: .env
     depends_on:
-      - redis
-      - db
+      redis:
+        condition: service_started
+      db:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   beat:
@@ -72,8 +92,12 @@ services:
       - .:/app:rw
     env_file: .env
     depends_on:
-      - redis
-      - db
+      redis:
+        condition: service_started
+      db:
+        condition: service_started
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
 
 volumes:

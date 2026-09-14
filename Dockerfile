@@ -28,7 +28,7 @@ COPY . .
 # Créer les dossiers nécessaires
 RUN mkdir -p logs staticfiles media
 
-RUN chmod +x /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh /app/migrate.sh
 
 # Exposer le port
 EXPOSE 8000

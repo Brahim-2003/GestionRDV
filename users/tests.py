@@ -1,8 +1,10 @@
 # users/tests.py
+import os
 from unittest import mock
 from django.test import TestCase, Client
 from django.urls import reverse
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, authenticate
+from django.core.management import call_command
 from django.utils import timezone
 from datetime import date, timedelta
 from rdv.models import Patient, Medecin
@@ -107,6 +109,30 @@ class UtilisateurModelTest(TestCase):
         )
         
         self.assertTrue(admin.is_admin_role())
+
+
+class CreateSuperuserManagementCommandTest(TestCase):
+    """Régression : la commande standard `createsuperuser` de Django passe toujours
+    le mot de passe sous la clé `password`, jamais `mot_de_passe`. Un test qui appelle
+    le manager directement avec `mot_de_passe=` ne peut pas détecter ce bug puisqu'il
+    contourne exactement le chemin défectueux : il faut passer par la vraie commande."""
+
+    def test_createsuperuser_command_produces_usable_login(self):
+        env = {
+            'DJANGO_SUPERUSER_EMAIL': 'cli-admin@test.com',
+            'DJANGO_SUPERUSER_PASSWORD': 'CliAdminPass123!',
+            'DJANGO_SUPERUSER_NOM': 'Admin',
+            'DJANGO_SUPERUSER_PRENOM': 'CLI',
+            'DJANGO_SUPERUSER_DATE_NAISSANCE': '1990-01-01',
+        }
+        with mock.patch.dict(os.environ, env):
+            call_command('createsuperuser', interactive=False)
+
+        admin = Utilisateur.objects.get(email='cli-admin@test.com')
+        self.assertTrue(admin.has_usable_password())
+        self.assertIsNotNone(
+            authenticate(username='cli-admin@test.com', password='CliAdminPass123!')
+        )
 
 
 class SignalProfileCreationTest(TestCase):

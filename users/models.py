@@ -9,20 +9,25 @@ import re
 class UtilisateurManager(BaseUserManager):
 
     # Manager personnalisé pour le modèle Utilisateur
-    def create_user(self, email, nom, prenom, date_naissance, mot_de_passe=None, **extra_fields):
+    def create_user(self, email, nom, prenom, date_naissance, password=None, mot_de_passe=None, **extra_fields):
+
+        # Accepte `password` (nom attendu par la commande standard `createsuperuser`
+        # de Django) aussi bien que `mot_de_passe` (utilisé dans le reste du code et
+        # des tests de ce projet).
+        mot_de_passe = password or mot_de_passe
 
         # Crée et sauvegarde un utilisateur avec l'email, nom et prénom donnés
         if not email:
             raise ValueError("L'email est obligatoire")
-        
+
         if not nom:
             raise ValueError("Le nom est obligatoire")
-        
+
         if not prenom:
             raise ValueError("Le prénom est obligatoire")
         if not date_naissance:
             raise ValueError("La date de naissance est obligatoire")
-        
+
         email = self.normalize_email(email)
         user = self.model(email=email, nom=nom, prenom=prenom, date_naissance = date_naissance, **extra_fields)
         user.set_password(mot_de_passe)
@@ -30,7 +35,7 @@ class UtilisateurManager(BaseUserManager):
 
         return user
 
-    def create_superuser(self, email, nom, prenom, date_naissance, mot_de_passe=None, **extra_fields):
+    def create_superuser(self, email, nom, prenom, date_naissance, password=None, mot_de_passe=None, **extra_fields):
 
         # Crée et sauvegarde un superutilisateur
         extra_fields.setdefault('is_staff', True)
@@ -42,8 +47,8 @@ class UtilisateurManager(BaseUserManager):
             raise ValueError("Le superutilisateur doit avoir is_staff=True !")
         if extra_fields.get('is_superuser') is not True:
             raise ValueError("Le superutilisateur doit avoir is_superuser=True !")
-        
-        return self.create_user(email, nom, prenom, date_naissance, mot_de_passe, **extra_fields)
+
+        return self.create_user(email, nom, prenom, date_naissance, password, mot_de_passe, **extra_fields)
 
     # Fonction qui assigne automatiquement les permissions selon le rôle
     def _assign_role_permissions(self, user):

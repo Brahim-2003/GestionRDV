@@ -1,4 +1,7 @@
+import logging
+
 from django.conf import settings
+from django.db.models import ProtectedError
 from django.db.models.signals import post_save, post_migrate
 from django.dispatch import receiver
 from django.contrib.auth.models import Group, Permission
@@ -11,6 +14,24 @@ from rdv.models import Patient, Medecin
 from rdv.utils import safe_delay
 from users.models import Utilisateur
 from users.tasks import notify_admins_on_user_create
+
+logger = logging.getLogger(__name__)
+
+
+def _delete_stale_profile(queryset, label):
+    """Supprime un profil (Patient/Medecin) devenu obsolète après un
+    changement de rôle. RendezVous.patient/medecin est en PROTECT : si ce
+    profil a des rendez-vous, la DB refuse la suppression. On journalise et
+    on laisse le profil en place plutôt que de faire planter le changement
+    de rôle (et donc la requête qui l'a déclenché)."""
+    try:
+        queryset.delete()
+    except ProtectedError:
+        logger.warning(
+            "Changement de rôle : impossible de supprimer l'ancien profil %s "
+            "(rendez-vous existants protégés par PROTECT). Profil laissé en place.",
+            label,
+        )
 
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
@@ -28,7 +49,7 @@ def manage_profiles_on_role_change(sender, instance, created, **kwargs):
                 'tel': instance.telephone,
             }
         )
-        Medecin.objects.filter(user=instance).delete()
+        _delete_stale_profile(Medecin.objects.filter(user=instance), 'médecin')
 
     elif role == 'medecin':
         Medecin.objects.get_or_create(
@@ -39,11 +60,11 @@ def manage_profiles_on_role_change(sender, instance, created, **kwargs):
                 'specialite': 'generaliste'
             }
         )
-        Patient.objects.filter(user=instance).delete()
+        _delete_stale_profile(Patient.objects.filter(user=instance), 'patient')
 
     else:
-        Patient.objects.filter(user=instance).delete()
-        Medecin.objects.filter(user=instance).delete()
+        _delete_stale_profile(Patient.objects.filter(user=instance), 'patient')
+        _delete_stale_profile(Medecin.objects.filter(user=instance), 'médecin')
 
     # Attribution du groupe
     instance.groups.clear()

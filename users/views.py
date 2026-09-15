@@ -450,7 +450,9 @@ def edit_user(request, user_id):
 @require_POST
 def supprimer_utilisateur(request, user_id):
     user = get_object_or_404(Utilisateur, pk=user_id)
-    user.delete()
+    # Soft-delete : le compte n'est plus jamais trouvable/connectable, mais
+    # son dossier (RDV, historique) n'est jamais détruit (conformité).
+    user.soft_delete()
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return JsonResponse({'status':'success'})
     return redirect('users:list_users')  # Redirige vers la liste des utilisateurs

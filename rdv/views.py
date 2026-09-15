@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.core.serializers.json import DjangoJSONEncoder 
 from django.db import IntegrityError, transaction
-from django.db.models import Q, Count
+from django.db.models import Q, Count, ProtectedError
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse, HttpResponseBadRequest
 from django.shortcuts import render, redirect, get_object_or_404
 from django.template.loader import render_to_string
@@ -340,7 +340,17 @@ def edit_rdv(request, rdv_id):
 @require_POST
 def delete_rdv(request, rdv_id):
     rdv = get_object_or_404(RendezVous, pk=rdv_id)
-    rdv.delete()
+    try:
+        rdv.delete()
+    except ProtectedError:
+        # RdvHistory.rdv est en PROTECT (conformité dossier médical) : un RDV
+        # ayant de l'historique (quasi tous, dès sa création) ne peut plus
+        # être supprimé définitivement.
+        messages.error(
+            request,
+            "Ce rendez-vous a un historique associé et ne peut pas être supprimé définitivement."
+        )
+        return redirect('/rdv/rdvs')
     messages.success(request, f'Le Rendez-vous a été supprimé avec succès!')
     return redirect('/rdv/rdvs')
 

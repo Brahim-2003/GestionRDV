@@ -1,0 +1,28 @@
+# Contrôle de version
+.git
+.gitignore
+
+# Secrets / configuration locale
+.env
+.env.local
+
+# Python
+**/__pycache__/
+**/*.pyc
+.venv/
+venv/
+
+# Base de données locale
+db.sqlite3
+
+# Logs applicatifs
+logs/
+
+# Dumps de données (peuvent contenir des données réelles/sensibles)
+backups/*.json
+
+# Fichiers statiques collectés (régénérés au démarrage par collectstatic)
+staticfiles/
+
+# Cache de tests
+.pytest_cache

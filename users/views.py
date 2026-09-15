@@ -61,10 +61,9 @@ def permission_required_with_403(perm):
     return decorator
 
 def permission_denied_view(request, exception=None):
-    return HttpResponseForbidden(
-        render(request, 'users/403.html'),
-        content_type='text/html'
-    )
+    response = render(request, 'users/403.html', content_type='text/html')
+    response.status_code = 403
+    return response
 
 
 

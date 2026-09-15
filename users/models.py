@@ -2,11 +2,19 @@ from django.db import models
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin, Group, Permission
 from django.core.exceptions import ValidationError
 from django.contrib.contenttypes.models import ContentType
+from django.utils import timezone
 import re
 
 # Create your models here.
 
 class UtilisateurManager(BaseUserManager):
+
+    def get_queryset(self):
+        # Exclut par défaut les comptes soft-supprimés (deleted_at renseigné) :
+        # plus aucune requête habituelle (filter/get/authenticate/liste admin) ne
+        # les voit, sans que les données liées (dossier médical, RDV) ne soient
+        # jamais détruites.
+        return super().get_queryset().filter(deleted_at__isnull=True)
 
     # Manager personnalisé pour le modèle Utilisateur
     def create_user(self, email, nom, prenom, date_naissance, password=None, mot_de_passe=None, **extra_fields):
@@ -66,6 +74,11 @@ class UtilisateurManager(BaseUserManager):
             user.groups.add(group)
 
 
+class UtilisateurAllManager(BaseUserManager):
+    """Identique au manager par défaut mais sans exclure les comptes
+    soft-supprimés. Réservé à l'usage admin/technique (ex. consulter le
+    dossier d'un compte supprimé) — ne jamais utiliser pour l'authentification
+    ni pour les listes affichées aux utilisateurs standard."""
 
 
 
@@ -86,12 +99,18 @@ class Utilisateur(AbstractBaseUser, PermissionsMixin):
     is_actif = models.BooleanField(default=True, verbose_name="Actif")
 
 
-    
+
     is_staff = models.BooleanField(default=False, verbose_name="Staff")
 
     updated_at = models.DateTimeField(auto_now=True, verbose_name="Date de mise à jour")
 
+    # Soft-delete : distinct de is_actif (qui sert à activer/désactiver un
+    # compte sans le supprimer). Un compte avec deleted_at renseigné ne doit
+    # plus jamais être trouvable via le manager par défaut (objects).
+    deleted_at = models.DateTimeField(null=True, blank=True, default=None, verbose_name="Supprimé le")
+
     objects = UtilisateurManager()
+    all_objects = UtilisateurAllManager()
 
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['nom', 'prenom', 'date_naissance']
@@ -132,8 +151,15 @@ class Utilisateur(AbstractBaseUser, PermissionsMixin):
     # Attribue le role administrateur
     def is_admin_role(self):
         return self.role == 'admin'
-    
-    
+
+    def soft_delete(self):
+        """Marque le compte comme supprimé sans détruire les données liées
+        (dossier médical, historique de rendez-vous) : plus jamais visible
+        via le manager par défaut, ni connectable."""
+        self.deleted_at = timezone.now()
+        self.save(update_fields=['deleted_at'])
+
+
     def save(self, *args, **kwargs):
 
         # Définir is_staff et is_active selon le rôle

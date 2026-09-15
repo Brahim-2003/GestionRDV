@@ -21,7 +21,10 @@ class RdvHistory(models.Model):
         ('delete', 'Suppression'),
     ]
 
-    rdv = models.ForeignKey('RendezVous', on_delete=models.CASCADE, related_name='history')
+    # PROTECT : l'historique légal des RDV ne doit jamais disparaître en
+    # cascade (conformité dossier médical). Un hard-delete direct sur un
+    # RendezVous ayant de l'historique doit échouer bruyamment.
+    rdv = models.ForeignKey('RendezVous', on_delete=models.PROTECT, related_name='history')
     action = models.CharField(max_length=20, choices=ACTION_CHOICES)
     performed_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
                                      on_delete=models.SET_NULL, related_name='rdv_actions')
@@ -466,8 +469,10 @@ class RendezVous(models.Model):
         ('reporte', 'Reporté'),
     ]
 
-    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name='rendez_vous')
-    medecin = models.ForeignKey(Medecin, on_delete=models.CASCADE, related_name='rendez_vous')
+    # PROTECT (et non CASCADE) : empêche la suppression en cascade d'un
+    # patient/médecin qui a des RDV, donc de leur historique légal en aval.
+    patient = models.ForeignKey(Patient, on_delete=models.PROTECT, related_name='rendez_vous')
+    medecin = models.ForeignKey(Medecin, on_delete=models.PROTECT, related_name='rendez_vous')
     date_heure_rdv = models.DateTimeField()
     duree_minutes = models.IntegerField(default=30)
     motif = models.CharField(max_length=200, blank=True)

@@ -8,6 +8,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.db import connection, connections, transaction
+from django.db.models import ProtectedError
 from django.db.utils import OperationalError
 from datetime import datetime, date, time, timedelta
 from decimal import Decimal
@@ -1718,6 +1719,60 @@ class AccessControlSecurityTest(TestCase):
         self.assertEqual(response.status_code, 403)
         self.rdv.refresh_from_db()
         self.assertEqual(self.rdv.statut, 'programme')
+
+
+class RendezVousProtectionTest(TestCase):
+    """PROTECT en filet de sécurité (conformité dossier médical) : un
+    hard-delete direct (bypass de l'application normale : admin Django,
+    shell, script) sur un Patient/Medecin ayant un RDV, ou sur un
+    RendezVous ayant de l'historique, doit échouer bruyamment au lieu de
+    cascader silencieusement jusqu'à RdvHistory."""
+
+    def setUp(self):
+        self.patient_user = Utilisateur.objects.create_user(
+            email='protect_patient@test.com',
+            nom='Patient', prenom='Test',
+            date_naissance=date(1990, 1, 1),
+            role='patient',
+            mot_de_passe='test123',
+        )
+        self.medecin_user = Utilisateur.objects.create_user(
+            email='protect_medecin@test.com',
+            nom='Medecin', prenom='Test',
+            date_naissance=date(1980, 1, 1),
+            role='medecin',
+            mot_de_passe='test123',
+        )
+        self.patient = self.patient_user.profil_patient
+        self.medecin = self.medecin_user.profil_medecin
+        self.rdv = RendezVous.objects.create(
+            patient=self.patient,
+            medecin=self.medecin,
+            date_heure_rdv=timezone.now() + timedelta(days=3),
+            statut='programme',
+            motif='Test',
+        )
+
+    def test_hard_delete_patient_with_rdv_raises_protected_error(self):
+        with self.assertRaises(ProtectedError):
+            self.patient.delete()
+        self.assertTrue(Patient.objects.filter(pk=self.patient.pk).exists())
+        self.assertTrue(RendezVous.objects.filter(pk=self.rdv.pk).exists())
+
+    def test_hard_delete_medecin_with_rdv_raises_protected_error(self):
+        with self.assertRaises(ProtectedError):
+            self.medecin.delete()
+        self.assertTrue(Medecin.objects.filter(pk=self.medecin.pk).exists())
+        self.assertTrue(RendezVous.objects.filter(pk=self.rdv.pk).exists())
+
+    def test_hard_delete_rdv_with_history_raises_protected_error(self):
+        history = RdvHistory.objects.create(
+            rdv=self.rdv, action='create', description='Rendez-vous créé'
+        )
+        with self.assertRaises(ProtectedError):
+            self.rdv.delete()
+        self.assertTrue(RendezVous.objects.filter(pk=self.rdv.pk).exists())
+        self.assertTrue(RdvHistory.objects.filter(pk=history.pk).exists())
 
 
 class CeleryIntegrationTest(TestCase):

@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model, authenticate
 from django.core.management import call_command
 from django.utils import timezone
 from datetime import date, timedelta
-from rdv.models import Patient, Medecin
+from rdv.models import Patient, Medecin, RendezVous, RdvHistory
 
 Utilisateur = get_user_model()
 
@@ -133,6 +133,99 @@ class CreateSuperuserManagementCommandTest(TestCase):
         self.assertIsNotNone(
             authenticate(username='cli-admin@test.com', password='CliAdminPass123!')
         )
+
+
+class SoftDeleteUtilisateurTest(TestCase):
+    """Soft-delete (conformité dossier médical) : un compte supprimé ne
+    doit plus jamais être trouvable/connectable, mais ses RDV et son
+    historique doivent rester intacts et consultables par un admin via
+    Utilisateur.all_objects — aucun CASCADE ne doit se déclencher."""
+
+    def setUp(self):
+        self.patient_user = Utilisateur.objects.create_user(
+            email='soft_delete_patient@test.com',
+            nom='Patient', prenom='Test',
+            date_naissance=date(1990, 1, 1),
+            role='patient',
+            mot_de_passe='SoftPass123!',
+        )
+        self.medecin_user = Utilisateur.objects.create_user(
+            email='soft_delete_medecin@test.com',
+            nom='Medecin', prenom='Test',
+            date_naissance=date(1980, 1, 1),
+            role='medecin',
+            mot_de_passe='test123',
+        )
+        self.rdv = RendezVous.objects.create(
+            patient=self.patient_user.profil_patient,
+            medecin=self.medecin_user.profil_medecin,
+            date_heure_rdv=timezone.now() + timedelta(days=3),
+            statut='programme',
+            motif='Test',
+        )
+        self.history = RdvHistory.objects.create(
+            rdv=self.rdv,
+            action='create',
+            performed_by=self.patient_user,
+            description='Rendez-vous créé',
+        )
+
+    def test_soft_deleted_user_cannot_login(self):
+        self.patient_user.soft_delete()
+
+        response = self.client.post(reverse('users:login'), {
+            'email': 'soft_delete_patient@test.com',
+            'password': 'SoftPass123!',
+        })
+
+        self.assertEqual(response.status_code, 200)  # formulaire réaffiché, pas de redirection
+        self.assertFalse(response.wsgi_request.user.is_authenticated)
+
+    def test_soft_deleted_user_excluded_from_default_manager(self):
+        user_id = self.patient_user.pk
+        self.patient_user.soft_delete()
+
+        self.assertFalse(Utilisateur.objects.filter(pk=user_id).exists())
+        with self.assertRaises(Utilisateur.DoesNotExist):
+            Utilisateur.objects.get(pk=user_id)
+
+        # Toujours accessible via le manager non filtré (usage admin).
+        deleted = Utilisateur.all_objects.get(pk=user_id)
+        self.assertIsNotNone(deleted.deleted_at)
+
+    def test_soft_deleted_user_excluded_from_admin_user_list(self):
+        admin = Utilisateur.objects.create_superuser(
+            email='soft_delete_admin@test.com',
+            nom='Admin', prenom='Test',
+            date_naissance=date(1970, 1, 1),
+            mot_de_passe='admin123',
+        )
+        self.patient_user.soft_delete()
+
+        client = Client()
+        client.force_login(admin)
+        response = client.get(reverse('users:list_users'))
+
+        self.assertEqual(response.status_code, 200)
+        emails = [u.email for u in response.context['page_obj'].object_list]
+        self.assertNotIn('soft_delete_patient@test.com', emails)
+
+    def test_rdv_history_survives_soft_delete_and_stays_consultable(self):
+        history_id = self.history.pk
+        rdv_id = self.rdv.pk
+        user_id = self.patient_user.pk
+
+        self.patient_user.soft_delete()
+
+        # Rien n'a été détruit en cascade.
+        self.assertTrue(RendezVous.objects.filter(pk=rdv_id).exists())
+        self.assertTrue(RdvHistory.objects.filter(pk=history_id).exists())
+
+        # Consultable pour un admin, à partir du compte supprimé lui-même.
+        deleted_user = Utilisateur.all_objects.get(pk=user_id)
+        history_qs = RdvHistory.objects.filter(rdv__patient__user=deleted_user)
+        self.assertEqual(history_qs.count(), 1)
+        self.assertEqual(history_qs.first().description, 'Rendez-vous créé')
 
 
 class SignalProfileCreationTest(TestCase):

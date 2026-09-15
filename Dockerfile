@@ -30,6 +30,13 @@ RUN mkdir -p logs staticfiles media
 
 RUN chmod +x /app/entrypoint.sh /app/migrate.sh
 
+# Utilisateur non-root pour l'exécution (l'installation des dépendances
+# ci-dessus reste en root). Droits accordés uniquement sur les
+# répertoires où l'application écrit réellement à l'exécution.
+RUN useradd --create-home --shell /usr/sbin/nologin appuser \
+    && chown -R appuser:appuser /app/logs /app/staticfiles /app/media
+USER appuser
+
 # Exposer le port
 EXPOSE 8000
 

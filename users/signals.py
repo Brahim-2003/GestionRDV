@@ -195,20 +195,25 @@ def create_default_groups_and_permissions(sender, **kwargs):
         )
         created_perms[codename] = perm
 
-    # Attribution propre (sans erreurs)
-    patients_group.permissions.add(
-        get_perm('users', 'Utilisateur', 'view')
-    )
+    # Attribution propre : comme get_perm() peut renvoyer None (permission
+    # pas encore créée à ce point de l'ordre des signaux post_migrate), on
+    # filtre avant .add() — un None littéral dans .add() tente d'insérer
+    # une ligne auth_group_permissions avec permission_id NULL et lève une
+    # IntegrityError (cassait migrate sur une base neuve, dont la base de
+    # test recréée à chaque run).
+    view_utilisateur = get_perm('users', 'Utilisateur', 'view')
 
-    medecins_group.permissions.add(
-        get_perm('users', 'Utilisateur', 'view'),
-        created_perms['can_manage_appointments']
-    )
+    patients_group.permissions.add(*filter(None, [view_utilisateur]))
 
-    admins_group.permissions.add(
+    medecins_group.permissions.add(*filter(None, [
+        view_utilisateur,
+        created_perms['can_manage_appointments'],
+    ]))
+
+    admins_group.permissions.add(*filter(None, [
         get_perm('users', 'Utilisateur', 'add'),
         get_perm('users', 'Utilisateur', 'change'),
         get_perm('users', 'Utilisateur', 'delete'),
-        get_perm('users', 'Utilisateur', 'view'),
-        *created_perms.values()
-    )
+        view_utilisateur,
+        *created_perms.values(),
+    ]))

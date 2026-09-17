@@ -6,6 +6,7 @@ from unittest import mock
 from django.test import TestCase, TransactionTestCase, Client
 from django.urls import reverse
 from django.utils import timezone
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.db import connection, connections, transaction
 from django.db.models import ProtectedError
@@ -16,7 +17,8 @@ from decimal import Decimal
 from users.models import Utilisateur
 from rdv.models import (
     Patient, Medecin, Disponibilite, RendezVous,
-    Notification, RdvHistory, FavoriMedecin, ListeAttenteCreneau
+    Notification, RdvHistory, FavoriMedecin, ListeAttenteCreneau,
+    RechercheSymptome,
 )
 
 
@@ -814,6 +816,26 @@ class PriseRdvViewTest(TestCase):
         thorax = next((s for s in douleur['symptomes'] if s['nom'] == 'Douleur thoracique'), None)
         self.assertIsNotNone(thorax)
         self.assertIn('cardiologue', thorax['specialites'])
+
+    def test_api_symptomes_second_call_served_from_cache(self):
+        """Chantier cache Redis : le 2e appel à api_symptomes ne doit pas
+        retaper RechercheSymptome en base (donnée quasi-statique mise en
+        cache, voir CACHE_KEY_SYMPTOMES dans rdv/views.py)."""
+        cache.clear()
+        with mock.patch(
+            'rdv.views.RechercheSymptome.objects.all',
+            wraps=RechercheSymptome.objects.all,
+        ) as mocked_all:
+            response1 = self.client.get(reverse('rdv:api_symptomes'))
+            self.assertEqual(response1.status_code, 200)
+            self.assertEqual(mocked_all.call_count, 1)
+
+            response2 = self.client.get(reverse('rdv:api_symptomes'))
+            self.assertEqual(response2.status_code, 200)
+            # Toujours 1 : le 2e appel a été servi depuis le cache Redis,
+            # pas recalculé depuis la base.
+            self.assertEqual(mocked_all.call_count, 1)
+            self.assertEqual(response1.json(), response2.json())
 
     def test_api_creneaux_medecin(self):
         """Récupération des créneaux d'un médecin"""

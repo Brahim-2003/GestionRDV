@@ -159,6 +159,23 @@ CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
 CELERY_ENABLE_UTC = True
 
+# ==========================================================================
+# Cache (Redis)
+# ==========================================================================
+# Index Redis dédié (/2), distinct de ceux déjà utilisés par Celery
+# (broker sur /0, result backend sur /1), pour ne jamais mélanger clés de
+# cache et données Celery dans la même base logique Redis.
+CACHE_URL = env("CACHE_URL", default='redis://localhost:6379/2')
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": CACHE_URL,
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        },
+    }
+}
+
 # Le planning des tâches périodiques n'est PAS géré via CELERY_BEAT_SCHEDULE
 # ici : ce projet a déjà son propre mécanisme, rdv/management/commands/
 # init_periodic_tasks.py (appelé par entrypoint.sh/entrypoint.bat à chaque

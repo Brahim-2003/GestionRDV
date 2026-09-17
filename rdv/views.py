@@ -2,6 +2,7 @@ from datetime import timedelta, datetime, date as date_cls
 
 # Django imports (groupés et triés)
 from django.contrib import messages
+from django.core.cache import cache
 from django.core.exceptions import ValidationError
 from django.core.paginator import Paginator
 from django.core.serializers.json import DjangoJSONEncoder 
@@ -38,6 +39,37 @@ from . import notifications as notif_helpers
 from rdv.utils import user_can_manage_rdv, send_manual_notification
 
 
+# ==========================================================================
+# Cache (Redis, voir GestionRDV/settings.py::CACHES)
+# ==========================================================================
+# Clés et durées de vie — valeurs de départ raisonnables, à ajuster avec le
+# métier plutôt qu'à considérer comme définitives :
+# - CACHE_KEY_SYMPTOMES : référentiel quasi-statique (catégories de
+#   symptômes + spécialités suggérées, RechercheSymptome), qui ne change
+#   que lorsqu'un admin l'édite. TTL long (1h) — pas d'invalidation sur
+#   save() de RechercheSymptome, la donnée redevient fraîche au plus tard
+#   au prochain TTL.
+# - CACHE_KEY_SPECIALITES_COUNT : agrégat DB (nb de médecins par
+#   spécialité, affiché sur "prendre RDV"), change seulement quand un
+#   médecin est créé/supprimé ou change de spécialité — rare. TTL moyen
+#   (10 min).
+# - CACHE_KEY_DASHBOARD_STATS : statistiques admin, coûteuses (une dizaine
+#   de requêtes d'agrégation) mais qui évoluent avec l'activité réelle
+#   (nouveaux RDV, inscriptions...) — cas ambigu, TTL volontairement court
+#   (30s) plutôt que pas de cache du tout. Ne couvre PAS les notifications
+#   (spécifiques à l'utilisateur connecté), récupérées à chaque appel.
+#
+# Ne JAMAIS mettre en cache ici la disponibilité réelle des créneaux
+# (api_search_medecins, api_creneaux_medecin) : ces données doivent rester
+# à jour en temps réel, même si leur calcul est coûteux.
+CACHE_KEY_SYMPTOMES = 'rdv:symptomes_categories'
+CACHE_TTL_SYMPTOMES = 60 * 60  # 1h
+
+CACHE_KEY_SPECIALITES_COUNT = 'rdv:medecins_par_specialite_count'
+CACHE_TTL_SPECIALITES_COUNT = 60 * 10  # 10 min
+
+CACHE_KEY_DASHBOARD_STATS = 'rdv:dashboard_admin_stats'
+CACHE_TTL_DASHBOARD_STATS = 30  # 30s
 
 
 
@@ -204,41 +236,51 @@ def dashboard_admin_view(request):
 @login_required(login_url='users:login')
 @permission_required('users.can_view_statistics', raise_exception=True)
 def api_dashboard_stats(request):
-    
-    now = timezone.now()
-    debut_semaine = now - timezone.timedelta(days=now.weekday())
-    debut_mois = now.replace(day=1)
-    debut_jour = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    jours_semaine = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
+    """Statistiques agrégées consommées par dashboard_admin.js (lecture de
+    data[key] pour chaque .stat-card) : uniquement des compteurs globaux,
+    identiques pour tout admin -> mis en cache (voir CACHE_TTL_DASHBOARD_STATS,
+    TTL volontairement court car ces chiffres évoluent avec l'activité réelle).
 
-    data = {
-            'total_utilisateurs': Utilisateur.objects.count(),
-            'total_utilisateurs_inscris_semaine': Utilisateur.objects.filter(date_inscription__gte=debut_semaine).count(),
-            'total_utilisateurs_inscris_mois': Utilisateur.objects.filter(date_inscription__gte = debut_mois).count(),
-            'total_utilisateurs_inscris_aujour': Utilisateur.objects.filter(date_inscription__gte = debut_jour).count(),
-            'total_admins': Utilisateur.objects.filter(role='admin').count(),
-            'total_patients': Utilisateur.objects.filter(role='patient').count(),
-            'total_medecins': Utilisateur.objects.filter(role='medecin').count(),
-            
+    NB: 'notifications' et 'rdvs_recents' ont été retirés de cette réponse :
+    dashboard_admin.js ne les lit jamais, et un QuerySet de modèles n'est de
+    toute façon pas sérialisable par JsonResponse (ça levait une 500 avant ce
+    correctif — bug préexistant, sans rapport avec la mise en cache)."""
+    data = cache.get(CACHE_KEY_DASHBOARD_STATS)
+    if data is None:
+        now = timezone.now()
+        debut_semaine = now - timezone.timedelta(days=now.weekday())
+        debut_mois = now.replace(day=1)
+        debut_jour = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        jours_semaine = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
 
-            'total_rendez_vous': RendezVous.objects.count(),
-            'total_confirmes': RendezVous.objects.filter(statut='confirme').count(),
-            'total_annules': RendezVous.objects.filter(statut='annule').count(),
-            'total_en_cours': RendezVous.objects.filter(statut='en_cours').count(),
-            'total_programmes': RendezVous.objects.filter(statut='programme').count(),
-            'total_termines': RendezVous.objects.filter(statut='termine').count(),
+        data = {
+                'total_utilisateurs': Utilisateur.objects.count(),
+                'total_utilisateurs_inscris_semaine': Utilisateur.objects.filter(date_inscription__gte=debut_semaine).count(),
+                'total_utilisateurs_inscris_mois': Utilisateur.objects.filter(date_inscription__gte = debut_mois).count(),
+                'total_utilisateurs_inscris_aujour': Utilisateur.objects.filter(date_inscription__gte = debut_jour).count(),
+                'total_admins': Utilisateur.objects.filter(role='admin').count(),
+                'total_patients': Utilisateur.objects.filter(role='patient').count(),
+                'total_medecins': Utilisateur.objects.filter(role='medecin').count(),
 
-            'rendez_vous_semaine': RendezVous.objects.filter(date_creation__gte=debut_semaine).count(),
-            'rendez_vous_mois': RendezVous.objects.filter(date_creation__gte=debut_mois).count(),
-            'rendez_vous_aujour': RendezVous.objects.filter(date_creation__gte=debut_jour).count(),
-            'jours_semaine': jours_semaine,
-            'rendez_vous_jour': [
-                RendezVous.objects.filter(date_creation__date=debut_jour + timezone.timedelta(days=i)).count()
-                for i in range(7)
-            ],
-            'notifications': Notification.objects.filter(user=request.user)[:5],
-            'rdvs_recents': RendezVous.objects.all().order_by('-date_creation')[:5]
-        }
+
+                'total_rendez_vous': RendezVous.objects.count(),
+                'total_confirmes': RendezVous.objects.filter(statut='confirme').count(),
+                'total_annules': RendezVous.objects.filter(statut='annule').count(),
+                'total_en_cours': RendezVous.objects.filter(statut='en_cours').count(),
+                'total_programmes': RendezVous.objects.filter(statut='programme').count(),
+                'total_termines': RendezVous.objects.filter(statut='termine').count(),
+
+                'rendez_vous_semaine': RendezVous.objects.filter(date_creation__gte=debut_semaine).count(),
+                'rendez_vous_mois': RendezVous.objects.filter(date_creation__gte=debut_mois).count(),
+                'rendez_vous_aujour': RendezVous.objects.filter(date_creation__gte=debut_jour).count(),
+                'jours_semaine': jours_semaine,
+                'rendez_vous_jour': [
+                    RendezVous.objects.filter(date_creation__date=debut_jour + timezone.timedelta(days=i)).count()
+                    for i in range(7)
+                ],
+            }
+        cache.set(CACHE_KEY_DASHBOARD_STATS, data, CACHE_TTL_DASHBOARD_STATS)
+
     return JsonResponse(data)
 
 
@@ -1910,8 +1952,13 @@ def prendre_rdv(request):
     ).values('medecin__specialite').annotate(count=Count('id')).order_by('-count')[:3]
 
     from types import SimpleNamespace
-    medecins_par_specialite = Medecin.objects.values('specialite').annotate(count=Count('id'))
-    counts_dict = {item['specialite']: item['count'] for item in medecins_par_specialite}
+    # Nombre de médecins par spécialité : agrégat DB quasi-statique
+    # (change seulement à la création/suppression d'un médecin) -> caché.
+    counts_dict = cache.get(CACHE_KEY_SPECIALITES_COUNT)
+    if counts_dict is None:
+        medecins_par_specialite = Medecin.objects.values('specialite').annotate(count=Count('id'))
+        counts_dict = {item['specialite']: item['count'] for item in medecins_par_specialite}
+        cache.set(CACHE_KEY_SPECIALITES_COUNT, counts_dict, CACHE_TTL_SPECIALITES_COUNT)
     medecins_counts = SimpleNamespace(**counts_dict)
 
     context = {
@@ -1932,30 +1979,37 @@ def api_symptomes(request):
     """Catégories de symptômes (interface hybride : catégorie cliquable ->
     symptômes précis à cocher) et spécialités suggérées associées, sourcées
     depuis RechercheSymptome. Le regroupement par catégorie n'existe pas en
-    base ; il est recréé ici depuis SYMPTOME_CATEGORIES (rdv/models.py)."""
-    symptomes_par_nom = {
-        s.symptome: s for s in RechercheSymptome.objects.all()
-    }
+    base ; il est recréé ici depuis SYMPTOME_CATEGORIES (rdv/models.py).
 
-    categories = []
-    for nom_categorie, noms_symptomes in SYMPTOME_CATEGORIES:
-        symptomes = []
-        for nom_symptome in noms_symptomes:
-            symptome = symptomes_par_nom.get(nom_symptome)
-            if not symptome:
-                continue
-            symptomes.append({
-                'id': symptome.id,
-                'nom': symptome.symptome,
-                'specialites': symptome.specialites_suggerees,
-            })
-        if symptomes:
-            categories.append({'nom': nom_categorie, 'symptomes': symptomes})
+    Référentiel quasi-statique -> mis en cache (voir CACHE_TTL_SYMPTOMES)."""
+    data = cache.get(CACHE_KEY_SYMPTOMES)
+    if data is None:
+        symptomes_par_nom = {
+            s.symptome: s for s in RechercheSymptome.objects.all()
+        }
 
-    return JsonResponse({
-        'categories': categories,
-        'avertissement': AVERTISSEMENT_URGENCE_SYMPTOME,
-    })
+        categories = []
+        for nom_categorie, noms_symptomes in SYMPTOME_CATEGORIES:
+            symptomes = []
+            for nom_symptome in noms_symptomes:
+                symptome = symptomes_par_nom.get(nom_symptome)
+                if not symptome:
+                    continue
+                symptomes.append({
+                    'id': symptome.id,
+                    'nom': symptome.symptome,
+                    'specialites': symptome.specialites_suggerees,
+                })
+            if symptomes:
+                categories.append({'nom': nom_categorie, 'symptomes': symptomes})
+
+        data = {
+            'categories': categories,
+            'avertissement': AVERTISSEMENT_URGENCE_SYMPTOME,
+        }
+        cache.set(CACHE_KEY_SYMPTOMES, data, CACHE_TTL_SYMPTOMES)
+
+    return JsonResponse(data)
 
 
 @login_required

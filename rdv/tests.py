@@ -1694,6 +1694,22 @@ class AccessControlSecurityTest(TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertTrue(RendezVous.objects.filter(pk=self.rdv.id).exists())
 
+    def test_delete_rdv_with_history_shows_clear_message_not_500(self):
+        """Un RDV avec historique refuse la suppression avec un message clair
+        et exploitable (invite à l'annulation), jamais une erreur serveur générique."""
+        RdvHistory.objects.create(rdv=self.rdv, action='create', description='Rendez-vous créé')
+        self.client.login(email='admin@test.com', password='admin123')
+
+        response = self.client.post(
+            reverse('rdv:supprimer_rendez_vous', kwargs={'rdv_id': self.rdv.id}),
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        messages_list = [str(m) for m in response.context['messages']]
+        self.assertTrue(any('annulation' in m for m in messages_list), messages_list)
+        self.assertTrue(RendezVous.objects.filter(pk=self.rdv.id).exists())
+
     def test_patient_can_cancel_own_rdv(self):
         """Le patient propriétaire du RDV peut désormais l'annuler lui-même (chantier 5)."""
         self.client.login(email='patient@test.com', password='patient123')

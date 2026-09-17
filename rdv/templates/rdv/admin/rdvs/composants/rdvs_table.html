@@ -25,13 +25,11 @@
            class="action-btn-edit">
           <i class='bx bxs-edit' style='color:#20a52d'  ></i>
           </a>
-        <form method="post" action="{% url 'rdv:supprimer_rendez_vous' rdv.id %}" style="display:inline;">
-          {% csrf_token %}
-          <button type="submit" class="action-btn-delete"
-                  style="background:none;border:none;padding:0;cursor:pointer;">
-            <i class='bx bxs-trash-alt' style='color:#dc3545'></i>
-          </button>
-        </form>
+        {% if rdv.statut == 'programme' or rdv.statut == 'confirme' or rdv.statut == 'reporte' %}
+        <a href="{% url 'rdv:annuler_rdv' rdv.id %}" class="action-btn-delete" title="Annuler">
+          <i class='bx bx-x-circle' style='color:#dc3545'></i>
+        </a>
+        {% endif %}
       </td>
     </tr>
     {% empty %}

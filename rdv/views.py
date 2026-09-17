@@ -348,7 +348,8 @@ def delete_rdv(request, rdv_id):
         # être supprimé définitivement.
         messages.error(
             request,
-            "Ce rendez-vous a un historique associé et ne peut pas être supprimé définitivement."
+            "Ce rendez-vous a un historique et ne peut pas être supprimé ; "
+            "utilisez l'annulation à la place."
         )
         return redirect('/rdv/rdvs')
     messages.success(request, f'Le Rendez-vous a été supprimé avec succès!')

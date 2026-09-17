@@ -728,10 +728,15 @@ class DashboardViewTest(TestCase):
 
 class PriseRdvViewTest(TestCase):
     """Tests de la prise de rendez-vous"""
-    
+
     def setUp(self):
         self.client = Client()
-        
+        # Le rate limiting (django-ratelimit) s'appuie sur le cache Django
+        # (Redis) : on repart d'un compteur propre à chaque test pour éviter
+        # toute interférence entre tests (le cache n'est pas remis à zéro
+        # par le rollback de transaction de TestCase, contrairement à la DB).
+        cache.clear()
+
         # Patient
         self.patient_user = Utilisateur.objects.create_user(
             email='patient@test.com',
@@ -920,6 +925,61 @@ class PriseRdvViewTest(TestCase):
         self.assertEqual(rdv.patient, self.patient)
         self.assertEqual(rdv.medecin, self.medecin)
         self.assertEqual(rdv.statut, 'programme')
+
+    def test_api_reserver_rdv_not_blocked_under_threshold(self):
+        """RATELIMIT_RESERVATION = 20/min (par utilisateur) : quelques
+        requêtes ne déclenchent jamais le 429, même si le créneau visé est
+        déjà pris ensuite (le rate limiting compte les requêtes, pas les
+        réservations réussies)."""
+        today = date.today()
+        days_ahead = (0 - today.weekday()) % 7 or 7
+        next_monday = today + timedelta(days=days_ahead)
+        rdv_datetime = timezone.make_aware(datetime.combine(next_monday, time(10, 0)))
+        payload = json.dumps({
+            'medecin_id': self.medecin.id,
+            'datetime': rdv_datetime.isoformat(),
+            'motif': 'Test',
+        })
+        for _ in range(5):
+            response = self.client.post(
+                reverse('rdv:api_reserver_rdv'), data=payload, content_type='application/json'
+            )
+            self.assertNotEqual(response.status_code, 429)
+
+    def test_api_reserver_rdv_blocked_beyond_threshold(self):
+        """Au-delà de RATELIMIT_RESERVATION (20/min), la vue renvoie 429
+        avec un message clair plutôt qu'une erreur générique."""
+        today = date.today()
+        days_ahead = (0 - today.weekday()) % 7 or 7
+        next_monday = today + timedelta(days=days_ahead)
+        rdv_datetime = timezone.make_aware(datetime.combine(next_monday, time(10, 0)))
+        payload = json.dumps({
+            'medecin_id': self.medecin.id,
+            'datetime': rdv_datetime.isoformat(),
+            'motif': 'Test',
+        })
+        responses = [
+            self.client.post(reverse('rdv:api_reserver_rdv'), data=payload, content_type='application/json')
+            for _ in range(21)
+        ]
+        self.assertTrue(any(r.status_code == 429 for r in responses))
+        blocked = next(r for r in responses if r.status_code == 429)
+        self.assertIn('Trop de réservations', blocked.json()['error'])
+
+    def test_api_symptomes_not_blocked_under_threshold(self):
+        """RATELIMIT_SYMPTOMES = 30/min (par IP) : quelques requêtes ne
+        déclenchent jamais le 429."""
+        for _ in range(10):
+            response = self.client.get(reverse('rdv:api_symptomes'))
+            self.assertNotEqual(response.status_code, 429)
+
+    def test_api_symptomes_blocked_beyond_threshold(self):
+        """Au-delà de RATELIMIT_SYMPTOMES (30/min), la vue renvoie 429 avec
+        un message clair plutôt qu'une erreur générique."""
+        responses = [self.client.get(reverse('rdv:api_symptomes')) for _ in range(31)]
+        self.assertTrue(any(r.status_code == 429 for r in responses))
+        blocked = next(r for r in responses if r.status_code == 429)
+        self.assertIn('Trop de requêtes', blocked.json()['error'])
 
     def test_api_reserver_rdv_honore_inscription_et_expire_les_concurrentes(self):
         """Réserver un créneau honore l'inscription du réservataire sur ce

@@ -51,6 +51,7 @@ INSTALLED_APPS = [
     "users.apps.UsersConfig",
     "rdv",
     "django_celery_beat",
+    "django_ratelimit",
 ]
 
 MIDDLEWARE = [

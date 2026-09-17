@@ -14,6 +14,7 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.views.decorators.http import require_POST, require_http_methods, require_GET
 from django.contrib.auth.decorators import login_required, permission_required
+from django_ratelimit.decorators import ratelimit
 import json
 import logging
 import csv
@@ -70,6 +71,15 @@ CACHE_TTL_SPECIALITES_COUNT = 60 * 10  # 10 min
 
 CACHE_KEY_DASHBOARD_STATS = 'rdv:dashboard_admin_stats'
 CACHE_TTL_DASHBOARD_STATS = 30  # 30s
+
+
+# ==========================================================================
+# Rate limiting (django-ratelimit, voir GestionRDV/settings.py::CACHES)
+# ==========================================================================
+# Seuils de départ raisonnables, à ajuster avec le métier plutôt qu'à
+# considérer comme définitifs :
+RATELIMIT_SYMPTOMES = '30/m'     # par IP
+RATELIMIT_RESERVATION = '20/m'   # par utilisateur connecté
 
 
 
@@ -1975,6 +1985,7 @@ def prendre_rdv(request):
     return render(request, 'rdv/patient/prendre_rdv.html', context)
 
 @login_required
+@ratelimit(key='ip', rate=RATELIMIT_SYMPTOMES, method='GET', block=False)
 def api_symptomes(request):
     """Catégories de symptômes (interface hybride : catégorie cliquable ->
     symptômes précis à cocher) et spécialités suggérées associées, sourcées
@@ -1982,6 +1993,9 @@ def api_symptomes(request):
     base ; il est recréé ici depuis SYMPTOME_CATEGORIES (rdv/models.py).
 
     Référentiel quasi-statique -> mis en cache (voir CACHE_TTL_SYMPTOMES)."""
+    if getattr(request, 'limited', False):
+        return JsonResponse({'error': 'Trop de requêtes. Réessayez dans quelques instants.'}, status=429)
+
     data = cache.get(CACHE_KEY_SYMPTOMES)
     if data is None:
         symptomes_par_nom = {
@@ -2184,8 +2198,15 @@ def _parse_client_datetime(dt_str):
 
 @login_required
 @require_POST
+@ratelimit(key='user', rate=RATELIMIT_RESERVATION, method='POST', block=False)
 def api_reserver_rdv(request):
     """API pour confirmer la réservation"""
+    if getattr(request, 'limited', False):
+        return JsonResponse({
+            'success': False,
+            'error': 'Trop de réservations en peu de temps. Réessayez dans quelques instants.',
+        }, status=429)
+
     data = json.loads(request.body)
     patient = get_object_or_404(Patient, user=request.user)
     medecin = get_object_or_404(Medecin, id=data['medecin_id'])

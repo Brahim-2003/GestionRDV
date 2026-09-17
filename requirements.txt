@@ -9,6 +9,10 @@ django-celery-beat>=2.6.0
 redis==5.0.1
 django-redis==5.4.0
 
+# Rate limiting (s'appuie sur le cache Django ci-dessus pour compter les
+# requêtes de façon partagée entre tous les workers Gunicorn)
+django-ratelimit==4.1.0
+
 # Images
 Pillow>=10.0.0
 

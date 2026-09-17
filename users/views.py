@@ -11,6 +11,7 @@ from django.urls import reverse
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
 from django.views.decorators.http import require_POST, require_http_methods
+from django_ratelimit.decorators import ratelimit
 
 
 # App imports
@@ -19,6 +20,21 @@ from rdv.models import Patient, Medecin
 from .forms import ConnexionForm, RegisterForm, UtilisateurCreationForm, UserEditForm, PatientEditForm, MedecinEditForm, CustomPasswordChangeForm, UtilisateurEditForm
 from users.tasks import notify_admins_on_user_create
 from users.signals import RoleChangeBlocked
+
+
+# ==========================================================================
+# Rate limiting (django-ratelimit, voir GestionRDV/settings.py::CACHES)
+# ==========================================================================
+# Complémentaire à l'anti-bruteforce de users/middleware.py : celui-ci ne
+# compte que les ÉCHECS d'authentification (et bloque l'IP en conséquence),
+# alors que le rate limiting plafonne le nombre TOTAL de requêtes (réussies
+# ou non) sur ces vues sensibles. Les deux mécanismes tournent en parallèle
+# et se complètent, l'un ne remplace pas l'autre.
+#
+# Seuils de départ raisonnables, à ajuster avec le métier plutôt qu'à
+# considérer comme définitifs :
+RATELIMIT_LOGIN = '10/m'        # par IP
+RATELIMIT_INSCRIPTION = '5/h'   # par IP
 
 
 # Create your views here.
@@ -73,7 +89,15 @@ def permission_denied_view(request, exception=None):
 
 # Vue de connexion
 
+@ratelimit(key='ip', rate=RATELIMIT_LOGIN, method='POST', block=False)
 def connecter(request):
+    if getattr(request, 'limited', False):
+        messages.error(
+            request,
+            "Trop de tentatives de connexion depuis cette adresse IP. Réessayez dans quelques minutes."
+        )
+        return render(request, 'users/login.html', {'form': ConnexionForm()}, status=429)
+
     # Si déjà connecté, redirige selon le rôle
     if request.user.is_authenticated:
         if request.user.role == 'admin':
@@ -118,8 +142,16 @@ def connecter(request):
     
     return render(request, 'users/login.html', {'form': form})
 
-# Vue d'inscription 
+# Vue d'inscription
+@ratelimit(key='ip', rate=RATELIMIT_INSCRIPTION, method='POST', block=False)
 def inscription(request):
+    if getattr(request, 'limited', False):
+        message = "Trop de tentatives d'inscription depuis cette adresse IP. Réessayez plus tard."
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({'status': 'error', 'error': message}, status=429)
+        messages.error(request, message)
+        return render(request, 'users/register.html', {'form': RegisterForm()}, status=429)
+
     if request.method == 'POST':
         form = RegisterForm(request.POST)
         if form.is_valid():

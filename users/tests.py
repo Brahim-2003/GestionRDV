@@ -522,6 +522,91 @@ class AuthenticationViewsTest(TestCase):
         self.assertTrue(Utilisateur.objects.filter(email='newuser@test.com').exists())
 
 
+class RateLimitingTest(TestCase):
+    """
+    Vérifie le rate limiting (chantier cache/rate limiting/load balancing) sur
+    connecter/inscription : une limite se déclenche bien au-delà du seuil
+    (RATELIMIT_LOGIN / RATELIMIT_INSCRIPTION, users/views.py) et un usage
+    normal, sous le seuil, n'est jamais bloqué à tort. Distinct de
+    BruteForceProtectionTest : ici on plafonne le nombre TOTAL de requêtes,
+    pas seulement les échecs d'authentification.
+    """
+
+    def setUp(self):
+        from django.core.cache import cache
+        self.cache = cache
+        self.cache.clear()
+        self.user = Utilisateur.objects.create_user(
+            email='rl@test.com',
+            nom='Rate',
+            prenom='Limit',
+            date_naissance=date(1990, 1, 1),
+            role='patient',
+            mot_de_passe='testpass123'
+        )
+
+    def tearDown(self):
+        self.cache.clear()
+
+    def test_login_not_blocked_under_threshold(self):
+        """RATELIMIT_LOGIN = 10/m : 5 tentatives ne déclenchent jamais le 429."""
+        client = Client(REMOTE_ADDR='198.51.100.10')
+        for _ in range(5):
+            response = client.post(reverse('users:login'), {
+                'email': 'rl@test.com',
+                'password': 'wrongpassword',
+            })
+            self.assertNotEqual(response.status_code, 429)
+
+    def test_login_blocked_beyond_threshold(self):
+        """Au-delà de RATELIMIT_LOGIN (10/m), la vue renvoie 429 avec un message clair."""
+        client = Client(REMOTE_ADDR='198.51.100.11')
+        responses = [
+            client.post(reverse('users:login'), {
+                'email': 'rl@test.com',
+                'password': 'wrongpassword',
+            })
+            for _ in range(11)
+        ]
+        self.assertTrue(any(r.status_code == 429 for r in responses))
+        blocked = next(r for r in responses if r.status_code == 429)
+        self.assertContains(blocked, 'Trop de tentatives de connexion', status_code=429)
+
+    def test_inscription_not_blocked_under_threshold(self):
+        """RATELIMIT_INSCRIPTION = 5/h : 3 tentatives ne déclenchent jamais le 429."""
+        client = Client(REMOTE_ADDR='198.51.100.20')
+        for i in range(3):
+            response = client.post(reverse('users:register'), {
+                'email': f'rl-under-{i}@test.com',
+                'nom': 'New', 'prenom': 'User',
+                'date_naissance': '1995-05-15',
+                'telephone': '+33698765432',
+                'password1': 'SecurePass123!',
+                'password2': 'SecurePass123!',
+                'role': 'patient',
+            })
+            self.assertNotEqual(response.status_code, 429)
+
+    def test_inscription_blocked_beyond_threshold(self):
+        """Au-delà de RATELIMIT_INSCRIPTION (5/h), la vue renvoie 429 avec un message clair."""
+        client = Client(REMOTE_ADDR='198.51.100.21')
+        responses = [
+            client.post(reverse('users:register'), {
+                'email': f'rl-over-{i}@test.com',
+                'nom': 'New', 'prenom': 'User',
+                'date_naissance': '1995-05-15',
+                'telephone': '+33698765432',
+                'password1': 'SecurePass123!',
+                'password2': 'SecurePass123!',
+                'role': 'patient',
+            }, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+            for i in range(6)
+        ]
+        self.assertTrue(any(r.status_code == 429 for r in responses))
+        blocked = next(r for r in responses if r.status_code == 429)
+        self.assertIn("Trop de tentatives d'inscription", blocked.json()['error'])
+
+
 class UserManagementTest(TestCase):
     """Tests de gestion des utilisateurs (admin)"""
     

@@ -281,6 +281,78 @@ class SignalProfileCreationTest(TestCase):
         self.assertFalse(Medecin.objects.filter(user=admin).exists())
 
 
+class RoleChangeProtectionTest(TestCase):
+    """PROTECT en filet de sécurité : changer le rôle d'un patient/médecin
+    qui a des rendez-vous ne doit jamais réussir à moitié. transaction.atomic
+    (dans manage_profiles_on_role_change ET dans la vue d'édition) garantit
+    que ni le rôle sur Utilisateur, ni son profil, ne changent si le retrait
+    de l'ancien profil est bloqué par PROTECT."""
+
+    def setUp(self):
+        self.admin = Utilisateur.objects.create_superuser(
+            email='role_admin@test.com',
+            nom='Admin', prenom='Test',
+            date_naissance=date(1980, 1, 1),
+            mot_de_passe='admin123',
+        )
+        self.patient_user = Utilisateur.objects.create_user(
+            email='role_patient@test.com',
+            nom='Patient', prenom='Test',
+            date_naissance=date(1990, 1, 1),
+            role='patient',
+            mot_de_passe='test123',
+        )
+        self.medecin_user = Utilisateur.objects.create_user(
+            email='role_medecin@test.com',
+            nom='Medecin', prenom='Test',
+            date_naissance=date(1980, 1, 1),
+            role='medecin',
+            mot_de_passe='test123',
+        )
+        RendezVous.objects.create(
+            patient=self.patient_user.profil_patient,
+            medecin=self.medecin_user.profil_medecin,
+            date_heure_rdv=timezone.now() + timedelta(days=3),
+            statut='programme',
+            motif='Test',
+        )
+
+    def test_role_change_blocked_when_old_profile_has_rdv(self):
+        client = Client()
+        client.force_login(self.admin)
+
+        response = client.post(
+            reverse('users:edit_user_admin', kwargs={'user_id': self.patient_user.id}),
+            data={
+                'nom': 'Patient',
+                'prenom': 'Test',
+                'email': 'role_patient@test.com',
+                'telephone': '+23500000000',
+                'role': 'medecin',
+                'is_actif': 'on',
+            },
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+        # Le rôle n'a pas changé : la transaction a bien tout annulé.
+        self.patient_user.refresh_from_db()
+        self.assertEqual(self.patient_user.role, 'patient')
+
+        # Le profil Patient existe toujours intact, aucun profil Medecin créé.
+        self.assertTrue(Patient.objects.filter(user=self.patient_user).exists())
+        self.assertFalse(Medecin.objects.filter(user=self.patient_user).exists())
+
+        # Un message d'erreur clair est retourné.
+        messages_list = [str(m) for m in response.context['messages']]
+        self.assertIn(
+            "Ce patient a des rendez-vous existants et ne peut pas devenir "
+            "médecin sans traitement séparé de son historique.",
+            messages_list,
+        )
+
+
 class AuthenticationViewsTest(TestCase):
     """Tests des vues d'authentification"""
     

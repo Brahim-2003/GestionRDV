@@ -18,6 +18,7 @@ from .models import Utilisateur
 from rdv.models import Patient, Medecin
 from .forms import ConnexionForm, RegisterForm, UtilisateurCreationForm, UserEditForm, PatientEditForm, MedecinEditForm, CustomPasswordChangeForm, UtilisateurEditForm
 from users.tasks import notify_admins_on_user_create
+from users.signals import RoleChangeBlocked
 
 
 # Create your views here.
@@ -425,13 +426,29 @@ def edit_user(request, user_id):
     if request.method == 'POST':
         form = UtilisateurEditForm(request.POST, instance=user)
         if form.is_valid():
-            form.save()
-            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return JsonResponse({
-                    'status': 'ok',
-                    'message': 'Utilisateur modifié avec succès'
-                })
-            return redirect('users:list_users')
+            try:
+                # transaction.atomic englobe le save() ET le signal de
+                # changement de rôle qu'il déclenche (manage_profiles_on_role_change) :
+                # si celui-ci lève RoleChangeBlocked, le rôle sur Utilisateur
+                # est annulé avec le reste, aucun état partiel n'est possible.
+                with transaction.atomic():
+                    form.save()
+            except RoleChangeBlocked as exc:
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({
+                        'status': 'error',
+                        'errors': {'role': [str(exc)]}
+                    }, status=400)
+                messages.error(request, str(exc))
+                user.refresh_from_db()
+                form = UtilisateurEditForm(instance=user)
+            else:
+                if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return JsonResponse({
+                        'status': 'ok',
+                        'message': 'Utilisateur modifié avec succès'
+                    })
+                return redirect('users:list_users')
         else:
             # Si erreurs de validation et requête AJAX
             if request.headers.get('X-Requested-With') == 'XMLHttpRequest':

@@ -18,65 +18,93 @@ from users.tasks import notify_admins_on_user_create
 logger = logging.getLogger(__name__)
 
 
-def _delete_stale_profile(queryset, label):
+class RoleChangeBlocked(Exception):
+    """Levée quand un changement de rôle est bloqué parce que l'ancien
+    profil (Patient/Medecin) a des rendez-vous protégés (PROTECT) qui
+    empêchent sa suppression. Le message est destiné à être affiché tel
+    quel à l'utilisateur (admin) qui a demandé le changement."""
+
+
+def _delete_stale_profile(queryset, message):
     """Supprime un profil (Patient/Medecin) devenu obsolète après un
     changement de rôle. RendezVous.patient/medecin est en PROTECT : si ce
-    profil a des rendez-vous, la DB refuse la suppression. On journalise et
-    on laisse le profil en place plutôt que de faire planter le changement
-    de rôle (et donc la requête qui l'a déclenché)."""
+    profil a des rendez-vous, la DB refuse la suppression. On propage alors
+    RoleChangeBlocked plutôt que d'avaler l'erreur : appelé depuis un bloc
+    transaction.atomic, cela annule tout le changement de rôle (voir
+    manage_profiles_on_role_change)."""
     try:
         queryset.delete()
     except ProtectedError:
-        logger.warning(
-            "Changement de rôle : impossible de supprimer l'ancien profil %s "
-            "(rendez-vous existants protégés par PROTECT). Profil laissé en place.",
-            label,
-        )
+        raise RoleChangeBlocked(message) from None
 
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
 def manage_profiles_on_role_change(sender, instance, created, **kwargs):
     role = getattr(instance, 'role', None)
 
-    if role == 'patient':
-        # numero_patient n'est pas fourni ici : Patient.save() est l'unique
-        # point de génération (rdv/models.py::generate_next_numero_patient),
-        # déclenché par son propre "if not self.numero_patient:".
-        Patient.objects.get_or_create(
-            user=instance,
-            defaults={
-                'date_naissance': instance.date_naissance,
-                'tel': instance.telephone,
-            }
-        )
-        _delete_stale_profile(Medecin.objects.filter(user=instance), 'médecin')
+    # transaction.atomic garantit qu'un changement de rôle bloqué par PROTECT
+    # (ancien profil avec rendez-vous) est intégralement annulé : ni la
+    # création du nouveau profil, ni l'attribution du groupe ne doivent
+    # survivre si la suppression de l'ancien profil échoue. Pour annuler
+    # aussi le champ `role` sur Utilisateur lui-même, l'appelant (ex. la vue
+    # d'édition d'utilisateur) doit englober son appel à .save() dans son
+    # propre transaction.atomic() : voir users/views.py::edit_user.
+    with transaction.atomic():
+        if role == 'patient':
+            # numero_patient n'est pas fourni ici : Patient.save() est l'unique
+            # point de génération (rdv/models.py::generate_next_numero_patient),
+            # déclenché par son propre "if not self.numero_patient:".
+            Patient.objects.get_or_create(
+                user=instance,
+                defaults={
+                    'date_naissance': instance.date_naissance,
+                    'tel': instance.telephone,
+                }
+            )
+            _delete_stale_profile(
+                Medecin.objects.filter(user=instance),
+                "Ce médecin a des rendez-vous existants et ne peut pas devenir "
+                "patient sans traitement séparé de son historique."
+            )
 
-    elif role == 'medecin':
-        Medecin.objects.get_or_create(
-            user=instance,
-            defaults={
-                'date_naissance': instance.date_naissance,
-                'tel': instance.telephone,
-                'specialite': 'generaliste'
-            }
-        )
-        _delete_stale_profile(Patient.objects.filter(user=instance), 'patient')
+        elif role == 'medecin':
+            Medecin.objects.get_or_create(
+                user=instance,
+                defaults={
+                    'date_naissance': instance.date_naissance,
+                    'tel': instance.telephone,
+                    'specialite': 'generaliste'
+                }
+            )
+            _delete_stale_profile(
+                Patient.objects.filter(user=instance),
+                "Ce patient a des rendez-vous existants et ne peut pas devenir "
+                "médecin sans traitement séparé de son historique."
+            )
 
-    else:
-        _delete_stale_profile(Patient.objects.filter(user=instance), 'patient')
-        _delete_stale_profile(Medecin.objects.filter(user=instance), 'médecin')
+        else:
+            _delete_stale_profile(
+                Patient.objects.filter(user=instance),
+                "Ce patient a des rendez-vous existants et ne peut pas perdre "
+                "son rôle sans traitement séparé de son historique."
+            )
+            _delete_stale_profile(
+                Medecin.objects.filter(user=instance),
+                "Ce médecin a des rendez-vous existants et ne peut pas perdre "
+                "son rôle sans traitement séparé de son historique."
+            )
 
-    # Attribution du groupe
-    instance.groups.clear()
-    role_group = {
-        'patient': 'Patients',
-        'medecin': 'Médecins',
-        'admin': 'Administrateurs'
-    }.get(role)
+        # Attribution du groupe
+        instance.groups.clear()
+        role_group = {
+            'patient': 'Patients',
+            'medecin': 'Médecins',
+            'admin': 'Administrateurs'
+        }.get(role)
 
-    if role_group:
-        group, _ = Group.objects.get_or_create(name=role_group)
-        instance.groups.add(group)
+        if role_group:
+            group, _ = Group.objects.get_or_create(name=role_group)
+            instance.groups.add(group)
 
     if created and instance.role == 'patient':
         # safe_delay protège l'appel réel au broker, exécuté après commit (le try/except

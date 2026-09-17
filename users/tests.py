@@ -353,6 +353,84 @@ class RoleChangeProtectionTest(TestCase):
         )
 
 
+class NativeAdminRoleChangeProtectionTest(TestCase):
+    """La changeform admin Django native (/admin/users/utilisateur/<id>/change/,
+    pas le panneau admin de l'app) englobe déjà son POST dans transaction.atomic
+    (ModelAdmin.changeform_view) : ce filet suffit à garantir qu'aucun état
+    partiel n'est possible. Mais rien n'y rattrapait RoleChangeBlocked, qui
+    remontait donc en 500 brute. UtilisateurAdmin.save_model/response_change
+    la convertit maintenant en message clair + réaffichage du formulaire,
+    comme users.views.edit_user."""
+
+    def setUp(self):
+        self.admin = Utilisateur.objects.create_superuser(
+            email='native_admin@test.com',
+            nom='Admin', prenom='Test',
+            date_naissance=date(1980, 1, 1),
+            mot_de_passe='admin123',
+        )
+        self.patient_user = Utilisateur.objects.create_user(
+            email='native_patient@test.com',
+            nom='Patient', prenom='Test',
+            date_naissance=date(1990, 1, 1),
+            telephone='+235111',
+            role='patient',
+            mot_de_passe='test123',
+        )
+        self.medecin_user = Utilisateur.objects.create_user(
+            email='native_medecin@test.com',
+            nom='Medecin', prenom='Test',
+            date_naissance=date(1980, 1, 1),
+            role='medecin',
+            mot_de_passe='test123',
+        )
+        RendezVous.objects.create(
+            patient=self.patient_user.profil_patient,
+            medecin=self.medecin_user.profil_medecin,
+            date_heure_rdv=timezone.now() + timedelta(days=3),
+            statut='programme',
+            motif='Test',
+        )
+
+    def test_native_admin_role_change_blocked_shows_clear_message(self):
+        client = Client()
+        client.force_login(self.admin)
+        url = reverse('admin:users_utilisateur_change', args=[self.patient_user.pk])
+        data = {
+            'email': 'native_patient@test.com',
+            'nom': 'Patient', 'prenom': 'Test',
+            'telephone': '+235111',
+            'date_naissance': '1990-01-01',
+            'role': 'medecin',
+            'is_actif': 'on',
+            'groups': [],
+            'user_permissions': [],
+            '_continue': 'Save and continue editing',
+        }
+
+        # Pas d'exception non gérée : la requête aboutit normalement (pas de 500).
+        response = client.post(url, data, follow=True)
+        self.assertEqual(response.status_code, 200)
+
+        # Un message d'erreur clair est affiché.
+        messages_list = [str(m) for m in response.context['messages']]
+        self.assertIn(
+            "Ce patient a des rendez-vous existants et ne peut pas devenir "
+            "médecin sans traitement séparé de son historique.",
+            messages_list,
+        )
+
+        # Le formulaire est réaffiché avec les données du patient bloqué.
+        self.assertContains(response, 'native_patient@test.com')
+        self.assertEqual(response.context['adminform'].form.initial['role'], 'patient')
+
+        # Aucun état partiel : ni le rôle, ni le profil n'ont changé.
+        self.patient_user.refresh_from_db()
+        self.assertEqual(self.patient_user.role, 'patient')
+        self.assertTrue(Patient.objects.filter(user=self.patient_user).exists())
+        self.assertFalse(Medecin.objects.filter(user=self.patient_user).exists())
+
+
 class AuthenticationViewsTest(TestCase):
     """Tests des vues d'authentification"""
     

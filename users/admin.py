@@ -1,6 +1,9 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.db import transaction
+from django.http import HttpResponseRedirect
 from .models import Utilisateur
+from .signals import RoleChangeBlocked
 from django.contrib.auth.models import Group
 from django.contrib.auth.admin import GroupAdmin as BaseGroupAdmin
 
@@ -34,6 +37,29 @@ class UtilisateurAdmin(BaseUserAdmin):
     
     readonly_fields = ('date_inscription', 'last_login')
     filter_horizontal = ('groups', 'user_permissions')
+
+    def save_model(self, request, obj, form, change):
+        """Convertit un changement de rôle bloqué par PROTECT (RoleChangeBlocked,
+        levée par manage_profiles_on_role_change) en message d'erreur exploitable
+        au lieu de laisser remonter une 500 brute — même comportement que
+        users.views.edit_user. changeform_view englobe déjà tout l'appel dans
+        transaction.atomic() : notre propre transaction.atomic() imbriquée crée
+        un savepoint autour de super().save_model() (donc autour de l'UPDATE du
+        rôle ET du signal qu'il déclenche) et l'annule proprement quand on capture
+        l'exception à l'extérieur du bloc — sans laisser la transaction englobante
+        dans un état cassé (TransactionManagementError sur les requêtes suivantes
+        de _changeform_view, ex. save_related)."""
+        try:
+            with transaction.atomic():
+                super().save_model(request, obj, form, change)
+        except RoleChangeBlocked as exc:
+            messages.error(request, str(exc))
+            request._role_change_blocked = True
+
+    def response_change(self, request, obj):
+        if getattr(request, '_role_change_blocked', False):
+            return HttpResponseRedirect(request.path)
+        return super().response_change(request, obj)
 
 # Enregistrement du modèle avec la configuration personnalisée
 admin.site.register(Utilisateur, UtilisateurAdmin)

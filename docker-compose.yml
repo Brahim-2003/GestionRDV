@@ -39,13 +39,16 @@ services:
 
   web:
     build: .
-    container_name: gestionrdv_web
+    # Pas de container_name ici : Docker Compose ne peut pas donner le
+    # même nom à plusieurs répliques d'un même service (docker compose up
+    # --scale web=3). Pas de "ports" non plus : web n'est plus exposé
+    # directement sur l'hôte, seul nginx (reverse proxy) l'est désormais ;
+    # les répliques restent joignables entre elles via le réseau Docker
+    # interne (DNS "web", voir nginx/nginx.conf).
     command: ["gunicorn","GestionRDV.wsgi:application","--bind","0.0.0.0:8000","--workers","4"]
     volumes:
       - .:/app:rw
     env_file: .env
-    ports:
-      - '8000:8000'
     depends_on:
       redis:
         condition: service_started
@@ -53,6 +56,20 @@ services:
         condition: service_started
       migrate:
         condition: service_completed_successfully
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: gestionrdv_nginx
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # Lecture seule : nginx ne fait que servir /app/staticfiles/, il
+      # n'écrit jamais dans le projet.
+      - .:/app:ro
+    ports:
+      - '8000:80'
+    depends_on:
+      - web
     restart: unless-stopped
 
   worker:

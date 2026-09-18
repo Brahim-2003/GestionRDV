@@ -43,34 +43,13 @@ from rdv.utils import user_can_manage_rdv, send_manual_notification
 # ==========================================================================
 # Cache (Redis, voir GestionRDV/settings.py::CACHES)
 # ==========================================================================
-# Clés et durées de vie — valeurs de départ raisonnables, à ajuster avec le
-# métier plutôt qu'à considérer comme définitives :
-# - CACHE_KEY_SYMPTOMES : référentiel quasi-statique (catégories de
-#   symptômes + spécialités suggérées, RechercheSymptome), qui ne change
-#   que lorsqu'un admin l'édite. TTL long (1h) — pas d'invalidation sur
-#   save() de RechercheSymptome, la donnée redevient fraîche au plus tard
-#   au prochain TTL.
-# - CACHE_KEY_SPECIALITES_COUNT : agrégat DB (nb de médecins par
-#   spécialité, affiché sur "prendre RDV"), change seulement quand un
-#   médecin est créé/supprimé ou change de spécialité — rare. TTL moyen
-#   (10 min).
-# - CACHE_KEY_DASHBOARD_STATS : statistiques admin, coûteuses (une dizaine
-#   de requêtes d'agrégation) mais qui évoluent avec l'activité réelle
-#   (nouveaux RDV, inscriptions...) — cas ambigu, TTL volontairement court
-#   (30s) plutôt que pas de cache du tout. Ne couvre PAS les notifications
-#   (spécifiques à l'utilisateur connecté), récupérées à chaque appel.
-#
-# Ne JAMAIS mettre en cache ici la disponibilité réelle des créneaux
-# (api_search_medecins, api_creneaux_medecin) : ces données doivent rester
-# à jour en temps réel, même si leur calcul est coûteux.
-CACHE_KEY_SYMPTOMES = 'rdv:symptomes_categories'
-CACHE_TTL_SYMPTOMES = 60 * 60  # 1h
-
-CACHE_KEY_SPECIALITES_COUNT = 'rdv:medecins_par_specialite_count'
-CACHE_TTL_SPECIALITES_COUNT = 60 * 10  # 10 min
-
-CACHE_KEY_DASHBOARD_STATS = 'rdv:dashboard_admin_stats'
-CACHE_TTL_DASHBOARD_STATS = 30  # 30s
+# Clés, TTL et logique d'invalidation : voir rdv/cache.py (constantes) et
+# rdv/signals.py (invalidation post_save/post_delete sur Medecin).
+from .cache import (
+    CACHE_KEY_SYMPTOMES, CACHE_TTL_SYMPTOMES,
+    CACHE_KEY_SPECIALITES_COUNT, CACHE_TTL_SPECIALITES_COUNT,
+    CACHE_KEY_DASHBOARD_STATS, CACHE_TTL_DASHBOARD_STATS,
+)
 
 
 # ==========================================================================
@@ -1962,8 +1941,9 @@ def prendre_rdv(request):
     ).values('medecin__specialite').annotate(count=Count('id')).order_by('-count')[:3]
 
     from types import SimpleNamespace
-    # Nombre de médecins par spécialité : agrégat DB quasi-statique
-    # (change seulement à la création/suppression d'un médecin) -> caché.
+    # Nombre de médecins par spécialité : agrégat DB caché, invalidé
+    # immédiatement sur toute modification de Medecin (rdv/signals.py) ->
+    # voir rdv/cache.py pour le détail du TTL.
     counts_dict = cache.get(CACHE_KEY_SPECIALITES_COUNT)
     if counts_dict is None:
         medecins_par_specialite = Medecin.objects.values('specialite').annotate(count=Count('id'))

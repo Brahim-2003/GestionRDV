@@ -20,6 +20,7 @@ from rdv.models import (
     Notification, RdvHistory, FavoriMedecin, ListeAttenteCreneau,
     RechercheSymptome,
 )
+from rdv.cache import CACHE_KEY_SPECIALITES_COUNT
 
 
 class PatientModelTest(TestCase):
@@ -825,7 +826,7 @@ class PriseRdvViewTest(TestCase):
     def test_api_symptomes_second_call_served_from_cache(self):
         """Chantier cache Redis : le 2e appel à api_symptomes ne doit pas
         retaper RechercheSymptome en base (donnée quasi-statique mise en
-        cache, voir CACHE_KEY_SYMPTOMES dans rdv/views.py)."""
+        cache, voir CACHE_KEY_SYMPTOMES dans rdv/cache.py)."""
         cache.clear()
         with mock.patch(
             'rdv.views.RechercheSymptome.objects.all',
@@ -841,6 +842,32 @@ class PriseRdvViewTest(TestCase):
             # pas recalculé depuis la base.
             self.assertEqual(mocked_all.call_count, 1)
             self.assertEqual(response1.json(), response2.json())
+
+    def test_specialites_count_cache_invalidated_on_medecin_change(self):
+        """Chantier invalidation cache : modifier un médecin (ex. changement
+        de spécialité) doit rendre le nouveau compte visible immédiatement
+        sur prendre_rdv, sans attendre CACHE_TTL_SPECIALITES_COUNT (voir le
+        signal invalidate_specialites_count_cache dans rdv/signals.py)."""
+        cache.clear()
+
+        # 1er appel : peuple le cache avec la répartition actuelle.
+        response1 = self.client.get(reverse('rdv:prendre_rdv'))
+        self.assertEqual(response1.status_code, 200)
+        cached = cache.get(CACHE_KEY_SPECIALITES_COUNT)
+        self.assertIsNotNone(cached)
+        self.assertEqual(cached.get('cardiologue'), 1)
+
+        # Changement de spécialité -> doit invalider le cache immédiatement.
+        self.medecin.specialite = 'dermatologue'
+        self.medecin.save()
+        self.assertIsNone(cache.get(CACHE_KEY_SPECIALITES_COUNT))
+
+        # 2e appel : recalculé, reflète le changement sans attendre le TTL.
+        response2 = self.client.get(reverse('rdv:prendre_rdv'))
+        self.assertEqual(response2.status_code, 200)
+        cached_after = cache.get(CACHE_KEY_SPECIALITES_COUNT)
+        self.assertNotIn('cardiologue', cached_after)
+        self.assertEqual(cached_after.get('dermatologue'), 1)
 
     def test_api_creneaux_medecin(self):
         """Récupération des créneaux d'un médecin"""

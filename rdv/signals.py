@@ -1,9 +1,11 @@
-from django.db.models.signals import post_save, pre_save
+from django.core.cache import cache
+from django.db.models.signals import post_save, pre_save, post_delete
 from django.dispatch import receiver
 from django.db import transaction
 import logging
 
-from .models import RendezVous
+from .cache import CACHE_KEY_SPECIALITES_COUNT
+from .models import RendezVous, Medecin
 from .utils import safe_delay
 
 logger = logging.getLogger(__name__)
@@ -60,3 +62,17 @@ def rdv_status_change_notification(sender, instance, created, **kwargs):
         transaction.on_commit(
             lambda: safe_delay("notify_waitlist_on_cancellation", instance.id)
         )
+
+
+# ==========================
+# 📌 INVALIDATION CACHE — nb de médecins par spécialité
+# ==========================
+# CACHE_KEY_SPECIALITES_COUNT (rdv/cache.py) devient obsolète dès qu'un
+# médecin est créé, supprimé, ou modifié (ex. changement de specialite via
+# MedecinAdmin ou edit_medecin_view) — on l'invalide immédiatement plutôt
+# que d'attendre CACHE_TTL_SPECIALITES_COUNT, pour que le changement soit
+# visible tout de suite sur la page "prendre RDV".
+@receiver(post_save, sender=Medecin)
+@receiver(post_delete, sender=Medecin)
+def invalidate_specialites_count_cache(sender, instance, **kwargs):
+    cache.delete(CACHE_KEY_SPECIALITES_COUNT)

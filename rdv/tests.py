@@ -975,7 +975,8 @@ class PriseRdvViewTest(TestCase):
 
     def test_api_reserver_rdv_blocked_beyond_threshold(self):
         """Au-delà de RATELIMIT_RESERVATION (20/min), la vue renvoie 429
-        avec un message clair plutôt qu'une erreur générique."""
+        avec un message clair plutôt qu'une erreur générique, et le
+        déclenchement est loggé (WARNING) pour la visibilité opérationnelle."""
         today = date.today()
         days_ahead = (0 - today.weekday()) % 7 or 7
         next_monday = today + timedelta(days=days_ahead)
@@ -985,13 +986,15 @@ class PriseRdvViewTest(TestCase):
             'datetime': rdv_datetime.isoformat(),
             'motif': 'Test',
         })
-        responses = [
-            self.client.post(reverse('rdv:api_reserver_rdv'), data=payload, content_type='application/json')
-            for _ in range(21)
-        ]
+        with self.assertLogs('rdv.views', level='WARNING') as cm:
+            responses = [
+                self.client.post(reverse('rdv:api_reserver_rdv'), data=payload, content_type='application/json')
+                for _ in range(21)
+            ]
         self.assertTrue(any(r.status_code == 429 for r in responses))
         blocked = next(r for r in responses if r.status_code == 429)
         self.assertIn('Trop de réservations', blocked.json()['error'])
+        self.assertTrue(any('api_reserver_rdv' in line for line in cm.output))
 
     def test_api_symptomes_not_blocked_under_threshold(self):
         """RATELIMIT_SYMPTOMES = 30/min (par IP) : quelques requêtes ne
@@ -1002,11 +1005,14 @@ class PriseRdvViewTest(TestCase):
 
     def test_api_symptomes_blocked_beyond_threshold(self):
         """Au-delà de RATELIMIT_SYMPTOMES (30/min), la vue renvoie 429 avec
-        un message clair plutôt qu'une erreur générique."""
-        responses = [self.client.get(reverse('rdv:api_symptomes')) for _ in range(31)]
+        un message clair plutôt qu'une erreur générique, et le déclenchement
+        est loggé (WARNING) pour la visibilité opérationnelle."""
+        with self.assertLogs('rdv.views', level='WARNING') as cm:
+            responses = [self.client.get(reverse('rdv:api_symptomes')) for _ in range(31)]
         self.assertTrue(any(r.status_code == 429 for r in responses))
         blocked = next(r for r in responses if r.status_code == 429)
         self.assertIn('Trop de requêtes', blocked.json()['error'])
+        self.assertTrue(any('api_symptomes' in line for line in cm.output))
 
     def test_api_reserver_rdv_honore_inscription_et_expire_les_concurrentes(self):
         """Réserver un créneau honore l'inscription du réservataire sur ce

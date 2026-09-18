@@ -14,6 +14,7 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.views.decorators.http import require_POST, require_http_methods, require_GET
 from django.contrib.auth.decorators import login_required, permission_required
+from django.conf import settings
 from django_ratelimit.decorators import ratelimit
 import json
 import logging
@@ -53,12 +54,13 @@ from .cache import (
 
 
 # ==========================================================================
-# Rate limiting (django-ratelimit, voir GestionRDV/settings.py::CACHES)
+# Rate limiting (django-ratelimit, voir GestionRDV/settings.py, section
+# "Rate limiting (django-ratelimit)")
 # ==========================================================================
-# Seuils de départ raisonnables, à ajuster avec le métier plutôt qu'à
-# considérer comme définitifs :
-RATELIMIT_SYMPTOMES = '30/m'     # par IP
-RATELIMIT_RESERVATION = '20/m'   # par utilisateur connecté
+# Seuils ajustables sans toucher au code via RATELIMIT_SYMPTOMES/RATELIMIT_
+# RESERVATION dans l'environnement (voir GestionRDV/settings.py) :
+RATELIMIT_SYMPTOMES = settings.RATELIMIT_SYMPTOMES      # par IP
+RATELIMIT_RESERVATION = settings.RATELIMIT_RESERVATION  # par utilisateur connecté
 
 
 
@@ -1974,6 +1976,10 @@ def api_symptomes(request):
 
     Référentiel quasi-statique -> mis en cache (voir CACHE_TTL_SYMPTOMES)."""
     if getattr(request, 'limited', False):
+        logger.warning(
+            "Rate limit déclenché sur api_symptomes: IP=%s (seuil %s)",
+            request.META.get('REMOTE_ADDR', ''), RATELIMIT_SYMPTOMES
+        )
         return JsonResponse({'error': 'Trop de requêtes. Réessayez dans quelques instants.'}, status=429)
 
     data = cache.get(CACHE_KEY_SYMPTOMES)
@@ -2182,6 +2188,10 @@ def _parse_client_datetime(dt_str):
 def api_reserver_rdv(request):
     """API pour confirmer la réservation"""
     if getattr(request, 'limited', False):
+        logger.warning(
+            "Rate limit déclenché sur api_reserver_rdv: user=%s (seuil %s)",
+            request.user.pk, RATELIMIT_RESERVATION
+        )
         return JsonResponse({
             'success': False,
             'error': 'Trop de réservations en peu de temps. Réessayez dans quelques instants.',

@@ -177,6 +177,20 @@ CACHES = {
     }
 }
 
+# ==========================================================================
+# Rate limiting (django-ratelimit)
+# ==========================================================================
+# Seuils des vues sensibles (users/views.py::connecter/inscription,
+# rdv/views.py::api_symptomes/api_reserver_rdv). Valeurs de départ
+# raisonnables, pas définitives (voir commit d'introduction) -> exposées
+# via l'environnement pour que le métier puisse les ajuster par déploiement
+# sans toucher au code. Syntaxe django-ratelimit : "<nombre>/<période>"
+# (s = seconde, m = minute, h = heure, d = jour).
+RATELIMIT_LOGIN = env("RATELIMIT_LOGIN", default='10/m')              # par (IP, email)
+RATELIMIT_INSCRIPTION = env("RATELIMIT_INSCRIPTION", default='5/h')   # par (IP, email)
+RATELIMIT_SYMPTOMES = env("RATELIMIT_SYMPTOMES", default='30/m')      # par IP
+RATELIMIT_RESERVATION = env("RATELIMIT_RESERVATION", default='20/m')  # par utilisateur connecté
+
 # Le planning des tâches périodiques n'est PAS géré via CELERY_BEAT_SCHEDULE
 # ici : ce projet a déjà son propre mécanisme, rdv/management/commands/
 # init_periodic_tasks.py (appelé par entrypoint.sh/entrypoint.bat à chaque

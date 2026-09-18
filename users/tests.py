@@ -530,6 +530,10 @@ class RateLimitingTest(TestCase):
     normal, sous le seuil, n'est jamais bloqué à tort. Distinct de
     BruteForceProtectionTest : ici on plafonne le nombre TOTAL de requêtes,
     pas seulement les échecs d'authentification.
+
+    La clé de rate limiting est composite (IP, email soumis) -- voir
+    ip_email_ratelimit_key dans users/views.py -- donc les seuils
+    ci-dessous se déclenchent seulement quand IP ET email sont répétés.
     """
 
     def setUp(self):
@@ -559,18 +563,22 @@ class RateLimitingTest(TestCase):
             self.assertNotEqual(response.status_code, 429)
 
     def test_login_blocked_beyond_threshold(self):
-        """Au-delà de RATELIMIT_LOGIN (10/m), la vue renvoie 429 avec un message clair."""
+        """Au-delà de RATELIMIT_LOGIN (10/m), la vue renvoie 429 avec un
+        message clair, et le déclenchement est loggé (WARNING) pour la
+        visibilité opérationnelle."""
         client = Client(REMOTE_ADDR='198.51.100.11')
-        responses = [
-            client.post(reverse('users:login'), {
-                'email': 'rl@test.com',
-                'password': 'wrongpassword',
-            })
-            for _ in range(11)
-        ]
+        with self.assertLogs('users.views', level='WARNING') as cm:
+            responses = [
+                client.post(reverse('users:login'), {
+                    'email': 'rl@test.com',
+                    'password': 'wrongpassword',
+                })
+                for _ in range(11)
+            ]
         self.assertTrue(any(r.status_code == 429 for r in responses))
         blocked = next(r for r in responses if r.status_code == 429)
         self.assertContains(blocked, 'Trop de tentatives de connexion', status_code=429)
+        self.assertTrue(any('connecter' in line for line in cm.output))
 
     def test_inscription_not_blocked_under_threshold(self):
         """RATELIMIT_INSCRIPTION = 5/h : 3 tentatives ne déclenchent jamais le 429."""
@@ -588,23 +596,77 @@ class RateLimitingTest(TestCase):
             self.assertNotEqual(response.status_code, 429)
 
     def test_inscription_blocked_beyond_threshold(self):
-        """Au-delà de RATELIMIT_INSCRIPTION (5/h), la vue renvoie 429 avec un message clair."""
+        """Au-delà de RATELIMIT_INSCRIPTION (5/h), la vue renvoie 429 avec un
+        message clair. Même email à chaque tentative (la clé de rate
+        limiting est composite IP+email, voir ip_email_ratelimit_key) : la
+        1re requête crée le compte, les suivantes échouent sur l'email déjà
+        pris, mais toutes comptent dans le quota (rate limiting = nombre
+        TOTAL de requêtes, pas seulement les échecs)."""
         client = Client(REMOTE_ADDR='198.51.100.21')
-        responses = [
-            client.post(reverse('users:register'), {
-                'email': f'rl-over-{i}@test.com',
-                'nom': 'New', 'prenom': 'User',
-                'date_naissance': '1995-05-15',
-                'telephone': '+33698765432',
-                'password1': 'SecurePass123!',
-                'password2': 'SecurePass123!',
-                'role': 'patient',
-            }, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
-            for i in range(6)
-        ]
+        with self.assertLogs('users.views', level='WARNING') as cm:
+            responses = [
+                client.post(reverse('users:register'), {
+                    'email': 'rl-over@test.com',
+                    'nom': 'New', 'prenom': 'User',
+                    'date_naissance': '1995-05-15',
+                    'telephone': '+33698765432',
+                    'password1': 'SecurePass123!',
+                    'password2': 'SecurePass123!',
+                    'role': 'patient',
+                }, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+                for _ in range(6)
+            ]
         self.assertTrue(any(r.status_code == 429 for r in responses))
         blocked = next(r for r in responses if r.status_code == 429)
         self.assertIn("Trop de tentatives d'inscription", blocked.json()['error'])
+        self.assertTrue(any('inscription' in line for line in cm.output))
+
+    def test_login_cgnat_different_users_not_blocked_by_each_other(self):
+        """Clé composite (IP, email) (ip_email_ratelimit_key, users/views.py) :
+        plusieurs utilisateurs distincts derrière la même IP publique (CGNAT,
+        NAT d'entreprise/campus) ne doivent pas partager un même quota.
+        3 utilisateurs x 8 tentatives = 24 requêtes depuis la même IP,
+        aucune jamais bloquée puisque chaque (IP, email) reste sous
+        RATELIMIT_LOGIN (10/m). Avec une clé IP seule (comportement
+        précédent), la 11e requête aurait déjà été bloquée."""
+        ip = '198.51.100.30'
+        cgnat_users = [
+            Utilisateur.objects.create_user(
+                email=f'cgnat-{i}@test.com', nom='Cgnat', prenom=str(i),
+                date_naissance=date(1990, 1, 1), role='patient',
+                mot_de_passe='testpass123'
+            )
+            for i in range(3)
+        ]
+        for user in cgnat_users:
+            client = Client(REMOTE_ADDR=ip)
+            for _ in range(8):
+                response = client.post(reverse('users:login'), {
+                    'email': user.email,
+                    'password': 'wrongpassword',
+                })
+                self.assertNotEqual(response.status_code, 429)
+
+    def test_inscription_cgnat_different_emails_not_blocked_by_each_other(self):
+        """Même correctif que ci-dessus, côté inscription : 3 emails
+        différents x 3 tentatives = 9 requêtes depuis la même IP (CGNAT),
+        aucune jamais bloquée puisque chaque (IP, email) reste sous
+        RATELIMIT_INSCRIPTION (5/h) -- alors qu'avec une clé IP seule, la
+        6e requête aurait déjà dépassé le seuil."""
+        ip = '198.51.100.22'
+        for i in range(3):
+            client = Client(REMOTE_ADDR=ip)
+            for _ in range(3):
+                response = client.post(reverse('users:register'), {
+                    'email': f'cgnat-reg-{i}@test.com',
+                    'nom': 'New', 'prenom': 'User',
+                    'date_naissance': '1995-05-15',
+                    'telephone': '+33698765432',
+                    'password1': 'SecurePass123!',
+                    'password2': 'SecurePass123!',
+                    'role': 'patient',
+                }, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+                self.assertNotEqual(response.status_code, 429)
 
 
 class UserManagementTest(TestCase):

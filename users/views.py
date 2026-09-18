@@ -11,7 +11,9 @@ from django.urls import reverse
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
 from django.views.decorators.http import require_POST, require_http_methods
+from django.conf import settings
 from django_ratelimit.decorators import ratelimit
+import logging
 
 
 # App imports
@@ -20,10 +22,14 @@ from rdv.models import Patient, Medecin
 from .forms import ConnexionForm, RegisterForm, UtilisateurCreationForm, UserEditForm, PatientEditForm, MedecinEditForm, CustomPasswordChangeForm, UtilisateurEditForm
 from users.tasks import notify_admins_on_user_create
 from users.signals import RoleChangeBlocked
+from users.middleware import get_client_ip
+
+logger = logging.getLogger(__name__)
 
 
 # ==========================================================================
-# Rate limiting (django-ratelimit, voir GestionRDV/settings.py::CACHES)
+# Rate limiting (django-ratelimit, voir GestionRDV/settings.py, section
+# "Rate limiting (django-ratelimit)")
 # ==========================================================================
 # Complémentaire à l'anti-bruteforce de users/middleware.py : celui-ci ne
 # compte que les ÉCHECS d'authentification (et bloque l'IP en conséquence),
@@ -31,10 +37,38 @@ from users.signals import RoleChangeBlocked
 # ou non) sur ces vues sensibles. Les deux mécanismes tournent en parallèle
 # et se complètent, l'un ne remplace pas l'autre.
 #
-# Seuils de départ raisonnables, à ajuster avec le métier plutôt qu'à
-# considérer comme définitifs :
-RATELIMIT_LOGIN = '10/m'        # par IP
-RATELIMIT_INSCRIPTION = '5/h'   # par IP
+# Seuils ajustables sans toucher au code via RATELIMIT_LOGIN/RATELIMIT_
+# INSCRIPTION dans l'environnement (voir GestionRDV/settings.py) :
+RATELIMIT_LOGIN = settings.RATELIMIT_LOGIN              # par (IP, email)
+RATELIMIT_INSCRIPTION = settings.RATELIMIT_INSCRIPTION  # par (IP, email)
+
+
+def ip_email_ratelimit_key(group, request):
+    """Clé composite (IP, email soumis) pour le rate limiting de connecter/
+    inscription, plutôt que l'IP seule.
+
+    Risque avec une clé IP seule : derrière un CGNAT (ou un NAT
+    d'entreprise/campus), de nombreux utilisateurs distincts partagent la
+    même IP publique -> ils partageraient aussi le même quota, et l'usage
+    normal des uns pourrait bloquer les autres (faux positifs). En composant
+    avec l'email soumis, chaque (IP, email) a son propre quota : un
+    attaquant qui bruteforce un compte précis depuis cette IP est toujours
+    plafonné, mais des utilisateurs légitimes différents derrière la même IP
+    ne se gênent plus mutuellement.
+
+    Contrepartie assumée : un attaquant qui fait varier l'email à chaque
+    requête depuis la même IP n'est plus plafonné par CE mécanisme -- ce
+    n'est pas son rôle ; l'anti-bruteforce par email de users/middleware.py
+    (BruteForceProtectionTest) et l'unicité de l'email en base couvrent ce
+    cas côté inscription/connexion.
+
+    get_client_ip (users/middleware.py) lit X-Forwarded-For en priorité :
+    même résolution d'IP que le reste de la sécurité applicative, correcte
+    derrière le reverse proxy nginx (voir nginx/nginx.conf).
+    """
+    ip = get_client_ip(request)
+    email = (request.POST.get('email') or '').strip().lower()
+    return f'{ip}:{email}'
 
 
 # Create your views here.
@@ -89,9 +123,13 @@ def permission_denied_view(request, exception=None):
 
 # Vue de connexion
 
-@ratelimit(key='ip', rate=RATELIMIT_LOGIN, method='POST', block=False)
+@ratelimit(key=ip_email_ratelimit_key, rate=RATELIMIT_LOGIN, method='POST', block=False)
 def connecter(request):
     if getattr(request, 'limited', False):
+        logger.warning(
+            "Rate limit déclenché sur connecter: IP=%s email=%s (seuil %s)",
+            get_client_ip(request), request.POST.get('email', ''), RATELIMIT_LOGIN
+        )
         messages.error(
             request,
             "Trop de tentatives de connexion depuis cette adresse IP. Réessayez dans quelques minutes."
@@ -143,9 +181,13 @@ def connecter(request):
     return render(request, 'users/login.html', {'form': form})
 
 # Vue d'inscription
-@ratelimit(key='ip', rate=RATELIMIT_INSCRIPTION, method='POST', block=False)
+@ratelimit(key=ip_email_ratelimit_key, rate=RATELIMIT_INSCRIPTION, method='POST', block=False)
 def inscription(request):
     if getattr(request, 'limited', False):
+        logger.warning(
+            "Rate limit déclenché sur inscription: IP=%s email=%s (seuil %s)",
+            get_client_ip(request), request.POST.get('email', ''), RATELIMIT_INSCRIPTION
+        )
         message = "Trop de tentatives d'inscription depuis cette adresse IP. Réessayez plus tard."
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({'status': 'error', 'error': message}, status=429)
